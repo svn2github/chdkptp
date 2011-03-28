@@ -243,6 +243,23 @@ dlg = iup.dialog{
 			},
 			iup.vbox{
 				cam_btn_frame,
+				iup.hbox{
+					iup.button{
+						title='rec',
+						size='45x15',
+						action=function(self)
+							add_status(chdk.execlua('switch_mode_usb(1)'))
+						end,
+					},
+					iup.fill{},
+					iup.button{
+						title='play',
+						size='45x15',
+						action=function(self)
+							add_status(chdk.execlua('switch_mode_usb(0)'))
+						end,
+					},
+				},
 				iup.fill{},
 				iup.hbox{
 					iup.button{
