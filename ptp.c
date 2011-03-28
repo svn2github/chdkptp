@@ -906,7 +906,9 @@ ptp_ek_sendfileobject (PTPParams* params, char* object, uint32_t size)
 	return ptp_transaction(params, &ptp, PTP_DP_SENDDATA, size, &object);
 }
 
-/*************************************************************************
+// canon extensions not used now, may be useful later ?
+#if 0
+uint16_t/*************************************************************************
  *
  * Canon PTP extensions support
  *
@@ -929,7 +931,6 @@ ptp_ek_sendfileobject (PTPParams* params, char* object, uint32_t size)
  *		  uint32_t  rp2		- Yet unknown parameter
  *
  **/
-uint16_t
 ptp_canon_getobjectsize (PTPParams* params, uint32_t handle, uint32_t p2, 
 			uint32_t* size, uint32_t* rp2) 
 {
@@ -1345,65 +1346,7 @@ ptp_canon_getfolderentries (PTPParams* params, uint32_t store, uint32_t p2,
 	free(data);
 	return ret;
 }
-
-
-/* Nikon extension code */
-
-uint16_t
-ptp_nikon_setcontrolmode (PTPParams* params, uint32_t mode)
-{
-	PTPContainer ptp;
-	
-	PTP_CNT_INIT(ptp);
-	ptp.Code=PTP_OC_NIKON_SetControlMode;
-	ptp.Param1=mode;
-	ptp.Nparam=1;
-	return ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-}
-
-uint16_t
-ptp_nikon_directcapture (PTPParams* params, uint32_t unknown)
-{
-	PTPContainer ptp;
-	
-	PTP_CNT_INIT(ptp);
-	ptp.Code=PTP_OC_NIKON_DirectCapture;
-	ptp.Param1=unknown; /* as of yet unknown parameter */
-	ptp.Nparam=1;
-	return ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-}
-
-uint16_t
-ptp_nikon_checkevent (PTPParams* params, PTPUSBEventContainer** event, uint16_t* evnum)
-{
-	uint16_t ret;
-	PTPContainer ptp;
-	char *evdata = NULL;
-	
-	PTP_CNT_INIT(ptp);
-	ptp.Code=PTP_OC_NIKON_CheckEvent;
-	ptp.Nparam=0;
-
-	ret = ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &evdata);
-	if (ret == PTP_RC_OK) ptp_nikon_unpack_EC(params, evdata, event, evnum);
-	free (evdata);
-	return ret;
-}
-
-uint16_t
-ptp_nikon_keepalive (PTPParams* params)
-{
-	
-	PTPContainer ptp;
-
-	PTP_CNT_INIT(ptp);
-	ptp.Code=PTP_OC_NIKON_KeepAlive;
-	ptp.Nparam=0;
-	return ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-}
-
-
-
+#endif
 
 /* Non PTP protocol functions */
 /* devinfo testing functions */

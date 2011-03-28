@@ -136,9 +136,6 @@ extern short verbose;
 
 void ptpcam_siginthandler(int signum);
 
-void usage(void);
-void help(void);
-void list_devices(short force);
 void show_info (int busn, int devn, short force);
 void list_files (int busn, int devn, short force);
 void get_file (int busn, int devn, short force, uint32_t handle, char* filename, int overwrite);

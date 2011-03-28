@@ -841,14 +841,6 @@ uint16_t ptp_canon_getfolderentries (PTPParams* params, uint32_t store,
 				PTPCANONFolderEntry** entries,
 				uint32_t* entnum);
 
-/* Nikon extensions */
-uint16_t ptp_nikon_setcontrolmode (PTPParams* params, uint32_t mode);
-uint16_t ptp_nikon_directcapture (PTPParams* params, uint32_t unknown);
-uint16_t ptp_nikon_checkevent (PTPParams* params,
-				PTPUSBEventContainer** event, uint16_t* evnum);
-uint16_t ptp_nikon_keepalive (PTPParams* params);
-
-
 /* Non PTP protocol functions */
 int ptp_operation_issupported	(PTPParams* params, uint16_t operation);
 int ptp_property_issupported	(PTPParams* params, uint16_t property);
