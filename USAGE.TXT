@@ -1,0 +1,59 @@
+chdkptp supports console CLI, a GUI, and batch operation.
+
+The gui is not currently very useful
+
+The interface is selected by command line options
+Usage: chdkptp [options]
+Options:
+  -g    start gui
+  -i    start interactive cli
+  -c    connect at startup
+  -n    non-interactive - quit after processing command line options (default)
+  -e    execute cli command, multiple allowed
+  -h    help
+
+CLI commands are available from the console, gui and the command line
+
+The following CLI commands are available. () indicate short names for the commands
+help (h,?)   [command]   : - help on [command] or all commands
+#                        : - comment
+exec (!)     <lua code>  : - execute local lua
+quit (q)                 : - quit program
+lua (l,.)    <lua code>  : - execute remote lua
+getm                     : - get messages
+putm         <msg string>: - send message
+luar (=)     <lua code>  : - execute remote lua, wait for result
+rmem         <address> [count]: -  read memory
+list                     : - list devices
+upload (u)   <local> [remote]: - upload a file to the camera
+download (d) <remote> [local]: - download a file from the camera
+version (ver)             : - print API versions
+connect (c)              : - (re)connect to device
+disconnect (dis)             : - disconnect from device
+
+Examples
+upload bin/diskboot.bin to A/diskboot.bin, from the command line
+ chdkptp -c -e"u bin/diskboot.bin"
+
+download A/CHDK/CCHDK.CFG to BACKUP.CFG in the current directory
+ chdkptp -c -e"d CHDK/CCHDK.CFG BACKUP.CFG"
+
+start chdkptp in interactive mode and connect to the camera
+ chdkptp -i -c
+
+execute lua on host PC and print the result
+con> !return 1+1
+=2
+
+execute lua on the camera, and print the result
+con> =return get_buildinfo()
+1:return:'platformid    12732
+platform        d10
+version CHDK
+platsub 100a
+build_number    0.9.9
+os      dryos
+build_date      Mar 26 2011
+build_time      15:14:33
+'
+
