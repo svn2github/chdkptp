@@ -75,9 +75,6 @@
 /* some defines comes here */
 
 /* CHDK additions */
-#define CHDKBUFS 65535
-#define CHDK_MODE_INTERACTIVE 0
-#define CHDK_MODE_CLI 1
 #define MAXCONNRETRIES 10
 
 
@@ -388,6 +385,7 @@ find_endpoints(struct usb_device *dev, int* inep, int* outep, int* intep)
 	}
 }
 
+// TODO retry logic should be in lua
 int
 open_camera (int busn, int devn, short force, PTP_USB *ptp_usb, PTPParams *params, struct usb_device **dev)
 {
@@ -449,57 +447,8 @@ close_camera (PTP_USB *ptp_usb, PTPParams *params, struct usb_device *dev)
 }
 
 
-void
-list_devices(short force)
-{
-	struct usb_bus *bus;
-	struct usb_device *dev;
-	int found=0;
-
-
-	bus=init_usb();
-  	for (; bus; bus = bus->next)
-    	for (dev = bus->devices; dev; dev = dev->next) {
-		/* if it's a PTP device try to talk to it */
-		if (dev->config)
-		if ((dev->config->interface->altsetting->bInterfaceClass==
-			USB_CLASS_PTP)||force)
-		if (dev->descriptor.bDeviceClass!=USB_CLASS_HUB)
-		{
-			PTPParams params;
-			PTP_USB ptp_usb;
-			PTPDeviceInfo deviceinfo;
-
-			if (!found){
-				printf("\nListing devices...\n");
-				printf("bus/dev\tvendorID/prodID\tdevice model\n");
-				found=1;
-			}
-
-			find_endpoints(dev,&ptp_usb.inep,&ptp_usb.outep,
-				&ptp_usb.intep);
-			init_ptp_usb(&params, &ptp_usb, dev);
-
-			CC(ptp_opensession (&params,1),
-				"Could not open session!\n"
-				"Try to reset the camera.\n");
-			CC(ptp_getdeviceinfo (&params, &deviceinfo),
-				"Could not get device info!\n");
-
-      			printf("%s/%s\t0x%04X/0x%04X\t%s\n",
-				bus->dirname, dev->filename,
-				dev->descriptor.idVendor,
-				dev->descriptor.idProduct, deviceinfo.Model);
-
-			CC(ptp_closesession(&params),
-				"Could not close session!\n");
-			close_usb(&ptp_usb, dev);
-		}
-	}
-	if (!found) printf("\nFound no PTP devices\n");
-	printf("\n");
-}
-
+// TODO equivalent in lua, maybe just in list_devices
+#if 0
 void
 show_info (int busn, int devn, short force)
 {
@@ -524,6 +473,7 @@ show_info (int busn, int devn, short force)
 	printf("\n");
 	close_camera(&ptp_usb, &params, dev);
 }
+#endif
 
 int
 usb_get_endpoint_status(PTP_USB* ptp_usb, int ep, uint16_t* status)
@@ -651,37 +601,12 @@ static PTPParams params;
 static struct usb_device *dev;
 static int connected = 0;
 
-static void open_connection()
-{
-  connected = (0 == open_camera(camera_bus,camera_dev,camera_force,&ptp_usb,&params,&dev));
-  if ( connected )
-  {
-    int major,minor;
-    if ( !ptp_chdk_get_version(&params,&params.deviceinfo,&major,&minor) )
-    {
-      printf("error: cannot get camera CHDK PTP version; either it has an unsupported version or no CHDK PTP support at all\n");
-    } else if ( major != PTP_CHDK_VERSION_MAJOR || minor < PTP_CHDK_VERSION_MINOR )
-    {
-      printf("error: camera has unsupported camera version %i.%i; some functionality may be missing or cause unintented consequences\n",major,minor);
-    }
-  }
-}
-
 static void close_connection()
 {
   close_camera(&ptp_usb,&params,dev);
 }
 
-static void reset_connection()
-{
-  if ( connected )
-  {
-    close_connection();
-  }
-  open_connection();
-}
-
-// TODO accept retry count
+// TODO accept retry count, or move retry to lua
 static int chdk_connect(lua_State *L) {
 	if ( connected ) {
 		close_connection();
@@ -698,6 +623,7 @@ static int chdk_disconnect(lua_State *L) {
 	return 1;
 }
 
+// TODO we'd like to be able to check the actual connection state, not just flag set in open/close
 static int chdk_is_connected(lua_State *L) {
 	lua_pushboolean(L,connected);
 	return 1;
@@ -742,9 +668,9 @@ static int chdk_execlua(lua_State *L) {
 		return 2;
 	}
 
-	// TODO handle syntax errors differently than low level errors ?
 	if(!ptp_chdk_exec_lua((char *)luaL_optstring(L,1,""),&script_id,&params,&params.deviceinfo)) {
 		lua_pushboolean(L,0);
+		// if we got a script id, script request got as far as the the camera
 		if(script_id) {
 			lua_pushstring(L,"syntax"); // caller can check messages for details
 		} else {
@@ -757,6 +683,8 @@ static int chdk_execlua(lua_State *L) {
 }
 
 /*
+// TODO find a way to make this work while connected
+// TODO we can add additional information here
 return array of records like
 {
 	"bus" = "dirname", 
@@ -793,10 +721,6 @@ static int chdk_list_devices(lua_State *L) {
 
 					CC(ptp_opensession (&params,1), "Could not open session!\n" "Try to reset the camera.\n");
 					CC(ptp_getdeviceinfo (&params, &deviceinfo), "Could not get device info!\n");
-					/*
-					printf("%s/%s\t0x%04X/0x%04X\t%s\n", 
-							bus->dirname, dev->filename, dev->descriptor.idVendor, dev->descriptor.idProduct, deviceinfo.Model);
-					*/
 					// original find_device did stuff with strtol on device dirs/names that doesn't work on windows
 					// we'll work with string names
 					lua_createtable(L,0,5);
@@ -978,7 +902,7 @@ script_id=<id>
 mtype=<type_name>
 msubtype=<subtype_name>
 }
-no message: only type is set
+no message: type is set to 'none'
 
 use chdku.wait_status to wait for messages
 */
@@ -1039,7 +963,6 @@ static int chdk_read_msg(lua_State *L) {
 }
 
 /*
-TODO move timeout to chdku
 status[,errormessage]=chdk.write_msg(msgstring,[script_id])
 script_id defaults to the most recently started script
 errormessage can be used to identify full queue etc
@@ -1109,10 +1032,13 @@ static int chdk_get_script_id(lua_State *L) {
 	return 1;
 }
 
-// most functions return result[,errormessage]
-// result is false or nil on error
-// some also throw errors with lua_error
-// TODO should be either all lua_error (with pcall) or not.
+/*
+most functions return result[,errormessage]
+result is false or nil on error
+some also throw errors with lua_error
+TODO should be either all lua_error (with pcall) or not.
+TODO many errors are still printed to the console
+*/
 static const luaL_Reg chdklib[] = {
   {"connect", chdk_connect},
   {"disconnect", chdk_disconnect},
@@ -1135,6 +1061,7 @@ static const luaL_Reg chdklib[] = {
 
 /*
 sys.sleep(ms)
+NOTE this should not be used from gui code, since it blocks the whole gui
 */
 static int syslib_sleep(lua_State *L) {
 	unsigned ms=luaL_checknumber(L,1);
@@ -1177,7 +1104,7 @@ static int exec_lua_string(lua_State *L, const char *luacode) {
 
 static int iup_inited;
 
-// TODO we should allow using require
+// TODO we should allow loading IUP with require
 static int init_iup(lua_State *L) {
 #ifdef CHDKPTP_IUP
 	if(!iup_inited) {
