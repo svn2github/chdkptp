@@ -36,10 +36,12 @@
 /* boundaries in order to work properly on all architectures */
 
 /* Uncomment if system endian.h does not provide them */
+#ifndef htobe16
 #define htobe16(x) htons(x)
 #define htobe32(x) htonl(x)
 #define be16toh(x) ntohs(x)
 #define be32toh(x) ntohl(x)
+#endif
 
 #define HTOBE16(x) (x) = htobe16(x)
 #define HTOBE32(x) (x) = htobe32(x)
