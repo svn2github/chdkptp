@@ -4,6 +4,9 @@ cameras.
 This is an alpha version - protocol, functionality, APIs, commands, command line options 
 are all subject to change.
 
+chdkptp source is available from http://subversion.assembla.com/svn/chdkptp/
+Roadmap is under development in http://www.assembla.com/spaces/chdkptp/tickets
+
 For information about CHDK, see http://chdk.wikia.com/wiki/CHDK
 For information about the CHDK PTP extension, see http://chdk.wikia.com/wiki/PTP_Extension
 
@@ -57,8 +60,22 @@ libusb-win32-bin-1.2.2.0.zip
 Unzip somewhere convenient
 or is it libusb-win32-devel-filter-1.2.2.0.exe ?
 
-Configuring the source
-Edit make.conf to reflect the installation directories of the above packages
+
+Linux development
+The following is based on Ubuntu 10.04, 64 bit. YMMV
+Install the following packages and any required dependencies 
+libusb-1.0-0
+libusb-dev (may be called libusb-1.0-dev ?)
+liblua5.1-0-dev
+liblua5.1-0
+IUP support has not yet been built on linux, so you must disable it config.mk, or make it
+work and tell us about it.
+
+You will also need a fully working gcc environment.
+
+Configuring the source (all platforms)
+Edit config.mk to reflect the installation directories of the above packages
+See config-sample-*.mk for examples
 
 Building
 make
