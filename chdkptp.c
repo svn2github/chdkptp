@@ -969,7 +969,7 @@ errormessage can be used to identify full queue etc
 */
 static int chdk_write_msg(lua_State *L) {
 	const char *str;
-	int len;
+	size_t len;
 	int status;
 	int target_script_id = luaL_optinteger(L,2,script_id);
 
@@ -1090,12 +1090,12 @@ static int exec_lua_string(lua_State *L, const char *luacode) {
 	r=luaL_loadstring(L,luacode);
 	if(r) {
 		fprintf(stderr,"loadstring failed %d\n",r);
-		fprintf(stderr,"error %s %d\n",lua_tostring(L, -1));
+		fprintf(stderr,"error %s\n",lua_tostring(L, -1));
 	} else {
 		r=lua_pcall(L,0,LUA_MULTRET, 0);
 		if(r) {
 			fprintf(stderr,"pcall failed %d\n",r);
-			fprintf(stderr,"error %s %d\n",lua_tostring(L, -1));
+			fprintf(stderr,"error %s\n",lua_tostring(L, -1));
 			// TODO should get stack trace
 		}
 	}
