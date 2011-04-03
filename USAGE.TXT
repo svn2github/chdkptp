@@ -2,6 +2,7 @@ chdkptp supports console CLI, a GUI, and batch operation.
 
 The gui is not currently very useful
 
+=Command line=
 The interface is selected by command line options
 Usage: chdkptp [options]
 Options:
@@ -12,6 +13,8 @@ Options:
   -e    execute cli command, multiple allowed
   -h    help
 
+
+=CLI=
 CLI commands are available from the console, gui and the command line
 
 The following CLI commands are available. () indicate short names for the commands
@@ -31,7 +34,7 @@ version (ver)             : - print API versions
 connect (c)              : - (re)connect to device
 disconnect (dis)             : - disconnect from device
 
-Examples
+=Examples=
 upload bin/diskboot.bin to A/diskboot.bin, from the command line
  chdkptp -c -e"u bin/diskboot.bin"
 
@@ -56,4 +59,15 @@ os      dryos
 build_date      Mar 26 2011
 build_time      15:14:33
 '
+
+=Running under linux=
+Under linux, the .lua files will not automatically found relative to the executeable directory
+You can set LUA_PATH on the command line to allow them to be located:
+$ LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp ...
+
+Similarly, if you have built IUP and not installed the libraries to the system lib directory,
+you must also set LD_LIBARARY_PATH
+$ LD_LIBRARY_PATH=/path/to/iup LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp -g
+
+This can be done in a shell script, see chdkptp-sample.sh
 
