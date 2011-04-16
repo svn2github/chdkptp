@@ -22,7 +22,7 @@ mweerdens modified version can be found at https://github.com/mweerden/CHDK/tree
 the CHDKDE ptpcam source may be found at http://tools.assembla.com/chdkde/browser/trunk/tools/ptpcam
 
 =Dependencies=
-- IUP version 3.3 or 3.4 http://www.tecgraf.puc-rio.br/iup/
+- IUP version 3.4 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work)
   Optional, edit makefile to build without iup gui support
 - Lua version 5.1 http://www.lua.org/
 - LibUSB (libusb-win32 on windows)

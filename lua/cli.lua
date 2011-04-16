@@ -119,6 +119,9 @@ end
 
 -- add/correct A/ as needed, replace \ with /
 function cli:make_camera_path(path)
+	if not path then
+		return 'A/'
+	end
 	-- fix slashes
 	path = string.gsub(path,'\\','/')
 	local pfx = string.sub(path,1,2)
@@ -152,6 +155,24 @@ function cli:get_string_arg(arg)
 		return str, string.sub(arg,e+1)
 	end
 	return nil
+end
+
+--[[
+t,args=cli:get_opts(args,optspec)
+optspect is an array of option letters 
+returns table of option values
+plus arg string with recognized opts removed
+TODO should unify command line processing with main.lua args
+]]
+function cli:get_opts(arg,optspec)
+	local r={}
+	for i,v in ipairs(optspec) do
+		arg = string.gsub(arg,'-'..v,function() 
+			r[v]=true
+			return ''
+		end)
+	end
+	return r,arg
 end
 
 -- returns num, <remaining arg string>
@@ -430,6 +451,49 @@ cli:add_commands{
 		help='disconnect from device',
 		func=function(self,args) 
 			return chdk.disconnect()
+		end,
+	},
+	{
+		names={'ls'},
+		help='list files/directories on camera',
+		arghelp="[-l] [path]",
+		func=function(self,args) 
+			local opts
+			opts,args=cli:get_opts(args,{'l'})
+			print(tostring(args))
+			local path=cli:get_string_arg(args)
+			path = cli:make_camera_path(path)
+			local list,msg = chdku.listdir(path,opts.l)
+			if type(list) == 'table' then
+				local names={}
+				local i=1
+				for k,v in pairs(list) do
+					names[i] = k
+					i = i+1
+				end
+				-- alphabetic sort TODO sorting/grouping options
+				table.sort(names)
+				local r = '';
+				local line
+				for i,k in ipairs(names) do
+					local v = list[k]
+					if opts.l then
+						if v.is_dir then
+							line = k .. '/'
+						else
+							line = string.format("%-13s %10d",k,v.size)
+						end
+					else
+						line = k
+						if v == 'd' then
+							line = line .. '/'
+						end
+					end
+					r = r .. line .. '\n'
+				end
+				return true,r
+			end
+			return false,msg
 		end,
 	},
 };
