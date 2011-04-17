@@ -125,6 +125,7 @@ end
 	usb_msg_table_to_string=serialize
 ]],
 --[[
+TODO rework this to a general iterate over directory function
 sends file listing as serialized tables with write_usb_msg
 returns true, or false,error message
 opts={
@@ -220,8 +221,10 @@ function chdku.listdir(path,opts)
 	if type(opts) == 'table' then
 		opts = serialize(opts)
 	end
-	chdku.exec("return ls('"..path.."',"..opts..")",{'serialize','serialize_msgs','ls'})
-	local status,err
+	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",{'serialize','serialize_msgs','ls'})
+	if not status then
+		return false,err
+	end
 	local results={}
 
 	while true do
@@ -250,7 +253,7 @@ function chdku.listdir(path,opts)
 				return false, msg.value
 			end
 		elseif status.run == false then
-			return results,err
+			return results
 		end
 	end
 end
