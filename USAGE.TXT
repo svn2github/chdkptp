@@ -33,6 +33,7 @@ download (d) <remote> [local]: - download a file from the camera
 version (ver)             : - print API versions
 connect (c)              : - (re)connect to device
 disconnect (dis)             : - disconnect from device
+ls           [-l] [path] : - list files/directories on camera
 
 =Examples=
 upload bin/diskboot.bin to A/diskboot.bin, from the command line

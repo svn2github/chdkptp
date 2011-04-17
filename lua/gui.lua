@@ -3,7 +3,6 @@ gui scratchpad
 based on the button example from the IUP distribution
 this file is licensed under the same terms as the IUP examples
 ]]
-
 local gui = {}
 
 -- defines released button image
@@ -106,7 +105,7 @@ function btn_connect:action()
 end
 
 -- creates a text box
-text = iup.text{ 
+inputtext = iup.text{ 
 --	size = "700x",
 	expand = "HORIZONTAL",
 }
@@ -227,6 +226,69 @@ cam_btn_frame = iup.frame{
 	} ;
 	title = "Camera Controls",
 }
+
+camfiletree=iup.tree{}
+camfiletree.name="Camera"
+camfiletree.state="collapsed"
+camfiletree.addexpanded="NO"
+function camfiletree:get_data(id)
+	return iup.TreeGetUserId(self,id)
+end
+
+function camfiletree:set_data(id,data)
+	iup.TreeSetUserId(self,id,data)
+end
+function camfiletree:execute_cb(id)
+	print('execute',id)
+end
+
+function camfiletree:populate_branch(id,path)
+	self['delnode'..id] = "CHILDREN"
+	local list,msg = chdku.listdir(path,{stat='*'})
+	if type(list) == 'table' then
+		local names={}
+		local i=1
+		for k,v in pairs(list) do
+			names[i]=k
+			i=i+1
+		end
+		-- alphabetic sort TODO sorting/grouping options
+		table.sort(names)
+		for i,name in ipairs(names) do
+			print(name)
+			local st=list[name]
+			local new_id
+			if st.is_dir then
+				self['addbranch'..id] = name
+				new_id = self.lastaddnode
+				-- dummy, otherwise tree nodes not expandable
+				self['addleaf'..new_id] = 'dummy'
+			else
+				self['addleaf'..id] = name
+				new_id = self.lastaddnode
+			end
+			self:set_data(new_id,{name=name,stat=st,path=path})
+		end
+	end
+end
+
+function camfiletree:branchopen_cb(id)
+	print('branchopn_cb ' .. id)
+	if not chdk.is_connected() then
+		print('branchopn_cb not connected')
+		return iup.IGNORE
+	end
+	local path
+	if id == 0 then
+		print('root node expand')
+		path = 'A/'
+	else
+		local data = self:get_data(id)
+		path = data.path .. '/' .. data.name
+	end
+	self:populate_branch(id,path)
+end
+
 -- creates a dialog
 dlg = iup.dialog{
 	iup.vbox{ 
@@ -237,9 +299,17 @@ dlg = iup.dialog{
 			btn_connect;
 		},
 		iup.hbox{
-			iup.vbox{
-				statustext,
-				text, 
+			iup.tabs{
+				iup.vbox{
+					statustext,
+					iup.hbox{
+						inputtext, 
+						btn_exec,
+					},
+				},
+				camfiletree;
+				tabtitle0='console',
+				tabtitle1='files',
 			},
 			iup.vbox{
 				cam_btn_frame,
@@ -278,14 +348,13 @@ dlg = iup.dialog{
 						end,
 					},
 				},
-				iup.fill{ size="0x30"},
 			}
 		},
+		--[[
 		iup.hbox{
-			btn_exec,
 			iup.fill{},
-			btn_exit;
 		};
+		]]
 		padding = '2x2'
 	};
 	title = "CHDK PTP", 
@@ -323,16 +392,16 @@ cmd_history = {
 	end
 }
 
-function text:k_any(k)
+function inputtext:k_any(k)
 	if k == iup.K_CR then
 		btn_exec:action()
 	elseif k == iup.K_UP then
 		local hval = cmd_history:prev()
 		if hval then
-			text.value = hval
+			inputtext.value = hval
 		end
 	elseif k == iup.K_DOWN then
-		text.value = cmd_history:next()
+		inputtext.value = cmd_history:next()
 	end
 end
 
@@ -347,11 +416,11 @@ function add_status(status,msg)
 end
 
 function btn_exec:action()
-	statustext.append = '> ' .. text.value
-	cmd_history:add(text.value)
---	local status,err = chdk.execlua(text.value)
-	add_status(cli:execute(text.value))
-	text.value=''
+	statustext.append = '> ' .. inputtext.value
+	cmd_history:add(inputtext.value)
+--	local status,err = chdk.execlua(inputtext.value)
+	add_status(cli:execute(inputtext.value))
+	inputtext.value=''
 end
 
 -- callback called when the exit button is activated
@@ -375,6 +444,7 @@ function gui:run()
 	-- shows dialog
 	dlg:showxy( iup.CENTER, iup.CENTER)
 	--status_timer.run = "YES"
+	camfiletree.addbranch="dummy"
 
 	if (iup.MainLoopLevel()==0) then
 	  iup.MainLoop()
