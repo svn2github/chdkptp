@@ -231,19 +231,154 @@ camfiletree=iup.tree{}
 camfiletree.name="Camera"
 camfiletree.state="collapsed"
 camfiletree.addexpanded="NO"
+
 function camfiletree:get_data(id)
 	return iup.TreeGetUserId(self,id)
 end
 
+-- TODO
+filetreedata_getfullpath = function(self)
+	-- root is special special, we don't want to add slashes
+	if self.name == 'A/' then
+		return 'A/'
+	end
+	if self.path == 'A/' then
+		return self.path .. self.name
+	end
+	return self.path .. '/' .. self.name
+end
+
+function combine_path(path,filename)
+	if string.sub(path,-1,-1) ~= '/' then
+		path = path .. '/'
+	end
+	return path .. filename
+end
+
 function camfiletree:set_data(id,data)
+	data.fullpath = filetreedata_getfullpath
 	iup.TreeSetUserId(self,id,data)
 end
-function camfiletree:execute_cb(id)
-	print('execute',id)
+
+function do_download_dialog(remotepath)
+	local filedlg = iup.filedlg{
+		dialogtype = "SAVE",
+		title = "Download "..remotepath, 
+		filter = "*.*", 
+		filterinfo = "all files",
+		file = util.basename(remotepath)
+	} 
+
+-- Shows file dialog in the center of the screen
+	filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
+
+-- Gets file dialog status
+	local status = filedlg.status
+
+-- new or overwrite (windows native dialog already prompts for overwrite
+	if status == "1" or status == "0" then 
+		add_status(chdk.download(remotepath,filedlg.value))
+-- canceled
+--	elseif status == "-1" then 
+	end
+end
+
+function do_upload_dialog(remotepath)
+	local filedlg = iup.filedlg{
+		dialogtype = "OPEN",
+		title = "Upload to: "..remotepath, 
+		filter = "*.*", 
+		filterinfo = "all files",
+		multiplefiles = "yes",
+	} 
+	filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
+
+	print('upload ' .. remotepath)
+-- Gets file dialog status
+	local status = filedlg.status
+	local value = filedlg.value
+-- new or overwrite (windows native dialog already prompts for overwrite
+	print('upload status ' .. status)
+	if status ~= "0" then
+		return
+	end
+	print('upload value ' .. tostring(value))
+	local multi = {}
+	local e=1
+	while true do
+		local s
+		s,e,sub=string.find(value,'([^|]+)|',e)
+		if s then
+			print('multiup ' .. sub)
+			table.insert(multi,sub)
+		else
+			break
+		end
+	end
+	if #multi == 0 then
+		print("u "..value.."->"..combine_path(remotepath,basename(value)))
+		add_status(chdk.upload(value,combine_path(remotepath,basename(value))))
+	else
+		for i = 2, #multi do
+			print("u "..multi[1] .. '/' .. multi[i].."->"..combine_path(remotepath,multi[i]))
+			add_status(chdk.upload(multi[1] .. '/' .. multi[i],combine_path(remotepath,multi[i])))
+		end
+	end
+end
+
+function do_delete_dialog(fullpath)
+	if iup.Alarm('Confirm delete','delete ' .. fullpath .. ' ?','OK','Cancel') == 1 then
+		add_status(chdk.execlua('remove("'..fullpath..'")'))
+	end
+end
+
+function camfiletree:rightclick_cb(id)
+	local data=self:get_data(id)
+	if not data then
+		return
+	end
+	if data.fullpath then
+		print('right click: fullpath ' .. data:fullpath())
+	end
+	if data.stat.is_dir then
+		iup.menu{
+			iup.item{
+				title='Refresh',
+				action=function()
+					self:populate_branch(id,data:fullpath())
+				end,
+			},
+			iup.item{
+				title='Upload...',
+				action=function()
+					do_upload_dialog(data:fullpath())
+				end,
+			},
+		}:popup(iup.MOUSEPOS,iup.MOUSEPOS)
+	else
+		iup.menu{
+			iup.item{
+				title='Download...',
+				action=function()
+					do_download_dialog(data:fullpath())
+				end,
+			},
+			iup.item{
+				title='Delete...',
+				action=function()
+					do_delete_dialog(data:fullpath())
+				end,
+			},
+		}:popup(iup.MOUSEPOS,iup.MOUSEPOS)
+	end
 end
 
 function camfiletree:populate_branch(id,path)
 	self['delnode'..id] = "CHILDREN"
+	print('pop branch '..id..' '..path)
+	if id == 0 then
+		camfiletree.state="collapsed"
+	end		
 	local list,msg = chdku.listdir(path,{stat='*'})
 	if type(list) == 'table' then
 		local dirs={}
@@ -259,12 +394,12 @@ function camfiletree:populate_branch(id,path)
 		table.sort(files,function(a,b) return a>b end)
 		table.sort(dirs,function(a,b) return a>b end)
 		for i,name in ipairs(files) do
-			self['addleaf'..id] = name
-			self:set_data(self.lastaddnode,{name=name,stat=st,path=path})
+			self['addleaf'..id]=name
+			self:set_data(self.lastaddnode,{name=name,stat=list[name],path=path})
 		end
 		for i,name in ipairs(dirs) do
-			self['addbranch'..id] = name
-			self:set_data(self.lastaddnode,{name=name,stat=st,path=path})
+			self['addbranch'..id]=name
+			self:set_data(self.lastaddnode,{name=name,stat=list[name],path=path})
 			-- dummy, otherwise tree nodes not expandable
 			self['addleaf'..self.lastaddnode] = 'dummy'
 		end
@@ -279,13 +414,13 @@ function camfiletree:branchopen_cb(id)
 	end
 	local path
 	if id == 0 then
-		print('root node expand')
 		path = 'A/'
-	else
-		local data = self:get_data(id)
-		path = data.path .. '/' .. data.name
+		-- chdku.exec('return os.stat("A/")',{'serialize','serialize_msgs'})
+		-- TODO
+		self:set_data(0,{name='A/',stat={is_dir=true},path=''})
 	end
-	self:populate_branch(id,path)
+	local data = self:get_data(id)
+	self:populate_branch(id,data:fullpath())
 end
 
 -- creates a dialog
