@@ -14,8 +14,10 @@
   along with this program; if not, write to the Free Software
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 --]]
--- common misc utilties
--- loaded after lua libs and chdk.* low level ptp lib
+--[[
+common generic lua utilties
+utilities that depend on the chdkptp api go in chdku
+]]
 local util={}
 function util.fprintf(f,...)
 	local args={...}
@@ -35,6 +37,64 @@ end
 
 function util.errf(format,...)
 	fprintf(io.stderr,"ERROR: " .. format,...)
+end
+
+--[[ 
+copy members of source into target
+by default, not deep so any tables will be copied as references
+returns target so you can do x=extend_table({},...)
+if deep, cycles result in an error
+deep does not copy keys which are themselves tables
+]]
+util.extend_table_max_depth = 10
+local extend_table_r
+extend_table_r = function(target,source,seen,depth) 
+	if not seen then
+		seen = {}
+	end
+	if not depth then
+		depth = 1
+	end
+	if depth > util.extend_table_max_depth then
+		error('extend_table: max depth');
+	end
+	-- a source could have refernces to the target, don't want to do that
+	seen[target]=true
+	if seen[source] then
+		error('extend_table: cycles');
+	end
+	seen[source]=true
+	for k,v in pairs(source) do
+		if type(v) == 'table' then
+			if type(target[k]) ~= 'table' then
+				target[k] = {}
+			end
+			extend_table_r(target[k],v,seen,depth+1)
+		else
+			target[k]=v
+		end
+	end
+	return target
+end
+
+function util.extend_table(target,source,deep)
+	if type(source) ~= 'table' then 
+		error('extend_table: source not table')
+	end
+	if type(target) ~= 'table' then
+		error('extend_table: target not table')
+	end
+	if source == target then
+		error('extend_table: source == target')
+	end
+	if deep then
+		return extend_table_r(target, source)
+	else 
+		for k,v in pairs(source) do
+			target[k]=v
+		end
+		return target
+	end
 end
 
 function util.hexdump(str,offset)
@@ -66,46 +126,63 @@ function util.hexdump(str,offset)
 end
 
 local serialize_r
-serialize_r = function(v,sinfo)
+serialize_r = function(v,opts,seen,depth)
 	local vt = type(v)
 	if vt == 'nil' or  vt == 'boolean' or vt == 'number' then
 		return tostring(v)
 	elseif vt == 'string' then
 		return string.format('%q',v)
 	elseif vt == 'table' then
-		if type(sinfo) == 'nil' then
-			sinfo = {level=0}
-		else
-			sinfo.level = sinfo.level+1
+		if not depth then
+			depth = 1
 		end
-		if sinfo.level >= 10 then
-			error('serialize: table max depth exceeded')
+		if depth >= opts.maxdepth then
+			error('serialize: max depth')
 		end
-		if sinfo[v] then 
-			error('serialize: cyclic table reference')
+		if not seen then
+			seen={}
+		elseif seen[v] then 
+			if opts.err_cycle then
+				error('serialize: cycle')
+			else
+				return '"cycle:'..tostring(v)..'"'
+			end
 		end
-		sinfo[v] = true;
+		seen[v] = true;
 		local r='{'
 		for k,v1 in pairs(v) do
-			r = r .. '\n' ..  string.rep(' ',sinfo.level+1)
+			if opts.pretty then
+				r = r .. '\n' ..  string.rep(' ',depth)
+			end
 			-- more compact/friendly format simple string keys
 			-- TODO we could make integers more compact by doing array part first
 			if type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$') then
 				r = r .. tostring(k)
 			else
-				r = r .. '[' .. serialize_r(k,sinfo) .. ']'
+				r = r .. '[' .. serialize_r(k,opts,seen,depth+1) .. ']'
 			end
-			r = r .. '=' .. serialize_r(v1,sinfo) .. ','
+			r = r .. '=' .. serialize_r(v1,opts,seen,depth+1) .. ','
 		end
-		r = r .. '\n' .. string.rep(' ',sinfo.level) .. '}'
-		if sinfo.level > 0 then
-			sinfo.level = sinfo.level - 1
+		if opts.pretty then
+			r = r .. '\n' .. string.rep(' ',depth-1)
 		end
+		r = r .. '}'
 		return r
-	else
+	elseif opts.err_type then
 		error('serialize: unsupported type ' .. vt, 2)
+	else
+		return '"'..tostring(v)..'"'
 	end
 end
+
+util.serialize_defaults = {
+	-- maximum nested depth
+	maxdepth=10,
+	-- ignore or error on various conditions
+	err_type=true, -- bad type, e.g. function, userdata
+	err_cycle=true, -- cyclic references
+	pretty=true, -- indents and newlines
+}
 
 --[[
 serialize lua values
@@ -114,10 +191,15 @@ TODO should have some options
 - pretty vs compact
 - handling of unsupported types and cycles, ignore, error etc
 - depth
---]]
-function util.serialize(v)
-	return serialize_r(v)
+]]
+function util.serialize(v,opts_in)
+	local opts = util.extend_table({},util.serialize_defaults)
+	if type(opts_in) == 'table' then
+		util.extend_table(opts,opts_in)
+	end
+	return serialize_r(v,opts)
 end
+
 
 --[[
 turn string back into lua data by executing it. Not safe for untrusted data!

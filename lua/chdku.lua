@@ -44,62 +44,95 @@ can be used with chdku.exec
 TODO some of these are duplicated with local code, but we don't yet have an easy way of sharing them
 TODO would be good to minify
 TODO handle order and dependencies
+TODO passing compiled chunks might be better but our lua configurations are different
 ]]
 chdku.rlib={
-	-- mostly duplicated from util.serialize_r
+--[[
+mostly duplicated from util.serialize
+global defaults can be changed from code
+]]
 	serialize=[[
-local serialize_r
-serialize_r = function(v,sinfo)
+serialize_r = function(v,opts,seen,depth)
 	local vt = type(v)
 	if vt == 'nil' or  vt == 'boolean' or vt == 'number' then
 		return tostring(v)
 	elseif vt == 'string' then
 		return string.format('%q',v)
 	elseif vt == 'table' then
-		if type(sinfo) == 'nil' then
-			sinfo = {level=0}
-		else
-			sinfo.level = sinfo.level+1
+		if not depth then
+			depth = 1
 		end
-		if sinfo.level >= 10 then
-			error('serialize: table max depth exceeded')
+		if depth >= opts.maxdepth then
+			error('serialize: max depth')
 		end
-		if sinfo[v] then 
-			error('serialize: cyclic table reference')
+		if not seen then
+			seen={}
+		elseif seen[v] then 
+			if opts.err_cycle then
+				error('serialize: cycle')
+			else
+				return '"cycle:'..tostring(v)..'"'
+			end
 		end
-		sinfo[v] = true;
+		seen[v] = true;
 		local r='{'
 		for k,v1 in pairs(v) do
-			r = r .. '\n' ..  string.rep(' ',sinfo.level+1)
+			if opts.pretty then
+				r = r .. '\n' ..  string.rep(' ',depth)
+			end
 			if type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$') then
 				r = r .. tostring(k)
 			else
-				r = r .. '[' .. serialize_r(k,sinfo) .. ']'
+				r = r .. '[' .. serialize_r(k,opts,seen,depth+1) .. ']'
 			end
-			r = r .. '=' .. serialize_r(v1,sinfo) .. ','
+			r = r .. '=' .. serialize_r(v1,opts,seen,depth+1) .. ','
 		end
-		r = r .. '\n' .. string.rep(' ',sinfo.level) .. '}'
-		if sinfo.level > 0 then
-			sinfo.level = sinfo.level - 1
+		if opts.pretty then
+			r = r .. '\n' .. string.rep(' ',depth-1)
 		end
+		r = r .. '}'
 		return r
-	else
+	elseif opts.err_type then
 		error('serialize: unsupported type ' .. vt, 2)
+	else
+		return '"'..tostring(v)..'"'
 	end
 end
+
+serialize_defaults = {
+	maxdepth=10,
+	err_type=true,
+	err_cycle=true,
+	pretty=true,
+}
+
+function serialize(v,opts)
+	if opts then
+		for k,v in pairs(serialize_defaults) do
+			if not opts[k] then
+				opts[k]=v
+			end
+		end
+	else
+		opts=serialize_defaults
+	end
+	return serialize_r(v,opts)
+end
+
 ]],
 -- override default table serialization for messages
 	serialize_msgs=[[
-	usb_msg_table_to_string=serialize_r
+	usb_msg_table_to_string=serialize
 ]],
 --[[
 sends file listing as serialized tables with write_usb_msg
 returns true, or false,error message
 opts={
 	stat=bool|{table},
-	all=bool, 
+	listall=bool, 
 	msglimit=number,
 	match="pattern",
+	pretty=bool,
 }
 stat
 	false/nil, return an array of names without stating at all
@@ -114,27 +147,31 @@ match
 	pattern, file names matching with string.match will be returned
 listall 
 	passed as second arg to os.listdir
+pretty
+	should serialized results be pretty ?
 
 may run out of memory on very large directories,
 msglimit can help but os.listdir itself could use all memory
-
+TODO message timeout is not checked
+TODO handle case if 'path' is a file
 ]]
 	ls=[[
 function ls(path,opts_in)
 	local opts={
 		msglimit=50,
 		msgtimeout=100000,
+		pretty=false,
 	}
 	if opts_in then
 		for k,v in pairs(opts_in) do
-			opts[k] = v
+			opts[k]=v
 		end
 	end
 	local t,msg=os.listdir(path,opts.listall)
 	if not t then
 		return false,msg
 	end
-	local r = {}
+	local r={}
 	local count=1
 	for i,v in ipairs(t) do
 		if not opts.match or string.match(v,opts.match) then
@@ -153,19 +190,19 @@ function ls(path,opts_in)
 					r[v]=st
 				end
 			else
-				r[count] = t[i];
+				r[count]=t[i];
 			end
 			if count < opts.msglimit then
-				count = count+1
+				count=count+1
 			else
-				write_usb_msg(r,opts.msgtimeout)
+				write_usb_msg(serialize(r,{pretty=opts.pretty}),opts.msgtimeout)
 				r={}
 				count=1
 			end
 		end
 	end
 	if count > 1 then
-		write_usb_msg(r,opts.msgtimeout)
+		write_usb_msg(serialize(r,{pretty=opts.pretty}),opts.msgtimeout)
 	end
 	return true
 end
@@ -191,6 +228,9 @@ function chdku.listdir(path,opts)
 		
 		if status.msg then
 			local msg,err=chdk.read_msg()
+			if not msg then
+				return false, err
+			end
 			if msg.type == 'user' then
 				if msg.subtype ~= 'string' or string.sub(msg.value,1,1) ~= '{' then
 					return false, 'unexpected message value'

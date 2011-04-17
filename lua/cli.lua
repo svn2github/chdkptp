@@ -239,10 +239,9 @@ cli:add_commands{
 				end
 				local s
 				if #r > 1 then
-					-- TODO should use serialize for tables, but don't want to error out
-					s='=' .. tostring(r[2])
+					s='=' .. serialize(r[2],{pretty=true,err_type=false,err_cycle=false})
 					for i = 3, #r do
-						s = s .. ',' .. tostring(r[i])
+						s = s .. ',' .. serialize(r[i],{pretty=true,err_type=false,err_cycle=false})
 					end
 				end
 				return true, s
