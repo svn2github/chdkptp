@@ -239,6 +239,7 @@ cli:add_commands{
 				end
 				local s
 				if #r > 1 then
+					-- TODO should use serialize for tables, but don't want to error out
 					s='=' .. tostring(r[2])
 					for i = 3, #r do
 						s = s .. ',' .. tostring(r[i])
@@ -458,39 +459,42 @@ cli:add_commands{
 		help='list files/directories on camera',
 		arghelp="[-l] [path]",
 		func=function(self,args) 
-			local opts
+			local opts,listops
 			opts,args=cli:get_opts(args,{'l'})
-			print(tostring(args))
 			local path=cli:get_string_arg(args)
 			path = cli:make_camera_path(path)
-			local list,msg = chdku.listdir(path,opts.l)
+			if opts.l then
+				listopts = { stat='*' }
+			else
+				listopts = { stat='/' }
+			end
+			local list,msg = chdku.listdir(path,listopts)
 			if type(list) == 'table' then
-				local names={}
-				local i=1
-				for k,v in pairs(list) do
-					names[i] = k
-					i = i+1
-				end
-				-- alphabetic sort TODO sorting/grouping options
-				table.sort(names)
 				local r = '';
-				local line
-				for i,k in ipairs(names) do
-					local v = list[k]
-					if opts.l then
-						if v.is_dir then
-							line = k .. '/'
+				if opts.l then
+					local names={}
+					local i=1
+					for k,v in pairs(list) do
+						names[i]=k
+						i=i+1
+					end
+					-- alphabetic sort TODO sorting/grouping options
+					table.sort(names)
+					for i,name in ipairs(names) do
+						local st=list[name]
+						if st.is_dir then
+							r = r .. string.format("%s/\n",name)
 						else
-							line = string.format("%-13s %10d",k,v.size)
-						end
-					else
-						line = k
-						if v == 'd' then
-							line = line .. '/'
+							r = r .. string.format("%-13s %10d\n",name,list[name].size)
 						end
 					end
-					r = r .. line .. '\n'
+				else
+					table.sort(list)
+					for i,name in ipairs(list) do
+						r = r .. name .. '\n'
+					end
 				end
+
 				return true,r
 			end
 			return false,msg

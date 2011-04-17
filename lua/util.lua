@@ -88,8 +88,9 @@ serialize_r = function(v,sinfo)
 		local r='{'
 		for k,v1 in pairs(v) do
 			r = r .. '\n' ..  string.rep(' ',sinfo.level+1)
-			-- more compact/friendly format integer/simple string keys
-			if type(k) == 'number' or (type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$')) then
+			-- more compact/friendly format simple string keys
+			-- TODO we could make integers more compact by doing array part first
+			if type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$') then
 				r = r .. tostring(k)
 			else
 				r = r .. '[' .. serialize_r(k,sinfo) .. ']'
@@ -116,6 +117,23 @@ TODO should have some options
 --]]
 function util.serialize(v)
 	return serialize_r(v)
+end
+
+--[[
+turn string back into lua data by executing it. Not safe for untrusted data!
+returns the resulting value, or false + an error message on failure
+check the message, since the serialized value might be false or nil!
+]]
+function util.unserialize(s)
+	local f,err=loadstring('return ' .. s)
+	if not f then
+		return false, err
+	end
+	local status,r=pcall(f)
+	if status then
+		return r
+	end
+	return false,r
 end
 
 --[[

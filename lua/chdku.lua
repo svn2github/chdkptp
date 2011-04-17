@@ -71,7 +71,7 @@ serialize_r = function(v,sinfo)
 		local r='{'
 		for k,v1 in pairs(v) do
 			r = r .. '\n' ..  string.rep(' ',sinfo.level+1)
-			if type(k) == 'number' or (type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$')) then
+			if type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$') then
 				r = r .. tostring(k)
 			else
 				r = r .. '[' .. serialize_r(k,sinfo) .. ']'
@@ -92,47 +92,82 @@ end
 	serialize_msgs=[[
 	usb_msg_table_to_string=serialize_r
 ]],
--- return file listing as {'filename'='f|d'}
--- note that non-file, non-directory will be ignored
--- may run out of memory on very large directories
+--[[
+sends file listing as serialized tables with write_usb_msg
+returns true, or false,error message
+opts={
+	stat=bool|{table},
+	all=bool, 
+	msglimit=number,
+	match="pattern",
+}
+stat
+	false/nil, return an array of names without stating at all
+	'/' return array of names, with / appended to dirs
+	'*" return all stat fields
+	{table} return stat fields named in table (TODO not implemented)
+msglimit
+	maximum number of items to return in a message
+	each message will contain a table with partial results
+	default 50
+match
+	pattern, file names matching with string.match will be returned
+listall 
+	passed as second arg to os.listdir
+
+may run out of memory on very large directories,
+msglimit can help but os.listdir itself could use all memory
+
+]]
 	ls=[[
-function ls(path)
-	local t,msg=os.listdir(path)
-	local r={}
+function ls(path,opts_in)
+	local opts={
+		msglimit=50,
+		msgtimeout=100000,
+	}
+	if opts_in then
+		for k,v in pairs(opts_in) do
+			opts[k] = v
+		end
+	end
+	local t,msg=os.listdir(path,opts.listall)
 	if not t then
-		return msg
+		return false,msg
 	end
-	for k,v in pairs(t) do
-		local s,msg=os.stat(path..'/'..v)
-		if not s then
-			return msg
+	local r = {}
+	local count=1
+	for i,v in ipairs(t) do
+		if not opts.match or string.match(v,opts.match) then
+			if opts.stat then
+				local st,msg=os.stat(path..'/'..v)
+				if not st then
+					return false,msg
+				end
+				if opts.stat == '/' then
+					if st.is_dir then
+						r[count]=v .. '/'
+					else 
+						r[count]=v
+					end
+				elseif opts.stat == '*' then
+					r[v]=st
+				end
+			else
+				r[count] = t[i];
+			end
+			if count < opts.msglimit then
+				count = count+1
+			else
+				write_usb_msg(r,opts.msgtimeout)
+				r={}
+				count=1
+			end
 		end
-		if s.is_dir then
-			r[v]='d'
-		elseif s.is_file then
-			r[v]='f'
-		end
 	end
-	return r
-end
-]],
--- list directory as {'filename'={stat(filename)}}
--- more likely to run out of memory, should use putm messages
--- TODO checks stat status
-	lsstat=[[
-function lsstat(path)
-	local t,msg=os.listdir(path)
-	if not t then
-		return msg
+	if count > 1 then
+		write_usb_msg(r,opts.msgtimeout)
 	end
-	local r={}
-	for k,v in pairs(t) do
-		local s,msg = os.stat(path..'/'..v)
-		if s then
-			r[v]=s
-		end
-	end
-	return r
+	return true
 end
 ]],
 }
@@ -143,24 +178,35 @@ return
 table|false,msg
 note may return an empty table if target is not a directory
 ]]
-function chdku.listdir(path,mode) 
-	if mode then
-		chdku.exec("return lsstat('"..path.."')",{'serialize','serialize_msgs','lsstat'})
-	else
-		chdku.exec("return ls('"..path.."')",{'serialize','serialize_msgs','ls'})
-	end
-	local status,err=chdku.wait_status{ msg=true,run=false }
-	if not status then
-		return false,tostring(err)
-	end
+function chdku.listdir(path,opts) 
+	chdku.exec("return ls('"..path.."',"..serialize(opts)..")",{'serialize','serialize_msgs','ls'})
+	local status,err
+	local results={}
+
+	while true do
+		status,err=chdku.wait_status{ msg=true, run=false }
+		if not status then
+			return false,tostring(err)
+		end
 		
-	if status.msg then
-		msg,err=chdk.read_msg()
-		if msg.type == 'return' and msg.subtype == 'string' and string.sub(msg.value,1,1) == '{' then
-			-- TODO error checking
-			return loadstring('return ' .. msg.value)()
-		else
-			return false, msg.value
+		if status.msg then
+			local msg,err=chdk.read_msg()
+			if msg.type == 'user' then
+				if msg.subtype ~= 'string' or string.sub(msg.value,1,1) ~= '{' then
+					return false, 'unexpected message value'
+				end
+				local chunk,err=unserialize(msg.value)
+				if err then
+					return false, err
+				end
+				for k,v in pairs(chunk) do
+					results[k] = v
+				end
+			elseif msg.type ~= 'return' or msg.value ~= true then
+				return false, msg.value
+			end
+		elseif status.run == false then
+			return results,err
 		end
 	end
 end
