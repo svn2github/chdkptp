@@ -210,13 +210,17 @@ end
 }
 
 --[[
+opts may be a table, or a string containing lua code for a table
 return a list of remote directory contents
 return
 table|false,msg
 note may return an empty table if target is not a directory
 ]]
 function chdku.listdir(path,opts) 
-	chdku.exec("return ls('"..path.."',"..serialize(opts)..")",{'serialize','serialize_msgs','ls'})
+	if type(opts) == 'table' then
+		opts = serialize(opts)
+	end
+	chdku.exec("return ls('"..path.."',"..opts..")",{'serialize','serialize_msgs','ls'})
 	local status,err
 	local results={}
 

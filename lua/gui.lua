@@ -246,28 +246,27 @@ function camfiletree:populate_branch(id,path)
 	self['delnode'..id] = "CHILDREN"
 	local list,msg = chdku.listdir(path,{stat='*'})
 	if type(list) == 'table' then
-		local names={}
+		local dirs={}
+		local files={}
 		local i=1
 		for k,v in pairs(list) do
-			names[i]=k
-			i=i+1
-		end
-		-- alphabetic sort TODO sorting/grouping options
-		table.sort(names)
-		for i,name in ipairs(names) do
-			print(name)
-			local st=list[name]
-			local new_id
-			if st.is_dir then
-				self['addbranch'..id] = name
-				new_id = self.lastaddnode
-				-- dummy, otherwise tree nodes not expandable
-				self['addleaf'..new_id] = 'dummy'
+			if v.is_dir then
+				table.insert(dirs,k)
 			else
-				self['addleaf'..id] = name
-				new_id = self.lastaddnode
+				table.insert(files,k)
 			end
-			self:set_data(new_id,{name=name,stat=st,path=path})
+		end
+		table.sort(files,function(a,b) return a>b end)
+		table.sort(dirs,function(a,b) return a>b end)
+		for i,name in ipairs(files) do
+			self['addleaf'..id] = name
+			self:set_data(self.lastaddnode,{name=name,stat=st,path=path})
+		end
+		for i,name in ipairs(dirs) do
+			self['addbranch'..id] = name
+			self:set_data(self.lastaddnode,{name=name,stat=st,path=path})
+			-- dummy, otherwise tree nodes not expandable
+			self['addleaf'..self.lastaddnode] = 'dummy'
 		end
 	end
 end
