@@ -116,6 +116,15 @@ statustext = iup.text{
 	readonly = "YES",
 	expand = "YES",
 }
+
+function statusprint(...)
+	local args={...}
+	local s = tostring(args[1])
+	for i=2,#args do
+		s=s .. ' ' .. tostring(args[i])
+	end
+	statustext.append = s
+end
 --[[
 device_menu = iup.menu
 {
@@ -248,13 +257,6 @@ filetreedata_getfullpath = function(self)
 	return self.path .. '/' .. self.name
 end
 
-function combine_path(path,filename)
-	if string.sub(path,-1,-1) ~= '/' then
-		path = path .. '/'
-	end
-	return path .. filename
-end
-
 function camfiletree:set_data(id,data)
 	data.fullpath = filetreedata_getfullpath
 	iup.TreeSetUserId(self,id,data)
@@ -270,13 +272,15 @@ function do_download_dialog(remotepath)
 	} 
 
 -- Shows file dialog in the center of the screen
+	statusprint('download dialog ' .. remotepath)
 	filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
 
 -- Gets file dialog status
 	local status = filedlg.status
 
--- new or overwrite (windows native dialog already prompts for overwrite
+-- new or overwrite (windows native dialog already prompts for overwrite)
 	if status == "1" or status == "0" then 
+		statusprint("d "..remotepath.."->"..filedlg.value)
 		add_status(chdk.download(remotepath,filedlg.value))
 -- canceled
 --	elseif status == "-1" then 
@@ -291,37 +295,36 @@ function do_upload_dialog(remotepath)
 		filterinfo = "all files",
 		multiplefiles = "yes",
 	} 
+	statusprint('upload dialog ' .. remotepath)
 	filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
 
-	print('upload ' .. remotepath)
 -- Gets file dialog status
 	local status = filedlg.status
 	local value = filedlg.value
 -- new or overwrite (windows native dialog already prompts for overwrite
-	print('upload status ' .. status)
 	if status ~= "0" then
+		statusprint('upload canceled status ' .. status)
 		return
 	end
-	print('upload value ' .. tostring(value))
+	statusprint('upload value ' .. tostring(value))
 	local multi = {}
 	local e=1
 	while true do
 		local s
 		s,e,sub=string.find(value,'([^|]+)|',e)
 		if s then
-			print('multiup ' .. sub)
 			table.insert(multi,sub)
 		else
 			break
 		end
 	end
 	if #multi == 0 then
-		print("u "..value.."->"..combine_path(remotepath,basename(value)))
-		add_status(chdk.upload(value,combine_path(remotepath,basename(value))))
+		statusprint("u "..value.."->"..joinpath(remotepath,basename(value)))
+		add_status(chdk.upload(value,joinpath(remotepath,basename(value))))
 	else
 		for i = 2, #multi do
-			print("u "..multi[1] .. '/' .. multi[i].."->"..combine_path(remotepath,multi[i]))
-			add_status(chdk.upload(multi[1] .. '/' .. multi[i],combine_path(remotepath,multi[i])))
+			statusprint("u "..multi[1] .. '/' .. multi[i].."->"..joinpath(remotepath,multi[i]))
+			add_status(chdk.upload(multi[1] .. '/' .. multi[i],joinpath(remotepath,multi[i])))
 		end
 	end
 end
@@ -338,7 +341,7 @@ function camfiletree:rightclick_cb(id)
 		return
 	end
 	if data.fullpath then
-		print('right click: fullpath ' .. data:fullpath())
+		statusprint('tree right click: fullpath ' .. data:fullpath())
 	end
 	if data.stat.is_dir then
 		iup.menu{
@@ -375,7 +378,7 @@ end
 
 function camfiletree:populate_branch(id,path)
 	self['delnode'..id] = "CHILDREN"
-	print('pop branch '..id..' '..path)
+	statusprint('pop branch '..id..' '..path)
 	if id == 0 then
 		camfiletree.state="collapsed"
 	end		
@@ -407,9 +410,9 @@ function camfiletree:populate_branch(id,path)
 end
 
 function camfiletree:branchopen_cb(id)
-	print('branchopn_cb ' .. id)
+	statusprint('branchopn_cb ' .. id)
 	if not chdk.is_connected() then
-		print('branchopn_cb not connected')
+		statusprint('branchopn_cb not connected')
 		return iup.IGNORE
 	end
 	local path

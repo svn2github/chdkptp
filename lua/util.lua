@@ -220,7 +220,7 @@ end
 
 --[[
 similar to unix basename
---]]
+]]
 function util.basename(path,sfx)
 	local s,e,bn=string.find(path,'([^\\/]+)[\\/]?$')
 	if not s then
@@ -234,7 +234,27 @@ function util.basename(path,sfx)
 	return bn
 end
 
--- hacky hacky "import" values from a table into globals
+--[[ 
+add / between components, only if needed. / is ok for windows in most cases, don't mess with backslash
+]]
+function util.joinpath(...)
+	local parts={...}
+	if #parts < 2 then
+		error('joinpath requires at least 2 parts')
+	end
+	local r=parts[1]
+	for i = 2, #parts do
+		if string.sub(r,-1,-1) ~= '/' then
+			r=r..'/'
+		end
+		r=r..parts[i]
+	end
+	return r
+end
+--[[
+hacky hacky
+"import" values from a table into globals
+]]
 function util.import(t,names)
 	if names == nil then
 		for name,val in pairs(t) do
