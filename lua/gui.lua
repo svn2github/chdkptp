@@ -331,7 +331,7 @@ end
 
 function do_delete_dialog(fullpath)
 	if iup.Alarm('Confirm delete','delete ' .. fullpath .. ' ?','OK','Cancel') == 1 then
-		add_status(chdk.execlua('remove("'..fullpath..'")'))
+		add_status(chdk.execlua('os.remove("'..fullpath..'")'))
 	end
 end
 
