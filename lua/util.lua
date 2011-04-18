@@ -182,15 +182,12 @@ util.serialize_defaults = {
 	err_type=true, -- bad type, e.g. function, userdata
 	err_cycle=true, -- cyclic references
 	pretty=true, -- indents and newlines
+--	forceint=false, -- TODO convert numbers to integer
 }
 
 --[[
 serialize lua values
-TODO should have some options
-- convert numbers to ints for camera
-- pretty vs compact
-- handling of unsupported types and cycles, ignore, error etc
-- depth
+options as documented above
 ]]
 function util.serialize(v,opts_in)
 	local opts = util.extend_table({},util.serialize_defaults)
