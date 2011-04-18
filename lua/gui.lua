@@ -350,7 +350,7 @@ function camfiletree:rightclick_cb(id)
 				title='Refresh',
 				action=function()
 					local oldstate=camfiletree['state'..id]
-					statusprint('old state '.. oldstate)
+					statusprint('old state', oldstate)
 					self:populate_branch(id,data:fullpath())
 					if oldstate and oldstate ~= camfiletree['state'..id] then
 						camfiletree['state'..id]=oldstate
