@@ -349,7 +349,12 @@ function camfiletree:rightclick_cb(id)
 			iup.item{
 				title='Refresh',
 				action=function()
+					local oldstate=camfiletree['state'..id]
+					statusprint('old state '.. oldstate)
 					self:populate_branch(id,data:fullpath())
+					if oldstate and oldstate ~= camfiletree['state'..id] then
+						camfiletree['state'..id]=oldstate
+					end
 				end,
 			},
 			iup.item{
@@ -379,7 +384,7 @@ end
 
 function camfiletree:populate_branch(id,path)
 	self['delnode'..id] = "CHILDREN"
-	statusprint('pop branch '..id..' '..path)
+	statusprint('populate branch '..id..' '..path)
 	if id == 0 then
 		camfiletree.state="collapsed"
 	end		
@@ -405,6 +410,7 @@ function camfiletree:populate_branch(id,path)
 			self['addbranch'..id]=name
 			self:set_data(self.lastaddnode,{name=name,stat=list[name],path=path})
 			-- dummy, otherwise tree nodes not expandable
+			-- TODO would be better to only add if dir is not empty
 			self['addleaf'..self.lastaddnode] = 'dummy'
 		end
 	end
@@ -421,10 +427,17 @@ function camfiletree:branchopen_cb(id)
 		path = 'A/'
 		-- chdku.exec('return os.stat("A/")',{'serialize','serialize_msgs'})
 		-- TODO
-		self:set_data(0,{name='A/',stat={is_dir=true},path=''})
+		-- self:set_data(0,{name='A/',stat={is_dir=true},path=''})
+		camfiletree:set_data(0,{name='A/',stat={is_dir=true},path=''})
 	end
 	local data = self:get_data(id)
 	self:populate_branch(id,data:fullpath())
+end
+
+-- empty the tree, and add dummy we always re-populate on expand anyway
+function camfiletree:branchclose_cb(id)
+	self['delnode'..id] = "CHILDREN"
+	self['addleaf'..id] = 'dummy'
 end
 
 -- creates a dialog
@@ -583,6 +596,7 @@ function gui:run()
 	dlg:showxy( iup.CENTER, iup.CENTER)
 	--status_timer.run = "YES"
 	camfiletree.addbranch0="dummy"
+	camfiletree:set_data(0,{name='A/',stat={is_dir=true},path=''})
 
 	if (iup.MainLoopLevel()==0) then
 	  iup.MainLoop()
