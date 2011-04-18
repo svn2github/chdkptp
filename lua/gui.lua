@@ -240,6 +240,7 @@ camfiletree=iup.tree{}
 camfiletree.name="Camera"
 camfiletree.state="collapsed"
 camfiletree.addexpanded="NO"
+-- camfiletree.addroot="YES"
 
 function camfiletree:get_data(id)
 	return iup.TreeGetUserId(self,id)
@@ -581,7 +582,7 @@ function gui:run()
 	-- shows dialog
 	dlg:showxy( iup.CENTER, iup.CENTER)
 	--status_timer.run = "YES"
-	camfiletree.addbranch="dummy"
+	camfiletree.addbranch0="dummy"
 
 	if (iup.MainLoopLevel()==0) then
 	  iup.MainLoop()
