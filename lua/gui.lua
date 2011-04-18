@@ -435,10 +435,13 @@ function camfiletree:branchopen_cb(id)
 end
 
 -- empty the tree, and add dummy we always re-populate on expand anyway
+-- this crashes in gtk
+--[[
 function camfiletree:branchclose_cb(id)
 	self['delnode'..id] = "CHILDREN"
 	self['addleaf'..id] = 'dummy'
 end
+]]
 
 -- creates a dialog
 dlg = iup.dialog{
