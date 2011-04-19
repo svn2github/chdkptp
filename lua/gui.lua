@@ -425,7 +425,7 @@ function camfiletree:branchopen_cb(id)
 	local path
 	if id == 0 then
 		path = 'A/'
-		-- chdku.exec('return os.stat("A/")',{'serialize','serialize_msgs'})
+		-- chdku.exec('return os.stat("A/")',{libs={'serialize','serialize_msgs'}})
 		-- TODO
 		-- self:set_data(0,{name='A/',stat={is_dir=true},path=''})
 		camfiletree:set_data(0,{name='A/',stat={is_dir=true},path=''})

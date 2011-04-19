@@ -221,7 +221,7 @@ function chdku.listdir(path,opts)
 	if type(opts) == 'table' then
 		opts = serialize(opts)
 	end
-	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",{'serialize','serialize_msgs','ls'})
+	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",{libs={'serialize','serialize_msgs','ls'}})
 	if not status then
 		return false,err
 	end
@@ -257,14 +257,41 @@ function chdku.listdir(path,opts)
 		end
 	end
 end
---[[ 
-status[,err]=chdku.exec("code",{"rlib name1","rlib name2"...})
-wrapper for chdk.exec_lua, using optional code from rlibs
+
+--[[
+read pending messages and return error from current script, if available
 ]]
-function chdku.exec(code,libs)
-	if libs then
+function chdku.get_error_msg()
+	while true do
+		local msg,err = chdk.read_msg()
+		if not msg then
+			return false
+		end
+		if msg.type == 'none' then
+			return false
+		end
+		if msg.type == 'error' and msg.script_id == chdk.get_script_id() then
+			return msg.value
+		end
+		warnf("chdku.get_error_msg: ignoring message %s\n",chdku.format_script_msg(msg))
+	end
+end
+--[[ 
+status[,err]=chdku.exec("code",opts)
+opts {
+	libs:{"rlib name1","rlib name2"...} -- rlib code to be prepended to "code"
+	wait:bool -- wait for script to complete, return values will be returned after status if true
+	-- below only apply if with wait
+	msgs:{table|function} -- table or function to receive user script messages
+	rets:{table|function} -- table or function to receive script return values, instead of returning them
+}
+wrapper for chdk.execlua, using optional code from rlibs
+]]
+function chdku.exec(code,opts_in)
+	local opts = extend_table({},opts_in)
+	if opts.libs then
 		local libcode=''
-		for k,v in ipairs(libs) do
+		for k,v in ipairs(opts.libs) do
 			if chdku.rlib[v] then
 				libcode = libcode .. chdku.rlib[v];
 			else
@@ -273,22 +300,30 @@ function chdku.exec(code,libs)
 		end
 		code = libcode .. code
 	end
-	return chdk.execlua(code)
-end
-
---[[ 
-status[,err|result1,...]=chdku.exec_waitret("code",{"rlib name1","rlib name2"...})
-like exec, but wait for script execution to finish, and return results
-user messages are ignored
-]]
-function chdku.exec_waitret(code,libs)
-	local status,err=chdku.exec(code,libs)
+	local status,err=chdk.execlua(code)
 	if not status then
+		-- syntax error, try to fetch the error message
+		if err == 'syntax' then
+			local msg = chdku.get_error_msg()
+			if msg then
+				return false,msg
+			end
+		end
 		return false,err
 	end
-	-- first result is our status
-	local results={true}
-	local i=2
+	if not opts.wait then
+		return true
+	end
+	local results
+	local i
+	if type(opts.rets) == 'table' then
+		results = opts.rets
+		i=1
+	else
+		-- first result is our status
+		results={true}
+		i=2
+	end
 
 	while true do
 		status,err=chdku.wait_status{ msg=true, run=false }
@@ -300,21 +335,47 @@ function chdku.exec_waitret(code,libs)
 			if not msg then
 				return false, err
 			end
-			if msg.type == 'user' then
-				warnf("discarding unexpected user message")
+			if msg.script_id ~= chdk.get_script_id() then
+				warnf("chdku.exec: message from unexpected script %s\n",msg.script_id,chdku.format_script_msg(msg))
+			elseif msg.type == 'user' then
+				if type(opts.msgs) == 'function' then
+					local status,err = opts.msgs(msg)
+					if not status then
+						return false,err
+					end
+				elseif type(opts.msgs) == 'table' then
+					table.insert(opts.msgs,msg)
+				else
+					warnf("chdku.exec: unexpected user message %s\n",chdku.format_script_msg(msg))
+				end
 			elseif msg.type == 'return' then
-				results[i] = msg.value
-				i=i+1
+				if type(opts.rets) == 'function' then
+					local status,err = opts.rets(msg)
+					if not status then
+						return false,err
+					end
+				elseif type(opts.rets) == 'table' then
+					table.insert(opts.rets,msg)
+				else
+					results[i] = msg.value
+					i=i+1
+				end
 			elseif msg.type == 'error' then
 				return false, msg.value
 			else
 				return false, 'unexpected message type'
 			end
 		elseif status.run == false then
-			return unpack(results,1,table.maxn(results)) -- maxn expression preserves nils
+			if opts.rets then
+				return true
+			else
+				return unpack(results,1,table.maxn(results)) -- maxn expression preserves nils
+			end
 		end
 	end
+
 end
+
 --[[
 sleep until specified status is met
 status,errmsg=chdku.wait_status(opts)

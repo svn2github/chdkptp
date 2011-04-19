@@ -263,7 +263,7 @@ cli:add_commands{
 		help='execute remote lua',
 		arghelp='<lua code>',
 		func=function(self,args) 
-			return chdk.execlua(args)
+			return chdku.exec(args)
 		end,
 	},
 	{
@@ -297,40 +297,20 @@ cli:add_commands{
 		help='execute remote lua, wait for result',
 		arghelp='<lua code>',
 		func=function(self,args) 
-			local status,result=cli:execute("lua " .. args)
+			local rets={}
+			local msgs={}
+			local status,err = chdku.exec(args,{rets=rets,msgs=msgs,wait=true})
 			if not status then
-				if result == 'syntax' then
-					local _,mcontent = cli:execute("getm")
-					return status,mcontent
-				end
-				return status,result
-			else
-				-- TODO it would be better to print messages as they arrive
-				local msgs=''
-				local msg,err
-				while true do
-					status, err = chdku.wait_status{ msg=true,run=false }
-					if not status then
-						return status, msgs .. err
-					end
-					if status.msg then
-						msg,err=chdk.read_msg()
-						if type(msg) ~= 'table' then 
-							return false,msgs..err
-						end
-						-- none shouldn't really happen happen
-						if msg.type ~= 'none' then
-							msgs = msgs .. chdku.format_script_msg(msg) .. "\n"
-						end
-					-- ensure we only end after all messages have been read
-					elseif not status.run then
-						return true,msgs
-					end
-					if status.timeout then
-						return false, msgs .. "timeout"
-					end
-				end
+				return false,err
 			end
+			local r=''
+			for i=1,#msgs do
+				r=r .. chdku.format_script_msg(msgs[i]) .. '\n'
+			end
+			for i=1,table.maxn(rets) do
+				r=r .. chdku.format_script_msg(rets[i]) .. '\n'
+			end
+			return true,r
 		end,
 	},
 	{

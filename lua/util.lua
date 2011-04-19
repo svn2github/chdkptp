@@ -78,11 +78,14 @@ extend_table_r = function(target,source,seen,depth)
 end
 
 function util.extend_table(target,source,deep)
-	if type(source) ~= 'table' then 
-		error('extend_table: source not table')
-	end
 	if type(target) ~= 'table' then
 		error('extend_table: target not table')
+	end
+	if source == nil then -- easier handling of default options
+		return target
+	end
+	if type(source) ~= 'table' then 
+		error('extend_table: source not table')
 	end
 	if source == target then
 		error('extend_table: source == target')
@@ -189,14 +192,9 @@ util.serialize_defaults = {
 serialize lua values
 options as documented above
 ]]
-function util.serialize(v,opts_in)
-	local opts = util.extend_table({},util.serialize_defaults)
-	if type(opts_in) == 'table' then
-		util.extend_table(opts,opts_in)
-	end
-	return serialize_r(v,opts)
+function util.serialize(v,opts)
+	return serialize_r(v,util.extend_table(util.extend_table({},util.serialize_defaults),opts))
 end
-
 
 --[[
 turn string back into lua data by executing it. Not safe for untrusted data!
