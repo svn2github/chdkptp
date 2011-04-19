@@ -262,17 +262,59 @@ status[,err]=chdku.exec("code",{"rlib name1","rlib name2"...})
 wrapper for chdk.exec_lua, using optional code from rlibs
 ]]
 function chdku.exec(code,libs)
-	local libcode=''
-	for k,v in ipairs(libs) do
-		if chdku.rlib[v] then
-			libcode = libcode .. chdku.rlib[v];
-		else
-			return false,'unknown rlib'..v
+	if libs then
+		local libcode=''
+		for k,v in ipairs(libs) do
+			if chdku.rlib[v] then
+				libcode = libcode .. chdku.rlib[v];
+			else
+				return false,'unknown rlib'..v
+			end
 		end
+		code = libcode .. code
 	end
-	return chdk.execlua(libcode .. code)
+	return chdk.execlua(code)
 end
 
+--[[ 
+status[,err|result1,...]=chdku.exec_waitret("code",{"rlib name1","rlib name2"...})
+like exec, but wait for script execution to finish, and return results
+user messages are ignored
+]]
+function chdku.exec_waitret(code,libs)
+	local status,err=chdku.exec(code,libs)
+	if not status then
+		return false,err
+	end
+	-- first result is our status
+	local results={true}
+	local i=2
+
+	while true do
+		status,err=chdku.wait_status{ msg=true, run=false }
+		if not status then
+			return false,tostring(err)
+		end
+		if status.msg then
+			local msg,err=chdk.read_msg()
+			if not msg then
+				return false, err
+			end
+			if msg.type == 'user' then
+				warnf("discarding unexpected user message")
+			elseif msg.type == 'return' then
+				results[i] = msg.value
+				i=i+1
+			elseif msg.type == 'error' then
+				return false, msg.value
+			else
+				return false, 'unexpected message type'
+			end
+		elseif status.run == false then
+			return unpack(results,1,table.maxn(results)) -- maxn expression preserves nils
+		end
+	end
+end
 --[[
 sleep until specified status is met
 status,errmsg=chdku.wait_status(opts)
