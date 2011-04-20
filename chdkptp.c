@@ -871,24 +871,24 @@ static int chdk_script_status(lua_State *L) {
 // TODO these assume numbers are 0 based and contiguous 
 static const char* script_msg_type_to_name(unsigned type_id) {
 	const char *names[]={"none","error","return","user"};
-	if(type_id >= sizeof(names)) {
-		return NULL;
+	if(type_id >= sizeof(names)/sizeof(names[0])) {
+		return "unknown_msg_type";
 	}
 	return names[type_id];
 }
 
 static const char* script_msg_data_type_to_name(unsigned type_id) {
 	const char *names[]={"unsupported","nil","boolean","integer","string"};
-	if(type_id >= sizeof(names)) {
-		return NULL;
+	if(type_id >= sizeof(names)/sizeof(names[0])) {
+		return "unknown_msg_subtype";
 	}
 	return names[type_id];
 }
 
 static const char* script_msg_error_type_to_name(unsigned type_id) {
 	const char *names[]={"none","compile","runtime"};
-	if(type_id >= sizeof(names)) {
-		return NULL;
+	if(type_id >= sizeof(names)/sizeof(names[0])) {
+		return "unknown_error_subtype";
 	}
 	return names[type_id];
 }
