@@ -100,6 +100,14 @@ function util.extend_table(target,source,deep)
 	end
 end
 
+function util.in_table(table,value)
+	for k,v in pairs(table) do
+		if v == value then
+			return true
+		end
+	end
+end
+
 function util.hexdump(str,offset)
 	local c, result, byte
 	if not offset then
@@ -197,7 +205,8 @@ function util.serialize(v,opts)
 end
 
 --[[
-turn string back into lua data by executing it. Not safe for untrusted data!
+turn string back into lua data by executing it and returning the value
+the value is sandboxed in an empty function environment
 returns the resulting value, or false + an error message on failure
 check the message, since the serialized value might be false or nil!
 ]]
@@ -206,6 +215,7 @@ function util.unserialize(s)
 	if not f then
 		return false, err
 	end
+	setfenv(f,{}) -- empty fenv
 	local status,r=pcall(f)
 	if status then
 		return r
