@@ -878,7 +878,7 @@ static const char* script_msg_type_to_name(unsigned type_id) {
 }
 
 static const char* script_msg_data_type_to_name(unsigned type_id) {
-	const char *names[]={"unsupported","nil","boolean","integer","string"};
+	const char *names[]={"unsupported","nil","boolean","integer","string","table"};
 	if(type_id >= sizeof(names)/sizeof(names[0])) {
 		return "unknown_msg_subtype";
 	}
@@ -931,24 +931,26 @@ static int chdk_read_msg(lua_State *L) {
 	switch(msg->type) {
 		case PTP_CHDK_S_MSGTYPE_RET:
 		case PTP_CHDK_S_MSGTYPE_USER:
-		lua_pushstring(L, script_msg_data_type_to_name(msg->subtype));
-		lua_setfield(L, -2, "subtype");
-		switch(msg->subtype) {
-			case PTP_CHDK_TYPE_UNSUPPORTED: // type name will be returned in data
-			case PTP_CHDK_TYPE_STRING: // NOTE tables currently returned as string
-				lua_pushlstring(L, msg->data,msg->size);
-				lua_setfield(L, -2, "value");
-			break;
-			case PTP_CHDK_TYPE_BOOLEAN:
-				lua_pushboolean(L, *(int *)msg->data);
-				lua_setfield(L, -2, "value");
-			break;
-			case PTP_CHDK_TYPE_INTEGER:
-				lua_pushinteger(L, *(int *)msg->data);
-				lua_setfield(L, -2, "value");
-			break;
-			// default or PTP_CHDK_TYPE_NIL - value is nil
-		}
+			lua_pushstring(L, script_msg_data_type_to_name(msg->subtype));
+			lua_setfield(L, -2, "subtype");
+			switch(msg->subtype) {
+				case PTP_CHDK_TYPE_UNSUPPORTED: // type name will be returned in data
+				case PTP_CHDK_TYPE_STRING: 
+				case PTP_CHDK_TYPE_TABLE: // tables are returned as a serialized string. 
+										  // The user is responsible for unserializing, to allow different serialization methods
+					lua_pushlstring(L, msg->data,msg->size);
+					lua_setfield(L, -2, "value");
+				break;
+				case PTP_CHDK_TYPE_BOOLEAN:
+					lua_pushboolean(L, *(int *)msg->data);
+					lua_setfield(L, -2, "value");
+				break;
+				case PTP_CHDK_TYPE_INTEGER:
+					lua_pushinteger(L, *(int *)msg->data);
+					lua_setfield(L, -2, "value");
+				break;
+				// default or PTP_CHDK_TYPE_NIL - value is nil
+			}
 		break;
 		case PTP_CHDK_S_MSGTYPE_ERR:
 			lua_pushstring(L, script_msg_error_type_to_name(msg->subtype));

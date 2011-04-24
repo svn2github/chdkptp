@@ -103,7 +103,7 @@ serialize_defaults = {
 	maxdepth=10,
 	err_type=true,
 	err_cycle=true,
-	pretty=true,
+	pretty=false,
 }
 
 function serialize(v,opts)
@@ -196,14 +196,14 @@ function ls(path,opts_in)
 			if count < opts.msglimit then
 				count=count+1
 			else
-				write_usb_msg(serialize(r,{pretty=opts.pretty}),opts.msgtimeout)
+				write_usb_msg(r,opts.msgtimeout)
 				r={}
 				count=1
 			end
 		end
 	end
 	if count > 1 then
-		write_usb_msg(serialize(r,{pretty=opts.pretty}),opts.msgtimeout)
+		write_usb_msg(r,opts.msgtimeout)
 	end
 	return true
 end
@@ -239,7 +239,7 @@ function chdku.listdir(path,opts)
 				return false, err
 			end
 			if msg.type == 'user' then
-				if msg.subtype ~= 'string' or string.sub(msg.value,1,1) ~= '{' then
+				if msg.subtype ~= 'table' or string.sub(msg.value,1,1) ~= '{' then
 					return false, 'unexpected message value'
 				end
 				local chunk,err=unserialize(msg.value)
@@ -314,16 +314,11 @@ function chdku.exec(code,opts_in)
 	if not opts.wait then
 		return true
 	end
-	local results
-	local i
-	if type(opts.rets) == 'table' then
-		results = opts.rets
-		i=1
-	else
-		-- first result is our status
-		results={true}
-		i=2
-	end
+
+	-- to collect return values
+	-- first result is our status
+	local results = {true}
+	local i=2
 
 	while true do
 		status,err=chdku.wait_status{ msg=true, run=false }
@@ -357,7 +352,12 @@ function chdku.exec(code,opts_in)
 				elseif type(opts.rets) == 'table' then
 					table.insert(opts.rets,msg)
 				else
-					results[i] = msg.value
+					-- if serialize_msgs is not selected, table return values will be strings
+					if msg.subtype == 'table' and in_table(opts.libs,'serialize_msgs') then
+						results[i] = unserialize(msg.value)
+					else
+						results[i] = msg.value
+					end
 					i=i+1
 				end
 			elseif msg.type == 'error' then
