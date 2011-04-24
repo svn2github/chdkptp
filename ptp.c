@@ -1922,12 +1922,14 @@ int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_ch
     *msg = NULL;
     return 0;
   }
-  *msg = malloc(sizeof(ptp_chdk_script_msg) + ptp.Param4);
+  // for convenience, always allocate an extra byte and null it
+  *msg = malloc(sizeof(ptp_chdk_script_msg) + ptp.Param4 + 1);
   (*msg)->type = ptp.Param1;
   (*msg)->subtype = ptp.Param2;
   (*msg)->script_id = ptp.Param3;
   (*msg)->size = ptp.Param4;
   memcpy((*msg)->data,data,(*msg)->size);
+  (*msg)->data[(*msg)->size] = 0;
   return 1;
 }
 
