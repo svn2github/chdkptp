@@ -39,13 +39,6 @@ function util.errf(format,...)
 	fprintf(io.stderr,"ERROR: " .. format,...)
 end
 
---[[ 
-copy members of source into target
-by default, not deep so any tables will be copied as references
-returns target so you can do x=extend_table({},...)
-if deep, cycles result in an error
-deep does not copy keys which are themselves tables
-]]
 util.extend_table_max_depth = 10
 local extend_table_r
 extend_table_r = function(target,source,seen,depth) 
@@ -77,6 +70,13 @@ extend_table_r = function(target,source,seen,depth)
 	return target
 end
 
+--[[ 
+copy members of source into target
+by default, not deep so any tables will be copied as references
+returns target so you can do x=extend_table({},...)
+if deep, cycles result in an error
+deep does not copy keys which are themselves tables (the key will be a reference to the original key table)
+]]
 function util.extend_table(target,source,deep)
 	if type(target) ~= 'table' then
 		error('extend_table: target not table')
@@ -100,7 +100,13 @@ function util.extend_table(target,source,deep)
 	end
 end
 
+--[[
+does table have value in it ?
+]]
 function util.in_table(table,value)
+	if table == nil then
+		return false
+	end
 	for k,v in pairs(table) do
 		if v == value then
 			return true
