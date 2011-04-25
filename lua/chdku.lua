@@ -221,25 +221,13 @@ function chdku.listdir(path,opts)
 	if type(opts) == 'table' then
 		opts = serialize(opts)
 	end
-	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",{libs={'serialize','serialize_msgs','ls'}})
-	if not status then
-		return false,err
-	end
 	local results={}
-
-	while true do
-		status,err=chdku.wait_status{ msg=true, run=false }
-		if not status then
-			return false,tostring(err)
-		end
-		
-		if status.msg then
-			local msg,err=chdk.read_msg()
-			if not msg then
-				return false, err
-			end
-			if msg.type == 'user' then
-				if msg.subtype ~= 'table' or string.sub(msg.value,1,1) ~= '{' then
+	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",
+		{
+			wait=true,
+			libs={'serialize','serialize_msgs','ls'},
+			msgs=function(msg)
+				if msg.subtype ~= 'table' then
 					return false, 'unexpected message value'
 				end
 				local chunk,err=unserialize(msg.value)
@@ -249,13 +237,14 @@ function chdku.listdir(path,opts)
 				for k,v in pairs(chunk) do
 					results[k] = v
 				end
-			elseif msg.type ~= 'return' or msg.value ~= true then
-				return false, msg.value
-			end
-		elseif status.run == false then
-			return results
-		end
+				return true
+			end,
+		})
+	if not status then
+		return false,err
 	end
+
+	return results
 end
 
 --[[
@@ -277,15 +266,19 @@ function chdku.get_error_msg()
 	end
 end
 --[[ 
+wrapper for chdk.execlua, using optional code from rlibs
 status[,err]=chdku.exec("code",opts)
 opts {
-	libs:{"rlib name1","rlib name2"...} -- rlib code to be prepended to "code"
-	wait:bool -- wait for script to complete, return values will be returned after status if true
+	libs={"rlib name1","rlib name2"...} -- rlib code to be prepended to "code"
+	wait=bool -- wait for script to complete, return values will be returned after status if true
 	-- below only apply if with wait
-	msgs:{table|function} -- table or function to receive user script messages
-	rets:{table|function} -- table or function to receive script return values, instead of returning them
+	msgs={table|callback} -- table or function to receive user script messages
+	rets={table|callback} -- table or function to receive script return values, instead of returning them
+	fdata={any lua value} -- data to be passed as second argument to callbacks
 }
-wrapper for chdk.execlua, using optional code from rlibs
+callbacks
+	status[,err] = f(message,fdata)
+	processing continues if status is true, otherwise aborts and returns err
 ]]
 function chdku.exec(code,opts_in)
 	local opts = extend_table({},opts_in)
@@ -334,7 +327,7 @@ function chdku.exec(code,opts_in)
 				warnf("chdku.exec: message from unexpected script %s\n",msg.script_id,chdku.format_script_msg(msg))
 			elseif msg.type == 'user' then
 				if type(opts.msgs) == 'function' then
-					local status,err = opts.msgs(msg)
+					local status,err = opts.msgs(msg,opts.fdata)
 					if not status then
 						return false,err
 					end
@@ -345,7 +338,7 @@ function chdku.exec(code,opts_in)
 				end
 			elseif msg.type == 'return' then
 				if type(opts.rets) == 'function' then
-					local status,err = opts.rets(msg)
+					local status,err = opts.rets(msg,opts.fdata)
 					if not status then
 						return false,err
 					end
