@@ -50,19 +50,21 @@ TODO passing compiled chunks might be better but our lua configurations are diff
 local rlibs = {
 	libs={},
 }
-
 --[[
 register{
 	name='libname'
-	depend={'lib1','lib2'...}, -- already registered rlibs this one requires (cyclic deps not allowed)
+	depend='lib'|{'lib1','lib2'...}, -- already registered rlibs this one requires (cyclic deps not allowed)
 	code='', -- main lib code.
 }
 ]]
 function rlibs:register(t)
-	if type(t.depend) == 'nil' then
+	-- for convenience, single lib may be given as string
+	if type(t.depend) == 'string' then
+		t.depend = {t.depend}
+	elseif type(t.depend) == 'nil' then
 		t.depend = {}
 	elseif type(t.depend) ~= 'table' then
-		error('expected dependency table')
+		error('expected dependency table or string')
 	end
 	if type(t.code) ~= 'string' then
 		error('expected code string')
@@ -107,8 +109,15 @@ function rlibs:build_single(build,name)
 end
 --[[
 return a list of rlibs in dependency order
+t=rlibs:build_list('name'|{'name1','name2',...})
 ]]
 function rlibs:build_list(libnames)
+	-- single can be given as string
+	if type(libnames) == 'string' then
+		libnames={libnames}
+	elseif type(libnames) ~= 'table' then
+		error('rlibs:build_list expected string or table for libnames')
+	end
 	local build={
 		list={},
 		map={},
@@ -120,6 +129,7 @@ function rlibs:build_list(libnames)
 end
 --[[
 return a string containing all the required rlib code
+code=rlibs:build('name'|{'name1','name2',...})
 ]]
 function rlibs:build(names)
 	local liblist = self:build_list(names)
@@ -186,14 +196,12 @@ serialize_r = function(v,opts,seen,depth)
 		return '"'..tostring(v)..'"'
 	end
 end
-
 serialize_defaults = {
 	maxdepth=10,
 	err_type=true,
 	err_cycle=true,
 	pretty=false,
 }
-
 function serialize(v,opts)
 	if opts then
 		for k,v in pairs(serialize_defaults) do
@@ -211,7 +219,7 @@ end
 -- override default table serialization for messages
 {
 	name='serialize_msgs',
-	depend={'serialize'},
+	depend='serialize',
 	code=[[
 	usb_msg_table_to_string=serialize
 ]],
@@ -257,7 +265,7 @@ b:flush() sends any remaining items
 ]]
 {
 	name='msg_batcher',
-	depend={'serialize_msgs'},
+	depend='serialize_msgs',
 	code=[[
 function msg_batcher(opts_in)
 	local t = {
@@ -298,7 +306,7 @@ retrieve a directory listing of names, batched in messages
 ]]
 {
 	name='ls_simple',
-	depend={'msg_batcher'},
+	depend='msg_batcher',
 	code=[[
 function ls_simple(path)
 	local b=msg_batcher()
@@ -346,7 +354,7 @@ TODO handle case if 'path' is a file
 ]]
 {
 	name='ls',
-	depend={'serialize_msgs'},
+	depend='serialize_msgs',
 	code=[[
 function ls(path,opts_in)
 	local opts={
@@ -417,7 +425,7 @@ function chdku.listdir(path,opts)
 	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",
 		{
 			wait=true,
-			libs={'ls'},
+			libs='ls',
 			msgs=function(msg)
 				if msg.subtype ~= 'table' then
 					return false, 'unexpected message value'
@@ -481,6 +489,7 @@ function chdku.exec(code,opts_in)
 	if not status then
 		-- syntax error, try to fetch the error message
 		if err == 'syntax' then
+			-- TODO extract error line and match with code
 			local msg = chdku.get_error_msg()
 			if msg then
 				return false,msg
@@ -530,6 +539,7 @@ function chdku.exec(code,opts_in)
 					table.insert(opts.rets,msg)
 				else
 					-- if serialize_msgs is not selected, table return values will be strings
+					-- TODO not updated for new rlib yet
 					if msg.subtype == 'table' and in_table(opts.libs,'serialize_msgs') then
 						results[i] = unserialize(msg.value)
 					else
