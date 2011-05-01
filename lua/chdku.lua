@@ -38,20 +38,108 @@ function chdku.format_script_msg(msg)
 	return r
 end
 
+-- TODO this should be split out into it's own module(s)
 --[[
+simple library system for building remote commands
 chunks of source code to be used remotely
 can be used with chdku.exec
 TODO some of these are duplicated with local code, but we don't yet have an easy way of sharing them
 TODO would be good to minify
-TODO handle order and dependencies
 TODO passing compiled chunks might be better but our lua configurations are different
 ]]
-chdku.rlib={
+local rlibs = {
+	libs={},
+}
+
+--[[
+register{
+	name='libname'
+	depend={'lib1','lib2'...}, -- already registered rlibs this one requires (cyclic deps not allowed)
+	code='', -- main lib code.
+}
+]]
+function rlibs:register(t)
+	if type(t.depend) == 'nil' then
+		t.depend = {}
+	elseif type(t.depend) ~= 'table' then
+		error('expected dependency table')
+	end
+	if type(t.code) ~= 'string' then
+		error('expected code string')
+	end
+	if type(t.name) ~= 'string' then
+		error('expected name string')
+	end
+	for i,v in ipairs(t.depend) do
+		if not self.libs[v] then
+			errf('%s missing dep %s\n',t.name,v)
+		end
+	end
+	self.libs[t.name] = t
+end
+
+--[[
+register an array of libs
+]]
+function rlibs:register_array(t)
+	for i,v in ipairs(t) do
+		self:register(v)
+	end
+end
+
+--[[
+add deps for a single lib
+]]
+function rlibs:build_single(build,name)
+	local lib = self.libs[name]
+	if not lib then
+		errf('unknown lib %s\n',tostring(name))
+	end
+	-- already added
+	if build.map[name] then
+		return
+	end
+	for i,dname in ipairs(lib.depend) do
+		self:build_single(build,dname)
+	end
+	build.map[name]=lib
+	table.insert(build.list,lib)
+end
+--[[
+return a list of rlibs in dependency order
+]]
+function rlibs:build_list(libnames)
+	local build={
+		list={},
+		map={},
+	}
+	for i,name in ipairs(libnames) do
+		self:build_single(build,name)
+	end
+	return build.list
+end
+--[[
+return a string containing all the required rlib code
+]]
+function rlibs:build(names)
+	local liblist = self:build_list(names)
+	-- TODO would be good to keep a map of line numbers here somehow
+	-- or possibly exec should keep the code around ?
+	local code=""
+	for i,lib in ipairs(liblist) do
+		code = code .. lib.code .. '\n'
+	end
+	return code
+end
+
+rlibs:register_array{
 --[[
 mostly duplicated from util.serialize
 global defaults can be changed from code
 ]]
-	serialize=[[
+{
+	name='serialize',
+	code=[[
 serialize_r = function(v,opts,seen,depth)
 	local vt = type(v)
 	if vt == 'nil' or  vt == 'boolean' or vt == 'number' then
@@ -118,12 +206,16 @@ function serialize(v,opts)
 	end
 	return serialize_r(v,opts)
 end
-
 ]],
+},
 -- override default table serialization for messages
-	serialize_msgs=[[
+{
+	name='serialize_msgs',
+	depend={'serialize'},
+	code=[[
 	usb_msg_table_to_string=serialize
 ]],
+},
 --[[
 	status[,err]=dir_iter(path,func,opts)
 general purpose directory iterator
@@ -131,7 +223,9 @@ interates over directory 'path', calling
 func(path,filename,opts.fdata) on each item
 func is called with a nil filename after listing is complete
 ]]
-	dir_iter=[[
+{
+	name='dir_iter',
+	code=[[
 function dir_iter(path,func,opts)
 	if not opts then
 		opts = {}
@@ -150,6 +244,7 @@ function dir_iter(path,func,opts)
 	return func(path,nil,opts)
 end
 ]],
+},
 --[[
 function to batch stuff in groups of messages
 b=msg_batcher{
@@ -160,7 +255,10 @@ call
 b:write() adds items and sends when batch size is reached
 b:flush() sends any remaining items
 ]]
-	msg_batch=[[
+{
+	name='msg_batcher',
+	depend={'serialize_msgs'},
+	code=[[
 function msg_batcher(opts_in)
 	local t = {
 		batchsize=50,
@@ -194,10 +292,14 @@ function msg_batcher(opts_in)
 	return t
 end
 ]],
+},
 --[[
 retrieve a directory listing of names, batched in messages
 ]]
-	ls_simple=[[
+{
+	name='ls_simple',
+	depend={'msg_batcher'},
+	code=[[
 function ls_simple(path)
 	local b=msg_batcher()
 	local t,err=os.listdir(path)
@@ -212,6 +314,7 @@ function ls_simple(path)
 	return b:flush()
 end
 ]],
+},
 --[[
 TODO rework this to a general iterate over directory function
 sends file listing as serialized tables with write_usb_msg
@@ -241,7 +344,10 @@ msglimit can help but os.listdir itself could use all memory
 TODO message timeout is not checked
 TODO handle case if 'path' is a file
 ]]
-	ls=[[
+{
+	name='ls',
+	depend={'serialize_msgs'},
+	code=[[
 function ls(path,opts_in)
 	local opts={
 		msglimit=50,
@@ -292,8 +398,10 @@ function ls(path,opts_in)
 	return true
 end
 ]],
+},
 }
 
+chdku.rlibs = rlibs
 --[[
 opts may be a table, or a string containing lua code for a table
 return a list of remote directory contents
@@ -309,7 +417,7 @@ function chdku.listdir(path,opts)
 	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",
 		{
 			wait=true,
-			libs={'serialize','serialize_msgs','ls'},
+			libs={'ls'},
 			msgs=function(msg)
 				if msg.subtype ~= 'table' then
 					return false, 'unexpected message value'
@@ -367,15 +475,7 @@ callbacks
 function chdku.exec(code,opts_in)
 	local opts = extend_table({},opts_in)
 	if opts.libs then
-		local libcode=''
-		for k,v in ipairs(opts.libs) do
-			if chdku.rlib[v] then
-				libcode = libcode .. chdku.rlib[v];
-			else
-				return false,'unknown rlib'..v
-			end
-		end
-		code = libcode .. code
+		code = chdku.rlibs:build(opts.libs) .. code
 	end
 	local status,err=chdk.execlua(code)
 	if not status then
