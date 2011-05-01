@@ -125,6 +125,94 @@ end
 	usb_msg_table_to_string=serialize
 ]],
 --[[
+	status[,err]=dir_iter(path,func,opts)
+general purpose directory iterator
+interates over directory 'path', calling
+func(path,filename,opts.fdata) on each item
+func is called with a nil filename after listing is complete
+]]
+	dir_iter=[[
+function dir_iter(path,func,opts)
+	if not opts then
+		opts = {}
+	end
+		
+	local t,err=os.listdir(path,opts.listall)
+	if not t then
+		return false,err
+	end
+	for i,v in ipairs(t) do
+		local status,err=func(path,v,opts)
+		if not status then
+			return status,err
+		end
+	end
+	return func(path,nil,opts)
+end
+]],
+--[[
+function to batch stuff in groups of messages
+b=msg_batcher{
+	batchsize=num, -- items per batch
+	timeout=num, -- message timeout
+}
+call
+b:write() adds items and sends when batch size is reached
+b:flush() sends any remaining items
+]]
+	msg_batch=[[
+function msg_batcher(opts_in)
+	local t = {
+		batchsize=50,
+		timeout=100000
+	}
+	if opts_in then
+		for k,v in pairs(opts_in) do
+			t[k] = v
+		end
+	end
+	t.data = {}
+	t.n = 0
+	t.write=function(self,val)
+		self.n = self.n + 1
+		self.data[self.n] = val
+		if self.n >= self.batchsize then
+			return self:flush()
+		end
+		return true
+	end
+	t.flush = function(self)
+		if self.n > 0 then
+			if not write_usb_msg(self.data,self.timeout) then
+				return false
+			end
+			self.data = {}
+			self.n = 0
+		end
+		return true
+	end
+	return t
+end
+]],
+--[[
+retrieve a directory listing of names, batched in messages
+]]
+	ls_simple=[[
+function ls_simple(path)
+	local b=msg_batcher()
+	local t,err=os.listdir(path)
+	if not t then
+		return false,err
+	end
+	for i,v in ipairs(t) do
+		if not b:write(v) then
+			return false
+		end
+	end
+	return b:flush()
+end
+]],
+--[[
 TODO rework this to a general iterate over directory function
 sends file listing as serialized tables with write_usb_msg
 returns true, or false,error message
@@ -133,7 +221,6 @@ opts={
 	listall=bool, 
 	msglimit=number,
 	match="pattern",
-	pretty=bool,
 }
 stat
 	false/nil, return an array of names without stating at all
@@ -148,8 +235,6 @@ match
 	pattern, file names matching with string.match will be returned
 listall 
 	passed as second arg to os.listdir
-pretty
-	should serialized results be pretty ?
 
 may run out of memory on very large directories,
 msglimit can help but os.listdir itself could use all memory
@@ -161,7 +246,6 @@ function ls(path,opts_in)
 	local opts={
 		msglimit=50,
 		msgtimeout=100000,
-		pretty=false,
 	}
 	if opts_in then
 		for k,v in pairs(opts_in) do
