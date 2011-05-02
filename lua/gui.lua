@@ -390,28 +390,19 @@ function camfiletree:populate_branch(id,path)
 	end		
 	local list,msg = chdku.listdir(path,{stat='*'})
 	if type(list) == 'table' then
-		local dirs={}
-		local files={}
-		local i=1
-		for k,v in pairs(list) do
-			if v.is_dir then
-				table.insert(dirs,k)
+		chdku.sortdir_stat(list)
+		for i=#list, 1, -1 do
+			st = list[i]
+			if st.is_dir then
+				self['addbranch'..id]=st.name
+				self:set_data(self.lastaddnode,{name=st.name,stat=st,path=path})
+				-- dummy, otherwise tree nodes not expandable
+				-- TODO would be better to only add if dir is not empty
+				self['addleaf'..self.lastaddnode] = 'dummy'
 			else
-				table.insert(files,k)
+				self['addleaf'..id]=st.name
+				self:set_data(self.lastaddnode,{name=st.name,stat=st,path=path})
 			end
-		end
-		table.sort(files,function(a,b) return a>b end)
-		table.sort(dirs,function(a,b) return a>b end)
-		for i,name in ipairs(files) do
-			self['addleaf'..id]=name
-			self:set_data(self.lastaddnode,{name=name,stat=list[name],path=path})
-		end
-		for i,name in ipairs(dirs) do
-			self['addbranch'..id]=name
-			self:set_data(self.lastaddnode,{name=name,stat=list[name],path=path})
-			-- dummy, otherwise tree nodes not expandable
-			-- TODO would be better to only add if dir is not empty
-			self['addleaf'..self.lastaddnode] = 'dummy'
 		end
 	end
 end

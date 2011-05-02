@@ -349,7 +349,7 @@ opts={
 stat
 	false/nil, return an array of names without stating at all
 	'/' return array of names, with / appended to dirs
-	'*" return all stat fields
+	'*" return array of stat results, plus name="name"
 	{table} return stat fields named in table (TODO not implemented)
 msglimit
 	maximum number of items to return in a message
@@ -401,7 +401,8 @@ function ls(path,opts_in)
 						b:write(v)
 					end
 				elseif opts.stat == '*' then
-					b:write(st,v)
+					st.name=v
+					b:write(st)
 				end
 			else
 				b:write(t[i])
@@ -440,6 +441,21 @@ function chdku.listdir(path,opts)
 	end
 
 	return results
+end
+
+--[[
+sort an array of stat+name by directory status, name
+]]
+function chdku.sortdir_stat(list)
+	table.sort(list,function(a,b) 
+			if a.is_dir and not b.is_dir then
+				return true
+			end
+			if not a.is_dir and b.is_dir then
+				return false
+			end
+			return a.name < b.name
+		end)
 end
 
 --[[

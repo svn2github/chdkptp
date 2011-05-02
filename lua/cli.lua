@@ -449,22 +449,15 @@ cli:add_commands{
 			end
 			local list,msg = chdku.listdir(path,listopts)
 			if type(list) == 'table' then
-				local r = '';
+				local r = ''
 				if opts.l then
-					local names={}
-					local i=1
-					for k,v in pairs(list) do
-						names[i]=k
-						i=i+1
-					end
 					-- alphabetic sort TODO sorting/grouping options
-					table.sort(names)
-					for i,name in ipairs(names) do
-						local st=list[name]
+					chdku.sortdir_stat(list)
+					for i,st in ipairs(list) do
 						if st.is_dir then
-							r = r .. string.format("%s/\n",name)
+							r = r .. string.format("%s/\n",st.name)
 						else
-							r = r .. string.format("%-13s %10d\n",name,list[name].size)
+							r = r .. string.format("%-13s %10d\n",st.name,st.size)
 						end
 					end
 				else
