@@ -259,15 +259,13 @@ end
 },
 --[[
 function to batch stuff in groups of messages
-each batch is sent as a table
-by default, table is an array
-caller may specify keys, in which case caller is responsible for avoiding duplicates and nils are discarded
+each batch is sent as a numeric array
 b=msg_batcher{
 	batchsize=num, -- items per batch
 	timeout=num, -- message timeout
 }
 call
-b:write(value[,key]) adds items and sends when batch size is reached
+b:write(value) adds items and sends when batch size is reached
 b:flush() sends any remaining items
 ]]
 {
@@ -284,17 +282,11 @@ function msg_batcher(opts_in)
 			t[k] = v
 		end
 	end
-	t.data = {}
-	t.n = 0
-	t.write=function(self,val,key)
-		if type(key) == 'nil' then
-			key = self.n + 1
-		end
-		if type(self.data[key]) ~= 'nil' then
-			return true
-		end
-		self.n = self.n + 1
-		self.data[key] = val
+	t.data={}
+	t.n=0
+	t.write=function(self,val)
+		self.n = self.n+1
+		self.data[self.n]=val
 		if self.n >= self.batchsize then
 			return self:flush()
 		end
@@ -305,8 +297,8 @@ function msg_batcher(opts_in)
 			if not write_usb_msg(self.data,self.timeout) then
 				return false
 			end
-			self.data = {}
-			self.n = 0
+			self.data={}
+			self.n=0
 		end
 		return true
 	end
@@ -489,13 +481,9 @@ function chdku.msg_unbatcher(t)
 		if err then
 			return false, err
 		end
-		for k,v in pairs(chunk) do
-			if type(k) == 'string' then
-				t[k] = v
-			else
-				t[i] = v
-				i = i+1
-			end
+		for j,v in ipairs(chunk) do
+			t[i]=v
+			i=i+1
 		end
 		return true
 	end
