@@ -108,12 +108,21 @@ function rlibs:build_single(build,name)
 	table.insert(build.list,lib)
 end
 --[[
-return a list of rlibs in dependency order
-t=rlibs:build_list('name'|{'name1','name2',...})
+return an object containing the libs with deps resolved
+obj=rlibs:build('name'|{'name1','name2',...})
 ]]
-function rlibs:build_list(libnames)
-	-- single can be given as string
-	if type(libnames) == 'string' then
+-- helper for returned object
+local function rlib_get_code(build)
+	local code=""
+	for i,lib in ipairs(build.list) do
+		code = code .. lib.code .. '\n'
+	end
+	return code
+end
+function rlibs:build(libnames)
+	-- single can be given as string, 
+	-- nil is allowed, returns empty object
+	if type(libnames) == 'string' or type(libnames) == 'nil' then
 		libnames={libnames}
 	elseif type(libnames) ~= 'table' then
 		error('rlibs:build_list expected string or table for libnames')
@@ -121,25 +130,20 @@ function rlibs:build_list(libnames)
 	local build={
 		list={},
 		map={},
+		code=rlib_get_code,
 	}
 	for i,name in ipairs(libnames) do
 		self:build_single(build,name)
 	end
-	return build.list
+	return build
 end
 --[[
 return a string containing all the required rlib code
 code=rlibs:build('name'|{'name1','name2',...})
 ]]
-function rlibs:build(names)
-	local liblist = self:build_list(names)
-	-- TODO would be good to keep a map of line numbers here somehow
-	-- or possibly exec should keep the code around ?
-	local code=""
-	for i,lib in ipairs(liblist) do
-		code = code .. lib.code .. '\n'
-	end
-	return code
+function rlibs:code(names)
+	local build = self:build(names)
+	return build:code();
 end
 
 rlibs:register_array{
@@ -425,7 +429,7 @@ function chdku.listdir(path,opts)
 	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",
 		{
 			wait=true,
-			libs='ls',
+			libs={'ls'},
 			msgs=function(msg)
 				if msg.subtype ~= 'table' then
 					return false, 'unexpected message value'
@@ -471,6 +475,7 @@ status[,err]=chdku.exec("code",opts)
 opts {
 	libs={"rlib name1","rlib name2"...} -- rlib code to be prepended to "code"
 	wait=bool -- wait for script to complete, return values will be returned after status if true
+	nodefaultlib=bool -- don't automatically include default rlibs
 	-- below only apply if with wait
 	msgs={table|callback} -- table or function to receive user script messages
 	rets={table|callback} -- table or function to receive script return values, instead of returning them
@@ -480,11 +485,22 @@ callbacks
 	status[,err] = f(message,fdata)
 	processing continues if status is true, otherwise aborts and returns err
 ]]
+-- use serialize by default
+chdku.default_libs={
+	'serialize_msgs',
+}
+
 function chdku.exec(code,opts_in)
 	local opts = extend_table({},opts_in)
-	if opts.libs then
-		code = chdku.rlibs:build(opts.libs) .. code
+	local liblist={}
+	if not opts.nodefaultlib then
+		extend_table(liblist,chdku.default_libs)
 	end
+	extend_table(liblist,opts.libs)
+	local libs = chdku.rlibs:build(liblist)
+
+	code = libs:code() .. code
+
 	local status,err=chdk.execlua(code)
 	if not status then
 		-- syntax error, try to fetch the error message
@@ -539,8 +555,7 @@ function chdku.exec(code,opts_in)
 					table.insert(opts.rets,msg)
 				else
 					-- if serialize_msgs is not selected, table return values will be strings
-					-- TODO not updated for new rlib yet
-					if msg.subtype == 'table' and in_table(opts.libs,'serialize_msgs') then
+					if msg.subtype == 'table' and libs.map['serialize_msgs'] then
 						results[i] = unserialize(msg.value)
 					else
 						results[i] = msg.value
