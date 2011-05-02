@@ -433,24 +433,7 @@ function chdku.listdir(path,opts)
 		{
 			wait=true,
 			libs={'ls'},
-			msgs=function(msg)
-				if msg.subtype ~= 'table' then
-					return false, 'unexpected message value'
-				end
-				local chunk,err=unserialize(msg.value)
-				if err then
-					return false, err
-				end
-				for k,v in pairs(chunk) do
-					if type(k) == 'string' then
-						results[k] = v
-					else
-						results[i] = v
-						i = i+1
-					end
-				end
-				return true
-			end,
+			msgs=chdku.msg_unbatcher(results),
 		})
 	if not status then
 		return false,err
@@ -475,6 +458,30 @@ function chdku.get_error_msg()
 			return msg.value
 		end
 		warnf("chdku.get_error_msg: ignoring message %s\n",chdku.format_script_msg(msg))
+	end
+end
+--[[
+return a closure to be used with as a chdku.exec msgs function, which unbatches messages msg_batcher into t
+]]
+function chdku.msg_unbatcher(t)
+	local i=1
+	return function(msg)
+		if msg.subtype ~= 'table' then
+			return false, 'unexpected message value'
+		end
+		local chunk,err=unserialize(msg.value)
+		if err then
+			return false, err
+		end
+		for k,v in pairs(chunk) do
+			if type(k) == 'string' then
+				t[k] = v
+			else
+				t[i] = v
+				i = i+1
+			end
+		end
+		return true
 	end
 end
 --[[ 
