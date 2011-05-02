@@ -428,6 +428,7 @@ function chdku.listdir(path,opts)
 		opts = serialize(opts)
 	end
 	local results={}
+	local i=1
 	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",
 		{
 			wait=true,
@@ -441,7 +442,12 @@ function chdku.listdir(path,opts)
 					return false, err
 				end
 				for k,v in pairs(chunk) do
-					results[k] = v
+					if type(k) == 'string' then
+						results[k] = v
+					else
+						results[i] = v
+						i = i+1
+					end
 				end
 				return true
 			end,
