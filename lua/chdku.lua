@@ -259,12 +259,15 @@ end
 },
 --[[
 function to batch stuff in groups of messages
+each batch is sent as a table
+by default, table is an array
+caller may specify keys, in which case caller is responsible for avoiding duplicates and nils are discarded
 b=msg_batcher{
 	batchsize=num, -- items per batch
 	timeout=num, -- message timeout
 }
 call
-b:write() adds items and sends when batch size is reached
+b:write(value[,key]) adds items and sends when batch size is reached
 b:flush() sends any remaining items
 ]]
 {
@@ -283,9 +286,15 @@ function msg_batcher(opts_in)
 	end
 	t.data = {}
 	t.n = 0
-	t.write=function(self,val)
+	t.write=function(self,val,key)
+		if type(key) == 'nil' then
+			key = self.n + 1
+		end
+		if type(self.data[key]) ~= 'nil' then
+			return true
+		end
 		self.n = self.n + 1
-		self.data[self.n] = val
+		self.data[key] = val
 		if self.n >= self.batchsize then
 			return self:flush()
 		end
@@ -358,7 +367,7 @@ TODO handle case if 'path' is a file
 ]]
 {
 	name='ls',
-	depend='serialize_msgs',
+	depend='msg_batcher',
 	code=[[
 function ls(path,opts_in)
 	local opts={
@@ -374,8 +383,10 @@ function ls(path,opts_in)
 	if not t then
 		return false,msg
 	end
-	local r={}
-	local count=1
+	local b=msg_batcher{
+		batchsize=opts.msglimit,
+		timeoute=opts.msgtimeout
+	}
 	for i,v in ipairs(t) do
 		if not opts.match or string.match(v,opts.match) then
 			if opts.stat then
@@ -385,28 +396,19 @@ function ls(path,opts_in)
 				end
 				if opts.stat == '/' then
 					if st.is_dir then
-						r[count]=v .. '/'
+						b:write(v .. '/')
 					else 
-						r[count]=v
+						b:write(v)
 					end
 				elseif opts.stat == '*' then
-					r[v]=st
+					b:write(st,v)
 				end
 			else
-				r[count]=t[i];
-			end
-			if count < opts.msglimit then
-				count=count+1
-			else
-				write_usb_msg(r,opts.msgtimeout)
-				r={}
-				count=1
+				b:write(t[i])
 			end
 		end
 	end
-	if count > 1 then
-		write_usb_msg(r,opts.msgtimeout)
-	end
+	b:flush()
 	return true
 end
 ]],
