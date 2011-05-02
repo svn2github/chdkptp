@@ -299,7 +299,7 @@ cli:add_commands{
 		func=function(self,args) 
 			local rets={}
 			local msgs={}
-			local status,err = chdku.exec(args,{rets=rets,msgs=msgs,wait=true})
+			local status,err = chdku.execwait(args,{rets=rets,msgs=msgs})
 			if not status then
 				return false,err
 			end

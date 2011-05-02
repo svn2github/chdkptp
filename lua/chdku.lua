@@ -427,8 +427,7 @@ function chdku.listdir(path,opts)
 	end
 	local results={}
 	local i=1
-	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",{
-		wait=true,
+	local status,err=chdku.execwait("return ls('"..path.."',"..opts..")",{
 		libs='ls',
 		msgs=chdku.msg_unbatcher(results),
 	})
