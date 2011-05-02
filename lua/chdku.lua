@@ -72,6 +72,11 @@ function rlibs:register(t)
 	if type(t.name) ~= 'string' then
 		error('expected name string')
 	end
+	t.lines = 0 
+	for c in string.gmatch(t.code,'\n') do
+		t.lines = t.lines + 1
+	end
+
 	for i,v in ipairs(t.depend) do
 		if not self.libs[v] then
 			errf('%s missing dep %s\n',t.name,v)
@@ -422,12 +427,11 @@ function chdku.listdir(path,opts)
 	end
 	local results={}
 	local i=1
-	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",
-		{
-			wait=true,
-			libs={'ls'},
-			msgs=chdku.msg_unbatcher(results),
-		})
+	local status,err=chdku.exec("return ls('"..path.."',"..opts..")",{
+		wait=true,
+		libs='ls',
+		msgs=chdku.msg_unbatcher(results),
+	})
 	if not status then
 		return false,err
 	end
@@ -468,6 +472,34 @@ function chdku.get_error_msg()
 		warnf("chdku.get_error_msg: ignoring message %s\n",chdku.format_script_msg(msg))
 	end
 end
+
+--[[
+format a remote lua error from chdku.exec using line number information
+]]
+local function format_exec_error(libs,code,errmsg)
+	local lnum=tonumber(string.match(errmsg,'^%s*:(%d+):'))
+	if not lnum then
+		print('no match '..errmsg)
+		return errmsg
+	end
+	local l = 0
+	local lprev, errlib, errlnum
+	for i,lib in ipairs(libs.list) do
+		lprev = l
+		l = l + lib.lines + 1 -- TODO we add \n after each lib when building code
+		if l >= lnum then
+			errlib = lib
+			errlnum = lnum - lprev
+			break
+		end
+	end
+	if errlib then
+		return string.format("%s\nrlib %s:%d\n",errmsg,errlib.name,errlnum)
+	else
+		return string.format("%s\nuser code: %d\n",errmsg,lnum - l)
+	end
+end
+
 --[[
 return a closure to be used with as a chdku.exec msgs function, which unbatches messages msg_batcher into t
 ]]
@@ -509,13 +541,24 @@ chdku.default_libs={
 	'serialize_msgs',
 }
 
+--[[
+convenience, defaults wait=true
+]]
+function chdku.execwait(code,opts_in)
+	return chdku.exec(code,extend_table({wait=true},opts_in))
+end
+
 function chdku.exec(code,opts_in)
 	local opts = extend_table({},opts_in)
 	local liblist={}
 	if not opts.nodefaultlib then
 		extend_table(liblist,chdku.default_libs)
 	end
-	extend_table(liblist,opts.libs)
+	if type(opts.libs) == 'string' then
+		liblist={opts.libs}
+	else
+		extend_table(liblist,opts.libs)
+	end
 	local libs = chdku.rlibs:build(liblist)
 
 	code = libs:code() .. code
@@ -527,7 +570,7 @@ function chdku.exec(code,opts_in)
 			-- TODO extract error line and match with code
 			local msg = chdku.get_error_msg()
 			if msg then
-				return false,msg
+				return false,format_exec_error(libs,code,msg)
 			end
 		end
 		return false,err
@@ -582,7 +625,7 @@ function chdku.exec(code,opts_in)
 					i=i+1
 				end
 			elseif msg.type == 'error' then
-				return false, msg.value
+				return false, format_exec_error(libs,code,msg.value)
 			else
 				return false, 'unexpected message type'
 			end
