@@ -415,15 +415,20 @@ end
 
 chdku.rlibs = rlibs
 --[[
-opts may be a table, or a string containing lua code for a table
 return a list of remote directory contents
-return
-table|false,msg
+dirlist[,err]=chdku.listdir(path,opts)
+path should be directory, without a trailing slash (except in the case of A/...)
+opts may be a table, or a string containing lua code for a table
+returns directory listing as table, or false,error
 note may return an empty table if target is not a directory
 ]]
 function chdku.listdir(path,opts) 
 	if type(opts) == 'table' then
 		opts = serialize(opts)
+	elseif type(opts) == 'nil' then
+		opts = ''
+	elseif type(opts) ~= 'string' then
+		return false, "invalid options"
 	end
 	local results={}
 	local i=1
@@ -436,6 +441,29 @@ function chdku.listdir(path,opts)
 	end
 
 	return results
+end
+
+--[[
+simple batch download. This will change or go away later!
+download matching files in a directory
+does not handle recursive downloads, will fail if pattern matches a directory
+status[,err]=chdku.downloaddir(srcpath,dstpath,pattern)
+]]
+function chdku.downloaddir(srcpath,dstpath,pattern)
+	local filenames,err = chdku.listdir(srcpath,{match=pattern})
+	if not filenames then
+		return false,err
+	end
+	for i,name in ipairs(filenames) do
+		local src = srcpath .. '/' .. name
+		local dst = dstpath .. '/' .. name
+		printf("%s -> %s\n",src,dst)
+		status,err = chdk.download(src,dst)
+		if not status then
+			return status,err
+		end
+	end
+	return true
 end
 
 --[[
@@ -566,7 +594,6 @@ function chdku.exec(code,opts_in)
 	if not status then
 		-- syntax error, try to fetch the error message
 		if err == 'syntax' then
-			-- TODO extract error line and match with code
 			local msg = chdku.get_error_msg()
 			if msg then
 				return false,format_exec_error(libs,code,msg)
@@ -676,7 +703,7 @@ function chdku.wait_status(opts)
 				sleeptime = timeleft
 			end
 			sys.sleep(sleeptime)
-			timeleft =  timeleft - sleeptime
+			timeleft = timeleft - sleeptime
 		else
 			status.timeout=true
 			return status

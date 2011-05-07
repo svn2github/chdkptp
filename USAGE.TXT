@@ -51,15 +51,12 @@ con> !return 1+1
 
 execute lua on the camera, and print the result
 con> =return get_buildinfo()
-1:return:'platformid    12732
-platform        d10
-version CHDK
-platsub 100a
-build_number    0.9.9
-os      dryos
-build_date      Mar 26 2011
-build_time      15:14:33
-'
+1:return:table:{platformid=12732,platform="d10",version="CHDK",platsub="100a",build_number="0.9.9",os="dryos",build_date="May  3 2011",build_time="20:54:20",}
+
+ad hoc scripting on PC side - download some files
+con> !t=chdku.listdir('A/DCIM/100CANON',{match="%.JPG$"})
+con> !for i,n in ipairs(t) do chdk.download("A/DCIM/100CANON/"..n,"C:/TEMP/"..n) end
+note chdku.downloaddir() is a slightly niceer version of the above
 
 =Running under linux=
 Under linux, the .lua files will not automatically found relative to the executeable directory
