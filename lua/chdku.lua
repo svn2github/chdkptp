@@ -528,6 +528,19 @@ local function format_exec_error(libs,code,errmsg)
 end
 
 --[[
+read and discard all pending messages. Returns false,error if message functions fails, otherwise true
+]]
+function chdku.flushmsgs()
+	repeat
+		local msg,err=chdk.read_msg()
+		if not msg then
+			return false, err
+		end
+	until msg.type == 'none' 
+	return true
+end
+
+--[[
 return a closure to be used with as a chdku.exec msgs function, which unbatches messages msg_batcher into t
 ]]
 function chdku.msg_unbatcher(t)
@@ -554,6 +567,10 @@ opts {
 	libs={"rlib name1","rlib name2"...} -- rlib code to be prepended to "code"
 	wait=bool -- wait for script to complete, return values will be returned after status if true
 	nodefaultlib=bool -- don't automatically include default rlibs
+	clobber=bool -- if false, will check script-status and refuse to execute if script is already running
+				-- clobbering is likely to result in crashes / memory leaks in current versions of CHDK!
+	flushmsgs=bool -- if true (default) read and silently discard any pending messages before running script
+					-- not applicable if clobber is true, since the running script could just spew messages indefinitely
 	-- below only apply if with wait
 	msgs={table|callback} -- table or function to receive user script messages
 	rets={table|callback} -- table or function to receive script return values, instead of returning them
@@ -576,20 +593,42 @@ function chdku.execwait(code,opts_in)
 end
 
 function chdku.exec(code,opts_in)
-	local opts = extend_table({},opts_in)
+	-- setup the options
+	local opts = extend_table({flushmsgs=true},opts_in)
 	local liblist={}
+	-- add default libs, unless disabled
 	if not opts.nodefaultlib then
 		extend_table(liblist,chdku.default_libs)
 	end
+	-- allow a single lib to be given as by name
 	if type(opts.libs) == 'string' then
 		liblist={opts.libs}
 	else
 		extend_table(liblist,opts.libs)
 	end
-	local libs = chdku.rlibs:build(liblist)
 
+	-- check for already running script and flush messages
+	if not opts.clobber then
+		local status,err = chdk.script_status()
+		if not status then
+			return false,err
+		end
+		if status.run then
+			return false,"a script is already running"
+		end
+		if opts.flushmsgs and status.msg then
+			status,err=chdku.flushmsgs()
+			if not status then
+				return false,err
+			end
+		end
+	end
+
+	-- build the complete script from user code and rlibs
+	local libs = chdku.rlibs:build(liblist)
 	code = libs:code() .. code
 
+	-- try to start the script
 	local status,err=chdk.execlua(code)
 	if not status then
 		-- syntax error, try to fetch the error message
@@ -599,17 +638,21 @@ function chdku.exec(code,opts_in)
 				return false,format_exec_error(libs,code,msg)
 			end
 		end
+		--  other unspecified error, or fetching syntax/compile error message failed
 		return false,err
 	end
+
+	-- if not waiting, we're done
 	if not opts.wait then
 		return true
 	end
 
 	-- to collect return values
 	-- first result is our status
-	local results = {true}
+	local results={true}
 	local i=2
 
+	-- process messages and wait for script to end
 	while true do
 		status,err=chdku.wait_status{ msg=true, run=false }
 		if not status then
@@ -655,7 +698,9 @@ function chdku.exec(code,opts_in)
 			else
 				return false, 'unexpected message type'
 			end
+		-- script is completed and all messages have been processed
 		elseif status.run == false then
+			-- returns were handled by callback or table
 			if opts.rets then
 				return true
 			else
@@ -663,7 +708,6 @@ function chdku.exec(code,opts_in)
 			end
 		end
 	end
-
 end
 
 --[[
