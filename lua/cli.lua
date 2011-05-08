@@ -87,7 +87,11 @@ function cli:execute(line)
 	if s then
 		local args = string.sub(line,e+1)
 		if self.names[cmd] then
-			return self.names[cmd](args)
+			local status,msg = self.names[cmd](args)
+			if not status and not msg then
+				msg=cmd .. " failed"
+			end
+			return status,msg
 		else 
 			return false,string.format("unknown command '%s'\n",cmd)
 		end
@@ -103,7 +107,7 @@ function cli:run()
 	for line in io.lines() do
 		local status,msg = self:execute(line)
 		if not status then
-			errf("%s\n",msg)
+			errf("%s\n",tostring(msg))
 		elseif msg and string.len(msg) ~= 0 then
 			printf("%s",msg)
 			if string.sub(msg,-1,-1) ~= '\n' then
@@ -470,6 +474,32 @@ cli:add_commands{
 				return true,r
 			end
 			return false,msg
+		end,
+	},
+	{
+		names={'reboot'},
+		help='reboot the camera',
+		arghelp="[file]",
+		func=function(self,args) 
+			local bootfile=cli:get_string_arg(args)
+			if bootfile then
+				bootfile = cli:make_camera_path(bootfile)
+				bootfile = string.format("'%s'",bootfile)
+			else
+				bootfile = ''
+			end
+			-- sleep and disconnect to avoid later connection problems on some cameras
+			-- clobber because we don't care about memory leaks
+			print("reboot("..bootfile..')')
+			local status,err=chdku.exec('sleep(1000);reboot('..bootfile..')',{clobber=true})
+			if not status then
+				return false,err
+			end
+			chdk.disconnect()
+			-- sleep locally to avoid clobbering the reboot, and allow time for the camera to come up before trying to connect
+			sys.sleep(3000)
+			
+			return chdk.connect()
 		end,
 	},
 };
