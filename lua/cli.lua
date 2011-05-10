@@ -490,7 +490,6 @@ cli:add_commands{
 			end
 			-- sleep and disconnect to avoid later connection problems on some cameras
 			-- clobber because we don't care about memory leaks
-			print("reboot("..bootfile..')')
 			local status,err=chdku.exec('sleep(1000);reboot('..bootfile..')',{clobber=true})
 			if not status then
 				return false,err

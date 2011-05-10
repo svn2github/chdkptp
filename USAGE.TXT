@@ -34,10 +34,14 @@ version (ver)             : - print API versions
 connect (c)              : - (re)connect to device
 disconnect (dis)             : - disconnect from device
 ls           [-l] [path] : - list files/directories on camera
+reboot       [file]      : - reboot the camera
 
 =Examples=
 upload bin/diskboot.bin to A/diskboot.bin, from the command line
  chdkptp -c -e"u bin/diskboot.bin"
+
+upload diskboot.bin, reboot camera, enter interactive mode
+ chdkptp -c -e"u bin/diskboot.bin" -ereboot -i
 
 download A/CHDK/CCHDK.CFG to BACKUP.CFG in the current directory
  chdkptp -c -e"d CHDK/CCHDK.CFG BACKUP.CFG"
