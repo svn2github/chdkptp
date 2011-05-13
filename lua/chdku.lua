@@ -754,4 +754,31 @@ function chdku.wait_status(opts)
 		end
 	end
 end
+--[[
+quick and dirty bulk delete, this may change or go away
+
+delete files from directory, optionally matching pattern
+note directory should not end in a /, unless it is A/
+only *files* will be deleted, directories will not be touched
+]]
+function chdku.deletefiles(dir,match)
+	local files,err=chdku.listdir(dir,{stat="*",match=match})
+	if not files then
+		return false, err
+	end
+	-- TODO we should fix up the path properly like CLI does
+	if dir ~= 'A/' then
+		dir = dir .. '/'
+	end
+	for i,st in ipairs(files) do
+		if st.is_file then
+			local status,err=chdku.execwait("return os.remove('"..dir..st.name.."')")
+			if not status then
+				return false,err
+			end
+--			print('del '..st.name)
+		end
+	end
+	return true
+end
 return chdku
