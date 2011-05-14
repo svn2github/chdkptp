@@ -233,6 +233,9 @@ end
 similar to unix basename
 ]]
 function util.basename(path,sfx)
+	if not path then
+		return nil
+	end
 	local s,e,bn=string.find(path,'([^\\/]+)[\\/]?$')
 	if not s then
 		return nil

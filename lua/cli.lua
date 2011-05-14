@@ -360,6 +360,9 @@ cli:add_commands{
 		arghelp="<local> [remote]",
 		func=function(self,args) 
 			local src,args = cli:get_string_arg(args)
+			if not src then
+				return false, "missing source"
+			end
 			local dst = cli:get_string_arg(args)
 			-- no dst, use filename of source
 			if not dst then
@@ -386,15 +389,19 @@ cli:add_commands{
 		arghelp="<remote> [local]",
 		func=function(self,args) 
 			local src,args = cli:get_string_arg(args)
+			if not src then
+				return false, "missing source"
+			end
 			local dst = cli:get_string_arg(args)
 			-- use final component
 			if not dst then
 				dst = util.basename(src)
 			-- trailing slash, append filename of source
+			-- TODO should use stat to figure out if target is a directory
 			elseif string.find(dst,'[\\/]$') then
 				dst = dst .. util.basename(src)
 			end
-			if not (src and dst) then
+			if not dst then
 				return false, "bad/missing args ?"
 			end
 			src = cli:make_camera_path(src)

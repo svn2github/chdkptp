@@ -455,12 +455,35 @@ function chdku.downloaddir(srcpath,dstpath,pattern)
 		return false,err
 	end
 	for i,name in ipairs(filenames) do
-		local src = srcpath .. '/' .. name
-		local dst = dstpath .. '/' .. name
+		local src = joinpath(srcpath,name)
+		local dst = joinpath(dstpath,name)
 		printf("%s -> %s\n",src,dst)
 		status,err = chdk.download(src,dst)
 		if not status then
 			return status,err
+		end
+	end
+	return true
+end
+--[[
+quick and dirty bulk delete, this may change or go away
+
+delete files from directory, optionally matching pattern
+note directory should not end in a /, unless it is A/
+only *files* will be deleted, directories will not be touched
+]]
+function chdku.deletefiles(dir,pattern)
+	local files,err=chdku.listdir(dir,{stat="*",match=pattern})
+	if not files then
+		return false, err
+	end
+	for i,st in ipairs(files) do
+		if st.is_file then
+			local status,err=chdku.execwait("return os.remove('"..joinpath(dir,st.name).."')")
+			if not status then
+				return false,err
+			end
+--			print('del '..st.name)
 		end
 	end
 	return true
@@ -753,32 +776,5 @@ function chdku.wait_status(opts)
 			return status
 		end
 	end
-end
---[[
-quick and dirty bulk delete, this may change or go away
-
-delete files from directory, optionally matching pattern
-note directory should not end in a /, unless it is A/
-only *files* will be deleted, directories will not be touched
-]]
-function chdku.deletefiles(dir,match)
-	local files,err=chdku.listdir(dir,{stat="*",match=match})
-	if not files then
-		return false, err
-	end
-	-- TODO we should fix up the path properly like CLI does
-	if dir ~= 'A/' then
-		dir = dir .. '/'
-	end
-	for i,st in ipairs(files) do
-		if st.is_file then
-			local status,err=chdku.execwait("return os.remove('"..dir..st.name.."')")
-			if not status then
-				return false,err
-			end
---			print('del '..st.name)
-		end
-	end
-	return true
 end
 return chdku
