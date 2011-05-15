@@ -295,10 +295,9 @@ void
 close_usb(PTP_USB* ptp_usb, struct usb_device* dev)
 {
 	//clear_stall(ptp_usb);
-        usb_release_interface(ptp_usb->handle,
-                dev->config->interface->altsetting->bInterfaceNumber);
+   	usb_release_interface(ptp_usb->handle, dev->config->interface->altsetting->bInterfaceNumber);
 	usb_reset(ptp_usb->handle);
-        usb_close(ptp_usb->handle);
+	usb_close(ptp_usb->handle);
 }
 
 
@@ -325,24 +324,26 @@ find_device (int busn, int devn, short force)
 	struct usb_device *dev;
 
 	bus=init_usb();
-	for (; bus; bus = bus->next)
-	for (dev = bus->devices; dev; dev = dev->next)
-	if (dev->config)
-	if ((dev->config->interface->altsetting->bInterfaceClass==
-		USB_CLASS_PTP)||force)
-	if (dev->descriptor.bDeviceClass!=USB_CLASS_HUB)
-	{
-		int curbusn, curdevn;
+	for (; bus; bus = bus->next) {
+		for (dev = bus->devices; dev; dev = dev->next) {
+			if (dev->config) {
+				if ((dev->config->interface->altsetting->bInterfaceClass==USB_CLASS_PTP)||force) {
+					if (dev->descriptor.bDeviceClass!=USB_CLASS_HUB) {
+						int curbusn, curdevn;
 
-		curbusn=strtol(bus->dirname,NULL,10);
-		curdevn=strtol(dev->filename,NULL,10);
+						curbusn=strtol(bus->dirname,NULL,10);
+						curdevn=strtol(dev->filename,NULL,10);
 
-		if (devn==0) {
-			if (busn==0) return dev;
-			if (curbusn==busn) return dev;
-		} else {
-			if ((busn==0)&&(curdevn==devn)) return dev;
-			if ((curbusn==busn)&&(curdevn==devn)) return dev;
+						if (devn==0) {
+							if (busn==0) return dev;
+							if (curbusn==busn) return dev;
+						} else {
+							if ((busn==0)&&(curdevn==devn)) return dev;
+							if ((curbusn==busn)&&(curdevn==devn)) return dev;
+						}
+					}
+				}
+			}
 		}
 	}
 	return NULL;
@@ -361,8 +362,7 @@ find_endpoints(struct usb_device *dev, int* inep, int* outep, int* intep)
 
 	for (i=0;i<n;i++) {
 	if (ep[i].bmAttributes==USB_ENDPOINT_TYPE_BULK)	{
-		if ((ep[i].bEndpointAddress&USB_ENDPOINT_DIR_MASK)==
-			USB_ENDPOINT_DIR_MASK)
+		if ((ep[i].bEndpointAddress&USB_ENDPOINT_DIR_MASK)==USB_ENDPOINT_DIR_MASK)
 		{
 			*inep=ep[i].bEndpointAddress;
 			if (verbose>1)
@@ -486,7 +486,6 @@ usb_get_endpoint_status(PTP_USB* ptp_usb, int ep, uint16_t* status)
 int
 usb_clear_stall_feature(PTP_USB* ptp_usb, int ep)
 {
-
 	return (usb_control_msg(ptp_usb->handle,
 		USB_RECIP_ENDPOINT, USB_REQ_CLEAR_FEATURE, USB_FEATURE_HALT,
 		ep, NULL, 0, 3000));
@@ -623,8 +622,22 @@ static int chdk_disconnect(lua_State *L) {
 	return 1;
 }
 
-// TODO we'd like to be able to check the actual connection state, not just flag set in open/close
+static int check_connection_status() {
+	uint16_t devstatus[2] = {0,0};
+	
+	if(!ptp_usb.handle) {// never initialized
+		return 0;
+	}
+	if(usb_ptp_get_device_status(&ptp_usb,devstatus) < 0) {
+		return 0;
+	}
+	return (devstatus[1] == 0x2001);
+}
+
 static int chdk_is_connected(lua_State *L) {
+	if(connected) { // flag says we are connected, check usb and update flag
+		connected = check_connection_status();
+	}
 	lua_pushboolean(L,connected);
 	return 1;
 }
@@ -1035,11 +1048,25 @@ static int chdk_get_script_id(lua_State *L) {
 }
 
 /*
+testing
+get_status_result,status[0],status[1]=chdk.dev_status()
+*/
+static int chdk_dev_status(lua_State *L) {
+	uint16_t devstatus[2] = {0,0};
+	int r = usb_ptp_get_device_status(&ptp_usb,devstatus);
+	lua_pushnumber(L,r);
+	lua_pushnumber(L,devstatus[0]);
+	lua_pushnumber(L,devstatus[1]);
+	return 3;
+}
+
+/*
 most functions return result[,errormessage]
 result is false or nil on error
 some also throw errors with lua_error
 TODO should be either all lua_error (with pcall) or not.
 TODO many errors are still printed to the console
+TODO most of these will be attached to a connection object
 */
 static const luaL_Reg chdklib[] = {
   {"connect", chdk_connect},
@@ -1058,6 +1085,7 @@ static const luaL_Reg chdklib[] = {
   {"read_msg", chdk_read_msg},
   {"write_msg", chdk_write_msg},
   {"get_script_id", chdk_get_script_id},
+  {"dev_status", chdk_dev_status},
   {NULL, NULL}
 };
 
@@ -1080,6 +1108,17 @@ static const luaL_Reg lua_syslib[] = {
   {"sleep", syslib_sleep},
   {NULL, NULL}
 };
+
+/*
+static const luaL_Reg lua_usblib[] = {
+  {"init", luausb_init},
+  {"ibuses", luausb_busiter},
+  {"ibusdevs", luausb_busdeviter},
+  {"open", luausb_open},
+  {"close", luausb_close},
+  {NULL, NULL}
+};
+*/
 
 static int chdkptp_registerlibs(lua_State *L) {
   luaL_register(L, "chdk", chdklib);

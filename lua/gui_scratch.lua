@@ -331,6 +331,7 @@ multidl_dlg = iup.dialog{
 			expand="HORIZONTAL",
 			iup.list{
 				expand="HORIZONTAL",
+				visiblelines="20",
 				name="file_list",
 				multiple="YES",
 			}
