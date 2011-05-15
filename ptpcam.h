@@ -35,6 +35,7 @@ int myusb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int length,
  * macros
  */
 
+// TODO these need to be reworked to play nicely with lua error handling
 /* Check value and Return on error */
 #define CR(o,error) {						\
 			uint16_t result=o;				\
@@ -99,8 +100,6 @@ int myusb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int length,
 #define ACT_NIKON_DC2		0x102
 #define ACT_NIKON_IC		0x103
 
-#define ACT_CHDK		0x1337
-
 /* printing value type */
 #define PTPCAM_PRINT_HEX	00
 #define PTPCAM_PRINT_DEC	01
@@ -127,6 +126,7 @@ struct _PTP_USB {
  */
 
 /* one global variable */
+// TODO
 extern short verbose;
 
 
@@ -134,24 +134,9 @@ extern short verbose;
  * functions
  */
 
-void ptpcam_siginthandler(int signum);
+//void ptpcam_siginthandler(int signum);
 
-void show_info (int busn, int devn, short force);
-void list_files (int busn, int devn, short force);
-void get_file (int busn, int devn, short force, uint32_t handle, char* filename, int overwrite);
-void get_all_files (int busn, int devn, short force, int overwrite);
-void capture_image (int busn, int devn, short force);
-void nikon_direct_capture (int busn, int devn, short force, char* filename, int overwrite);
-void nikon_direct_capture2 (int busn, int devn, short force, char* filename, int overwrite);
-void delete_object (int busn, int devn, short force, uint32_t handle);
-void delete_all_files (int busn, int devn, short force);
-void list_operations (int busn, int devn, short force);
-void list_devices(short force);
-void list_properties (int dev, int bus, short force);
-void loop_capture (int busn, int devn, short force, int n,  int overwrite);
-void save_object(PTPParams *params, uint32_t handle, char* filename, PTPObjectInfo oi, int overwrite);
-void get_save_object (PTPParams *params, uint32_t handle, char* filename, int overwrite);
-
+//void show_info (int busn, int devn, short force);
 
 struct usb_bus* init_usb(void);
 void close_usb(PTP_USB* ptp_usb, struct usb_device* dev);

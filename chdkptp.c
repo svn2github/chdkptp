@@ -112,9 +112,12 @@
 /* one global variable (yes, I know it sucks) */
 short verbose=0;
 /* the other one, it sucks definitely ;) */
+// TODO this seems like it should go into ptp_usb
 int ptpcam_usb_timeout = USB_TIMEOUT;
 
 /* we need it for a proper signal handling :/ */
+// reyalp -not using signal handler for now, revisit later
+#if 0
 PTPParams* globalparams;
 
 void
@@ -132,6 +135,7 @@ ptpcam_siginthandler(int signum)
 	exit (-1);
     }
 }
+#endif
 
 static short
 ptp_read_func (unsigned char *bytes, unsigned int size, void *data)
@@ -256,7 +260,7 @@ init_ptp_usb (PTPParams* params, PTP_USB* ptp_usb, struct usb_device* dev)
 		usb_claim_interface(device_handle,
 			dev->config->interface->altsetting->bInterfaceNumber);
 	}
-	globalparams=params;
+//	globalparams=params;
 }
 
 void
