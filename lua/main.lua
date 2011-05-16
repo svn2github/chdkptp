@@ -128,7 +128,8 @@ if options.g then
 	end
 else
 	if options.c then
-		chdk.connect()
+		-- TODO global connection object
+		con=chdku.connect()
 	end
 	-- for the gui, e commands will be run after the gui is started
 	if options.e then

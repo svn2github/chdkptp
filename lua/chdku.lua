@@ -414,6 +414,10 @@ end
 }
 
 chdku.rlibs = rlibs
+--[[ 
+connection methods, added to the connection object
+]]
+local con_methods = {}
 --[[
 return a list of remote directory contents
 dirlist[,err]=chdku.listdir(path,opts)
@@ -422,7 +426,7 @@ opts may be a table, or a string containing lua code for a table
 returns directory listing as table, or false,error
 note may return an empty table if target is not a directory
 ]]
-function chdku.listdir(path,opts) 
+function con_methods.listdir(con,path,opts) 
 	if type(opts) == 'table' then
 		opts = serialize(opts)
 	elseif type(opts) == 'nil' then
@@ -432,7 +436,7 @@ function chdku.listdir(path,opts)
 	end
 	local results={}
 	local i=1
-	local status,err=chdku.execwait("return ls('"..path.."',"..opts..")",{
+	local status,err=con:execwait("return ls('"..path.."',"..opts..")",{
 		libs='ls',
 		msgs=chdku.msg_unbatcher(results),
 	})
@@ -449,8 +453,8 @@ download matching files in a directory
 does not handle recursive downloads, will fail if pattern matches a directory
 status[,err]=chdku.downloaddir(srcpath,dstpath,pattern)
 ]]
-function chdku.downloaddir(srcpath,dstpath,pattern)
-	local filenames,err = chdku.listdir(srcpath,{match=pattern})
+function con_methods.downloaddir(con,srcpath,dstpath,pattern)
+	local filenames,err = con:listdir(srcpath,{match=pattern})
 	if not filenames then
 		return false,err
 	end
@@ -458,7 +462,7 @@ function chdku.downloaddir(srcpath,dstpath,pattern)
 		local src = joinpath(srcpath,name)
 		local dst = joinpath(dstpath,name)
 		printf("%s -> %s\n",src,dst)
-		status,err = chdk.download(src,dst)
+		status,err = con:download(src,dst)
 		if not status then
 			return status,err
 		end
@@ -472,14 +476,14 @@ delete files from directory, optionally matching pattern
 note directory should not end in a /, unless it is A/
 only *files* will be deleted, directories will not be touched
 ]]
-function chdku.deletefiles(dir,pattern)
-	local files,err=chdku.listdir(dir,{stat="*",match=pattern})
+function con_methods.deletefiles(con,dir,pattern)
+	local files,err=con:listdir(dir,{stat="*",match=pattern})
 	if not files then
 		return false, err
 	end
 	for i,st in ipairs(files) do
 		if st.is_file then
-			local status,err=chdku.execwait("return os.remove('"..joinpath(dir,st.name).."')")
+			local status,err=con:execwait("return os.remove('"..joinpath(dir,st.name).."')")
 			if not status then
 				return false,err
 			end
@@ -507,16 +511,16 @@ end
 --[[
 read pending messages and return error from current script, if available
 ]]
-function chdku.get_error_msg()
+function con_methods.get_error_msg(con)
 	while true do
-		local msg,err = chdk.read_msg()
+		local msg,err = con:read_msg()
 		if not msg then
 			return false
 		end
 		if msg.type == 'none' then
 			return false
 		end
-		if msg.type == 'error' and msg.script_id == chdk.get_script_id() then
+		if msg.type == 'error' and msg.script_id == con:get_script_id() then
 			return msg.value
 		end
 		warnf("chdku.get_error_msg: ignoring message %s\n",chdku.format_script_msg(msg))
@@ -553,9 +557,9 @@ end
 --[[
 read and discard all pending messages. Returns false,error if message functions fails, otherwise true
 ]]
-function chdku.flushmsgs()
+function con_methods.flushmsgs(con)
 	repeat
-		local msg,err=chdk.read_msg()
+		local msg,err=con:read_msg()
 		if not msg then
 			return false, err
 		end
@@ -611,15 +615,16 @@ chdku.default_libs={
 --[[
 convenience, defaults wait=true
 ]]
-function chdku.execwait(code,opts_in)
-	return chdku.exec(code,extend_table({wait=true},opts_in))
+function con_methods.execwait(con,code,opts_in)
+	return con:exec(code,extend_table({wait=true},opts_in))
 end
 
-function chdku.exec(code,opts_in)
+function con_methods.exec(con,code,opts_in)
 	-- setup the options
 	local opts = extend_table({flushmsgs=true},opts_in)
 	local liblist={}
 	-- add default libs, unless disabled
+	-- TODO default libs should be per connection
 	if not opts.nodefaultlib then
 		extend_table(liblist,chdku.default_libs)
 	end
@@ -632,7 +637,7 @@ function chdku.exec(code,opts_in)
 
 	-- check for already running script and flush messages
 	if not opts.clobber then
-		local status,err = chdk.script_status()
+		local status,err = con:script_status()
 		if not status then
 			return false,err
 		end
@@ -640,7 +645,7 @@ function chdku.exec(code,opts_in)
 			return false,"a script is already running"
 		end
 		if opts.flushmsgs and status.msg then
-			status,err=chdku.flushmsgs()
+			status,err=con:flushmsgs()
 			if not status then
 				return false,err
 			end
@@ -652,11 +657,11 @@ function chdku.exec(code,opts_in)
 	code = libs:code() .. code
 
 	-- try to start the script
-	local status,err=chdk.execlua(code)
+	local status,err=con:execlua(code)
 	if not status then
 		-- syntax error, try to fetch the error message
 		if err == 'syntax' then
-			local msg = chdku.get_error_msg()
+			local msg = con:get_error_msg()
 			if msg then
 				return false,format_exec_error(libs,code,msg)
 			end
@@ -677,16 +682,16 @@ function chdku.exec(code,opts_in)
 
 	-- process messages and wait for script to end
 	while true do
-		status,err=chdku.wait_status{ msg=true, run=false }
+		status,err=con:wait_status{ msg=true, run=false }
 		if not status then
 			return false,tostring(err)
 		end
 		if status.msg then
-			local msg,err=chdk.read_msg()
+			local msg,err=con:read_msg()
 			if not msg then
 				return false, err
 			end
-			if msg.script_id ~= chdk.get_script_id() then
+			if msg.script_id ~= con:get_script_id() then
 				warnf("chdku.exec: message from unexpected script %s\n",msg.script_id,chdku.format_script_msg(msg))
 			elseif msg.type == 'user' then
 				if type(opts.msgs) == 'function' then
@@ -735,7 +740,7 @@ end
 
 --[[
 sleep until specified status is met
-status,errmsg=chdku.wait_status(opts)
+status,errmsg=con:wait_status(opts)
 opts:
 {
 	-- bool values cause the function to return when the status matches the given value
@@ -748,7 +753,7 @@ opts:
 status: table with msg and run set to last status, and timeout set if timeout expired, or false,errormessage on error
 TODO for gui, this should yield in lua, resume from timer or something
 ]]
-function chdku.wait_status(opts)
+function con_methods.wait_status(con,opts)
 	local timeleft = opts.timeout
 	local sleeptime = opts.poll
 	if not timeleft then
@@ -758,7 +763,7 @@ function chdku.wait_status(opts)
 		sleeptime=250
 	end
 	while true do
-		local status,msg = chdk.script_status()
+		local status,msg = con:script_status()
 		if not status then
 			return false,msg
 		end
@@ -777,4 +782,24 @@ function chdku.wait_status(opts)
 		end
 	end
 end
+
+--[[
+TODO temp
+add our methods to connection object meta table
+only needs to be done once
+]]
+local bound=false
+function chdku.connect()
+	local con = chdk.connect()
+	if not con then
+		return false, "connection failed"
+	end
+	if not bound then
+		for k,v in pairs(con_methods) do
+			con.__index[k]=v
+		end
+	end
+	return con
+end
+
 return chdku

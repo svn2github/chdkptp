@@ -89,16 +89,17 @@ btn_connect = iup.button{
 
 function btn_connect:action()
 	local host_major, host_minor = chdk.host_api_version()
-	if chdk.is_connected() then
-		chdk.disconnect()
+	if con and con:is_connected() then
+		con:disconnect()
 		connect_icon.active = "NO"
 		btn_connect.title = "Connect"
 		connect_label.title = string.format("host:%d.%d cam:-.-",host_major,host_minor)
 	else
-		if chdk.connect() then
+		con = chdku.connect() 
+		if con then
 			connect_icon.active = "YES"
 			btn_connect.title = "Disconnect"
-			local cam_major, cam_minor = chdk.camera_api_version()
+			local cam_major, cam_minor = con:camera_api_version()
 			connect_label.title = string.format("host:%d.%d cam:%d.%d",host_major,host_minor,cam_major,cam_minor)
 		end
 	end
@@ -176,7 +177,7 @@ function cam_btn(name,title)
 		title=title,
 		size='31x15', -- couldn't get normalizer to work for some reason
 		action=function(self)
-			add_status(chdk.execlua('click("' .. name .. '")'))
+			add_status(con:execlua('click("' .. name .. '")'))
 		end,
 	}
 end
@@ -212,7 +213,7 @@ cam_btn_frame = iup.frame{
 				title='zoom+',
 				size='45x15',
 				action=function(self)
-					add_status(chdk.execlua('click("zoom_in")'))
+					add_status(con:execlua('click("zoom_in")'))
 				end,
 			},
 			iup.fill{
@@ -221,7 +222,7 @@ cam_btn_frame = iup.frame{
 				title='zoom-',
 				size='45x15',
 				action=function(self)
-					add_status(chdk.execlua('click("zoom_out")'))
+					add_status(con:execlua('click("zoom_out")'))
 				end,
 			},
 		},
@@ -229,7 +230,7 @@ cam_btn_frame = iup.frame{
 			title='shoot',
 			size='94x15',
 			action=function(self)
-				add_status(chdk.execlua('shoot()'))
+				add_status(con:execlua('shoot()'))
 			end,
 		}
 	} ;
@@ -282,7 +283,7 @@ function do_download_dialog(remotepath)
 -- new or overwrite (windows native dialog already prompts for overwrite)
 	if status == "1" or status == "0" then 
 		statusprint("d "..remotepath.."->"..filedlg.value)
-		add_status(chdk.download(remotepath,filedlg.value))
+		add_status(con:download(remotepath,filedlg.value))
 -- canceled
 --	elseif status == "-1" then 
 	end
@@ -321,18 +322,18 @@ function do_upload_dialog(remotepath)
 	end
 	if #multi == 0 then
 		statusprint("u "..value.."->"..joinpath(remotepath,basename(value)))
-		add_status(chdk.upload(value,joinpath(remotepath,basename(value))))
+		add_status(con:upload(value,joinpath(remotepath,basename(value))))
 	else
 		for i = 2, #multi do
 			statusprint("u "..multi[1] .. '/' .. multi[i].."->"..joinpath(remotepath,multi[i]))
-			add_status(chdk.upload(multi[1] .. '/' .. multi[i],joinpath(remotepath,multi[i])))
+			add_status(con:upload(multi[1] .. '/' .. multi[i],joinpath(remotepath,multi[i])))
 		end
 	end
 end
 
 function do_delete_dialog(fullpath)
 	if iup.Alarm('Confirm delete','delete ' .. fullpath .. ' ?','OK','Cancel') == 1 then
-		add_status(chdk.execlua('os.remove("'..fullpath..'")'))
+		add_status(con:execlua('os.remove("'..fullpath..'")'))
 	end
 end
 
@@ -388,7 +389,7 @@ function camfiletree:populate_branch(id,path)
 	if id == 0 then
 		camfiletree.state="collapsed"
 	end		
-	local list,msg = chdku.listdir(path,{stat='*'})
+	local list,msg = con:listdir(path,{stat='*'})
 	if type(list) == 'table' then
 		chdku.sortdir_stat(list)
 		for i=#list, 1, -1 do
@@ -409,7 +410,7 @@ end
 
 function camfiletree:branchopen_cb(id)
 	statusprint('branchopn_cb ' .. id)
-	if not chdk.is_connected() then
+	if not con or not con:is_connected() then
 		statusprint('branchopn_cb not connected')
 		return iup.IGNORE
 	end
@@ -463,7 +464,7 @@ dlg = iup.dialog{
 						title='rec',
 						size='45x15',
 						action=function(self)
-							add_status(chdk.execlua('switch_mode_usb(1)'))
+							add_status(con:execlua('switch_mode_usb(1)'))
 						end,
 					},
 					iup.fill{},
@@ -471,7 +472,7 @@ dlg = iup.dialog{
 						title='play',
 						size='45x15',
 						action=function(self)
-							add_status(chdk.execlua('switch_mode_usb(0)'))
+							add_status(con:execlua('switch_mode_usb(0)'))
 						end,
 					},
 				},
@@ -481,7 +482,7 @@ dlg = iup.dialog{
 						title='shutdown',
 						size='45x15',
 						action=function(self)
-							add_status(chdk.execlua('shut_down()'))
+							add_status(con:execlua('shut_down()'))
 						end,
 					},
 					iup.fill{},
@@ -489,7 +490,7 @@ dlg = iup.dialog{
 						title='reboot',
 						size='45x15',
 						action=function(self)
-							add_status(chdk.execlua('reboot()'))
+							add_status(con:execlua('reboot()'))
 						end,
 					},
 				},

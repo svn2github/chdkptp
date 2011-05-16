@@ -113,12 +113,17 @@ int myusb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int length,
  * structures
  */
 
+// connection data
+// TODO might be more convenient to use this as the meta data and put in a pointer to PTPParams ?
 typedef struct _PTP_USB PTP_USB;
 struct _PTP_USB {
 	usb_dev_handle* handle;
 	int inep;
 	int outep;
 	int intep;
+	int script_id;
+	int timeout;
+	int connected; // soft check without actually trying to access usb
 };
 
 /*

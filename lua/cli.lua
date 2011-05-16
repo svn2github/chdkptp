@@ -63,8 +63,8 @@ function cli:add_commands(cmds)
 end
 
 function cli:prompt()
-	if chdk.is_connected() then
-		local script_id = chdk.get_script_id()
+	if con and con:is_connected() then
+		local script_id = con:get_script_id()
 		if script_id then
 			printf("con %d> ",script_id)
 		else
@@ -267,7 +267,7 @@ cli:add_commands{
 		help='execute remote lua',
 		arghelp='<lua code>',
 		func=function(self,args) 
-			return chdku.exec(args)
+			return con:exec(args)
 		end,
 	},
 	{
@@ -277,7 +277,7 @@ cli:add_commands{
 			local msgs=''
 			local msg,err
 			while true do
-				msg,err=chdk.read_msg()
+				msg,err=con:read_msg()
 				if type(msg) ~= 'table' then 
 					return false,msgs..err
 				end
@@ -293,7 +293,7 @@ cli:add_commands{
 		help='send message',
 		arghelp='<msg string>',
 		func=function(self,args) 
-			return chdk.write_msg(args)
+			return con:write_msg(args)
 		end,
 	},
 	{
@@ -303,7 +303,7 @@ cli:add_commands{
 		func=function(self,args) 
 			local rets={}
 			local msgs={}
-			local status,err = chdku.execwait(args,{rets=rets,msgs=msgs})
+			local status,err = con:execwait(args,{rets=rets,msgs=msgs})
 			if not status then
 				return false,err
 			end
@@ -333,7 +333,7 @@ cli:add_commands{
 				count = 1
 			end
 			printf("0x%x %u\n",addr,count)
-			r,msg = chdk.getmem(addr,count)
+			r,msg = con:getmem(addr,count)
 			if not r then
 				return false,msg
 			end
@@ -344,7 +344,7 @@ cli:add_commands{
 		names={'list'},
 		help='list devices',
 		func=function() 
-			if chdk.is_connected() then
+			if con and con:is_connected() then
 				return false,"cannot yet list while connected :("
 			end
 			local msg = ''
@@ -376,7 +376,7 @@ cli:add_commands{
 			end
 			dst = cli:make_camera_path(dst)
 			local msg=string.format("%s->%s\n",src,dst)
-			local r, msg2 = chdk.upload(src,dst)
+			local r, msg2 = con:upload(src,dst)
 			if msg2 then
 				msg = msg .. msg2
 			end
@@ -406,7 +406,7 @@ cli:add_commands{
 			end
 			src = cli:make_camera_path(src)
 			local msg=string.format("%s->%s\n",src,dst)
-			local r, msg2 = chdk.download(src,dst)
+			local r, msg2 = con:download(src,dst)
 			if msg2 then
 				msg = msg .. msg2
 			end
@@ -418,8 +418,8 @@ cli:add_commands{
 		help='print API versions',
 		func=function(self,args) 
 			local host_ver = string.format("host:%d.%d cam:",chdk.host_api_version())
-			if chdk.is_connected() then
-				cam_major, cam_minor = chdk.camera_api_version()
+			if con and con:is_connected() then
+				local cam_major, cam_minor = con:camera_api_version()
 				if not cam_major then
 					return false, host_ver .. string.format("error %s",cam_minor)
 				end
@@ -434,14 +434,17 @@ cli:add_commands{
 		help='(re)connect to device',
 		-- TODO support device selection
 		func=function(self,args) 
-			return chdk.connect()
+			con=chdku.connect()
+			if con then
+				return con:is_connected()
+			end
 		end,
 	},
 	{
 		names={'disconnect','dis'},
 		help='disconnect from device',
 		func=function(self,args) 
-			return chdk.disconnect()
+			return con:disconnect()
 		end,
 	},
 	{
@@ -458,7 +461,7 @@ cli:add_commands{
 			else
 				listopts = { stat='/' }
 			end
-			local list,msg = chdku.listdir(path,listopts)
+			local list,msg = con:listdir(path,listopts)
 			if type(list) == 'table' then
 				local r = ''
 				if opts.l then
@@ -497,15 +500,16 @@ cli:add_commands{
 			end
 			-- sleep and disconnect to avoid later connection problems on some cameras
 			-- clobber because we don't care about memory leaks
-			local status,err=chdku.exec('sleep(1000);reboot('..bootfile..')',{clobber=true})
+			local status,err=con:exec('sleep(1000);reboot('..bootfile..')',{clobber=true})
 			if not status then
 				return false,err
 			end
-			chdk.disconnect()
+			con:disconnect()
 			-- sleep locally to avoid clobbering the reboot, and allow time for the camera to come up before trying to connect
 			sys.sleep(3000)
 			
-			return chdk.connect()
+			con = chdku.connect()
+			return con
 		end,
 	},
 };
