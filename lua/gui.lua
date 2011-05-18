@@ -89,14 +89,13 @@ btn_connect = iup.button{
 
 function btn_connect:action()
 	local host_major, host_minor = chdk.host_api_version()
-	if con and con:is_connected() then
+	if con:is_connected() then
 		con:disconnect()
 		connect_icon.active = "NO"
 		btn_connect.title = "Connect"
 		connect_label.title = string.format("host:%d.%d cam:-.-",host_major,host_minor)
 	else
-		con = chdku.connect() 
-		if con then
+		if con:connect() then
 			connect_icon.active = "YES"
 			btn_connect.title = "Disconnect"
 			local cam_major, cam_minor = con:camera_api_version()
@@ -410,7 +409,7 @@ end
 
 function camfiletree:branchopen_cb(id)
 	statusprint('branchopn_cb ' .. id)
-	if not con or not con:is_connected() then
+	if not con:is_connected() then
 		statusprint('branchopn_cb not connected')
 		return iup.IGNORE
 	end

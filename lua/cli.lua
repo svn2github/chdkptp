@@ -63,7 +63,7 @@ function cli:add_commands(cmds)
 end
 
 function cli:prompt()
-	if con and con:is_connected() then
+	if con:is_connected() then
 		local script_id = con:get_script_id()
 		if script_id then
 			printf("con %d> ",script_id)
@@ -344,7 +344,7 @@ cli:add_commands{
 		names={'list'},
 		help='list devices',
 		func=function() 
-			if con and con:is_connected() then
+			if con:is_connected() then
 				return false,"cannot yet list while connected :("
 			end
 			local msg = ''
@@ -418,7 +418,7 @@ cli:add_commands{
 		help='print API versions',
 		func=function(self,args) 
 			local host_ver = string.format("host:%d.%d cam:",chdk.host_api_version())
-			if con and con:is_connected() then
+			if con:is_connected() then
 				local cam_major, cam_minor = con:camera_api_version()
 				if not cam_major then
 					return false, host_ver .. string.format("error %s",cam_minor)
@@ -434,10 +434,10 @@ cli:add_commands{
 		help='(re)connect to device',
 		-- TODO support device selection
 		func=function(self,args) 
-			con=chdku.connect()
-			if con then
-				return con:is_connected()
+			if con:is_connected() then
+				con:disconnect()
 			end
+			return con:connect()
 		end,
 	},
 	{
@@ -508,8 +508,8 @@ cli:add_commands{
 			-- sleep locally to avoid clobbering the reboot, and allow time for the camera to come up before trying to connect
 			sys.sleep(3000)
 			
-			con = chdku.connect()
-			return con
+			
+			return con:connect()
 		end,
 	},
 };

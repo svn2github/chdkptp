@@ -621,12 +621,14 @@ static void close_connection(PTPParams *params,PTP_USB *ptp_usb)
 // TODO send error status back to lua
 // TODO we might want to return a disconnected object if it can't connect, since it will have a disconnected state anyway ?
 /*
-chdk_connection=chdk.connect()
+chdk_connection=chdk.connection()
+create a disconnected connection object
+TODO optionally connect it
 */
-static int chdk_connect(lua_State *L) {
+static int chdk_connection(lua_State *L) {
 	PTP_USB *ptp_usb;
 	PTPParams *params;
-	struct usb_device *dev;
+//	struct usb_device *dev;
 	params = lua_newuserdata(L,sizeof(PTPParams));
 	luaL_getmetatable(L, CHDK_CONNECTION_META);
 	lua_setmetatable(L, -2);
@@ -635,12 +637,36 @@ static int chdk_connect(lua_State *L) {
 	ptp_usb = malloc(sizeof(PTP_USB));
 	params->data = ptp_usb; // this would be set on connect, but we want it to be set if connection fails so it can be collected
 	memset(ptp_usb,0,sizeof(PTP_USB));
+#if 0
 	if(open_camera(/*camera_bus*/0,/*camera_dev*/0,/*camera_force*/0,ptp_usb,params,&dev) != 0) {
 		// GC will take care of freeing
 		lua_pop(L,1);
 		lua_pushboolean(L,0);
 	} else {
 		ptp_usb->connected = 1;
+	}
+#endif
+	return 1;
+}
+/*
+status[errmsg]=con:connect()
+*/
+static int chdk_connect(lua_State *L) {
+	struct usb_device *dev;
+  	CHDK_CONNECTION_METHOD;
+	// TODO might want to disconnect, or check real connection status ? or options
+	if(ptp_usb->connected) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"already connected");
+		return 1;
+	}
+	if(open_camera(/*camera_bus*/0,/*camera_dev*/0,/*camera_force*/0,ptp_usb,params,&dev) != 0) {
+		// GC will take care of freeing
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"connection failed");
+	} else {
+		ptp_usb->connected = 1;
+		lua_pushboolean(L,1);
 	}
 	return 1;
 }
@@ -704,7 +730,6 @@ static int chdk_host_api_version(lua_State *L) {
 	return 2;
 }
 
-static int script_id;
 /*
 status[,err]=con:execlua("code")
 status is true if script started successfully, false otherwise
@@ -1121,7 +1146,7 @@ TODO should be either all lua_error (with pcall) or not.
 TODO many errors are still printed to the console
 */
 static const luaL_Reg chdklib[] = {
-  {"connect", chdk_connect},
+  {"connection", chdk_connection},
   {"host_api_version", chdk_host_api_version},
   {"list_devices", chdk_list_devices},
   {NULL, NULL}
@@ -1143,7 +1168,7 @@ static int chdk_connection_gc(lua_State *L) {
 methods of the connection object
 */
 static const luaL_Reg chdkconnection[] = {
-/*  {"connect", chdk_connect},*/ // TODO this object can become disconnected
+  {"connect", chdk_connect},
   {"disconnect", chdk_disconnect},
   {"is_connected", chdk_is_connected},
   {"camera_api_version", chdk_camera_api_version},

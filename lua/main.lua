@@ -119,6 +119,8 @@ end
 
 process_options()
 
+con=chdku.connection()
+
 if options.g then
 	if init_iup() then
 		gui=require('gui')
@@ -129,7 +131,7 @@ if options.g then
 else
 	if options.c then
 		-- TODO global connection object
-		con=chdku.connect()
+		con:connect()
 	end
 	-- for the gui, e commands will be run after the gui is started
 	if options.e then
