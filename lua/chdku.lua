@@ -429,14 +429,17 @@ note may return an empty table if target is not a directory
 function con_methods.listdir(con,path,opts) 
 	if type(opts) == 'table' then
 		opts = serialize(opts)
-	elseif type(opts) == 'nil' then
-		opts = ''
-	elseif type(opts) ~= 'string' then
+	elseif type(opts) ~= 'string' and type(opts) ~= 'nil' then
 		return false, "invalid options"
+	end
+	if opts then
+		opts = ','..opts
+	else
+		opts = ''
 	end
 	local results={}
 	local i=1
-	local status,err=con:execwait("return ls('"..path.."',"..opts..")",{
+	local status,err=con:execwait("return ls('"..path.."'"..opts..")",{
 		libs='ls',
 		msgs=chdku.msg_unbatcher(results),
 	})
