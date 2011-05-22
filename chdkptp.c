@@ -75,7 +75,13 @@
 /* some defines comes here */
 
 /* CHDK additions */
-#define CHDK_CONNECTION_META "CHDK_CONNECTION"
+/* meta table for connection objects */
+#define CHDK_CONNECTION_META "chkdptp.connection_meta"
+/* list of opened connections, indexed weakly as t[connection] = true */
+#define CHDK_CONNECTION_LIST "chkdptp.connection_list"
+/* meta table for for connection list */
+#define CHDK_CONNECTION_LIST_META "chkdptp.connection_list_meta"
+
 #define MAXCONNRETRIES 10
 
 
@@ -310,9 +316,9 @@ close_usb(PTP_USB* ptp_usb, struct usb_device* dev)
 
 
 struct usb_bus*
-init_usb()
+get_busses()
 {
-	usb_init();
+//	usb_init();
 	usb_find_busses();
 	usb_find_devices();
 	return (usb_get_busses());
@@ -331,7 +337,7 @@ find_device (int busn, int devn, short force)
 	struct usb_bus *bus;
 	struct usb_device *dev;
 
-	bus=init_usb();
+	bus=get_busses();
 	for (; bus; bus = bus->next) {
 		for (dev = bus->devices; dev; dev = dev->next) {
 			if (dev->config) {
@@ -616,69 +622,6 @@ static void close_connection(PTPParams *params,PTP_USB *ptp_usb)
 	ptp_usb->connected = 0;
 }
 
-// TODO accept retry count, or move retry to lua
-// TODO accept device specifier
-// TODO send error status back to lua
-// TODO we might want to return a disconnected object if it can't connect, since it will have a disconnected state anyway ?
-/*
-chdk_connection=chdk.connection()
-create a disconnected connection object
-TODO optionally connect it
-*/
-static int chdk_connection(lua_State *L) {
-	PTP_USB *ptp_usb;
-	PTPParams *params;
-//	struct usb_device *dev;
-	params = lua_newuserdata(L,sizeof(PTPParams));
-	luaL_getmetatable(L, CHDK_CONNECTION_META);
-	lua_setmetatable(L, -2);
-
-	memset(params,0,sizeof(PTPParams));
-	ptp_usb = malloc(sizeof(PTP_USB));
-	params->data = ptp_usb; // this would be set on connect, but we want it to be set if connection fails so it can be collected
-	memset(ptp_usb,0,sizeof(PTP_USB));
-#if 0
-	if(open_camera(/*camera_bus*/0,/*camera_dev*/0,/*camera_force*/0,ptp_usb,params,&dev) != 0) {
-		// GC will take care of freeing
-		lua_pop(L,1);
-		lua_pushboolean(L,0);
-	} else {
-		ptp_usb->connected = 1;
-	}
-#endif
-	return 1;
-}
-/*
-status[errmsg]=con:connect()
-*/
-static int chdk_connect(lua_State *L) {
-	struct usb_device *dev;
-  	CHDK_CONNECTION_METHOD;
-	// TODO might want to disconnect, or check real connection status ? or options
-	if(ptp_usb->connected) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"already connected");
-		return 1;
-	}
-	if(open_camera(/*camera_bus*/0,/*camera_dev*/0,/*camera_force*/0,ptp_usb,params,&dev) != 0) {
-		// GC will take care of freeing
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"connection failed");
-	} else {
-		ptp_usb->connected = 1;
-		lua_pushboolean(L,1);
-	}
-	return 1;
-}
-
-static int chdk_disconnect(lua_State *L) {
-  	CHDK_CONNECTION_METHOD;
-
-	close_connection(params,ptp_usb);
-	lua_pushboolean(L,1);
-	return 1;
-}
-
 static int check_connection_status(PTP_USB *ptp_usb) {
 	uint16_t devstatus[2] = {0,0};
 	
@@ -689,6 +632,263 @@ static int check_connection_status(PTP_USB *ptp_usb) {
 		return 0;
 	}
 	return (devstatus[1] == 0x2001);
+}
+
+
+/*
+convenience - values extracted from a devinfo table
+*/
+typedef struct {
+	const char *bus;
+	const char *dev;
+	unsigned vendor_id; // these are shorts in USB, but we want to allow special values
+	unsigned product_id;
+} devinfo_lua;
+#define DEVINFO_LUA_ID_NONE 0x10000
+/*
+read lua devinfo table into C values
+*/
+static int get_lua_devinfo(lua_State *L, int index, devinfo_lua *devinfo) {
+	if(!devinfo) {
+		return 0;
+	}
+	if(!lua_istable(L,index)) {
+		// TODO HACKY - returns a blank devinfo if not table 
+		devinfo->dev = devinfo->bus = NULL;
+		devinfo->vendor_id = devinfo->product_id = DEVINFO_LUA_ID_NONE;
+		return 0;
+	}
+	// TODO throw an error ? allow wildcards ?
+	lua_getfield(L,index,"dev");
+	devinfo->dev = lua_tostring(L,-1);
+	lua_pop(L,1);
+
+	lua_getfield(L,index,"bus");
+	devinfo->bus = lua_tostring(L,-1);
+	lua_pop(L,1);
+
+	lua_getfield(L,index,"vendor_id");
+	devinfo->vendor_id = luaL_optnumber(L,-1,DEVINFO_LUA_ID_NONE);
+	lua_pop(L,1);
+
+	lua_getfield(L,index,"product_id");
+	devinfo->product_id = luaL_optnumber(L,-1,DEVINFO_LUA_ID_NONE);
+	lua_pop(L,1);
+	return 1;
+}
+
+/*
+compare an devinfo_lua with a USB dev
+undefined values (ID_NONE or NULL) match any
+*/
+static int compare_ldevinfo(devinfo_lua *ldevinfo,struct usb_device *dev) {
+	return ( dev && ldevinfo
+			&& (!ldevinfo->bus || strcmp(dev->bus->dirname,ldevinfo->bus) == 0)
+			&& (!ldevinfo->dev || strcmp(dev->filename,ldevinfo->dev) == 0)
+			&& (ldevinfo->vendor_id == DEVINFO_LUA_ID_NONE || dev->descriptor.idVendor == ldevinfo->vendor_id)
+			&& (ldevinfo->product_id == DEVINFO_LUA_ID_NONE || dev->descriptor.idProduct == ldevinfo->product_id));
+}
+/*
+find existing connection connected to dev, as specified by a devinfo table, push onto stack and return 1 if found, otherwise return 0
+*/
+static int find_connection_ldev(lua_State *L, devinfo_lua *ldevinfo) {
+	
+	PTPParams *params;
+	PTP_USB *ptp_usb;
+	struct usb_device *dev;
+
+	if(!ldevinfo->dev || !ldevinfo->bus || ldevinfo->product_id == DEVINFO_LUA_ID_NONE || ldevinfo->vendor_id == DEVINFO_LUA_ID_NONE) {
+		return 0;
+	}
+
+	// get the connections list
+	lua_getfield(L,LUA_REGISTRYINDEX,CHDK_CONNECTION_LIST);
+	lua_pushnil(L);  /* first key */
+	while (lua_next(L, -2) != 0) {
+		params = (PTPParams *)luaL_checkudata(L,-2,CHDK_CONNECTION_META); // our key is the user data
+		lua_pop(L, 1); // discard the value
+		ptp_usb = params->data;
+		if(!ptp_usb->connected) {
+			continue;
+		}
+		dev = usb_device(ptp_usb->handle);
+		if(!dev) {
+			return luaL_error(L,"find_connection_ldev:null dev");
+		}
+		if(compare_ldevinfo(ldevinfo,dev)) {
+			// the udata will be on top of the stack
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/*
+as above, but with a usb_device
+*/
+static int find_connection_dev(lua_State *L, struct usb_device *finddev) {
+	
+	PTPParams *params;
+	PTP_USB *ptp_usb;
+	struct usb_device *dev;
+
+	if(!finddev) {
+		return 0;
+	}
+
+	// get the connections list
+	lua_getfield(L,LUA_REGISTRYINDEX,CHDK_CONNECTION_LIST);
+	lua_pushnil(L);  /* first key */
+	while (lua_next(L, -2) != 0) {
+		params = (PTPParams *)luaL_checkudata(L,-2,CHDK_CONNECTION_META); // our key is the user data
+		lua_pop(L, 1); // discard the value
+		ptp_usb = params->data;
+		if(!ptp_usb->connected) {
+			continue;
+		}
+		dev = usb_device(ptp_usb->handle);
+		if(!dev) {
+			return luaL_error(L,"find_connection_dev:null dev");
+		}
+		if( strcmp(dev->filename,finddev->filename) == 0
+			&& strcmp(dev->bus->dirname,finddev->bus->dirname) == 0
+			&& dev->descriptor.idVendor == finddev->descriptor.idVendor
+			&& dev->descriptor.idProduct == finddev->descriptor.idProduct) {
+			// the udata will be on top of the stack
+			return 1;
+		}
+	}
+	return 0;
+}
+
+
+struct usb_device *find_device_ldev(devinfo_lua *ldev) {
+	struct usb_bus *bus;
+	struct usb_device *dev;
+
+	bus=get_busses();
+	for (; bus; bus = bus->next) {
+		for (dev = bus->devices; dev; dev = dev->next) {
+			if (dev->config) {
+				if ((dev->config->interface->altsetting->bInterfaceClass==USB_CLASS_PTP)) {
+					if(compare_ldevinfo(ldev,dev)) {
+						return dev;
+					}
+				}
+			}
+		}
+	}
+	return NULL;
+}
+
+int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
+{
+  	if(!dev) {
+		return 0;
+	}
+	find_endpoints(dev,&ptp_usb->inep,&ptp_usb->outep,&ptp_usb->intep);
+    init_ptp_usb(params, ptp_usb, dev);   
+
+	if(ptp_opensession(params,1)!=PTP_RC_OK) {
+		return 0;
+	}
+	// TODO we could check camera CHDK, API version, etc here
+	ptp_usb->connected = 1;
+	return 1;
+}
+
+// TODO send error status back to lua
+/*
+chdk_connection=chdk.connection([devinfo])
+if devinfo is absent, the connection is returned in the disconnected state
+otherwise devinfo is a table with bus, dev, vendor_id and product_id
+if an existing, connected connection to the device exists, it is returned
+other try to connecto to the matching device
+*/
+static int chdk_connection(lua_State *L) {
+	devinfo_lua ldevinfo;
+	PTP_USB *ptp_usb;
+	PTPParams *params;
+	if(get_lua_devinfo(L,1,&ldevinfo)) {
+		if(find_connection_ldev(L,&ldevinfo)) {
+			params = lua_touserdata(L,-1);
+			if(!params) {
+				return luaL_error(L,"expected user data in chdk_connection");
+			}
+			ptp_usb=params->data;
+			// check that it's actually connected and return on stack if so
+			if(check_connection_status(ptp_usb)) {
+				return 1;
+			}
+			// not connected, create a new connection (TODO...)
+		}
+	}
+
+	params = lua_newuserdata(L,sizeof(PTPParams));
+	luaL_getmetatable(L, CHDK_CONNECTION_META);
+	lua_setmetatable(L, -2);
+
+	memset(params,0,sizeof(PTPParams));
+	ptp_usb = malloc(sizeof(PTP_USB));
+	params->data = ptp_usb; // this would be set on connect, but we want it to be set if connection fails so it can be collected
+	memset(ptp_usb,0,sizeof(PTP_USB));
+
+	// save in registry so we can easily identify / enumerate existing connections
+	lua_getfield(L,LUA_REGISTRYINDEX,CHDK_CONNECTION_LIST);
+	lua_pushvalue(L, -2); // our user data, for use as key
+	lua_pushboolean(L,1); // value (dummy)
+	lua_settable(L,-3); // set t[userdata]=true
+	lua_pop(L,1); // done with t
+	// no status on open, up to the caller to check is_connected
+	if(ldevinfo.dev) {
+		struct usb_device *dev = find_device_ldev(&ldevinfo);
+		open_camera_dev(dev,ptp_usb,params);
+	}
+	return 1;
+}
+/*
+status[errmsg]=con:connect([devinfo])
+*/
+static int chdk_connect(lua_State *L) {
+	devinfo_lua ldevinfo;
+
+  	CHDK_CONNECTION_METHOD;
+	// TODO might want to disconnect, or check real connection status ? or options
+	if(ptp_usb->connected) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"already connected");
+		return 1;
+	}
+
+	// TODO if we get no arg, and were previously connected, we should try to reconnect to that dev
+	get_lua_devinfo(L,2,&ldevinfo); // don't care about status, we will try to connect to first available if none given
+	struct usb_device *dev = find_device_ldev(&ldevinfo);
+	if(dev) {
+		// TODO this is ugly, check for existing connection on same device
+		// TODO should have a version of find_device_ldev that skips over connected devs
+		if(find_connection_dev(L,dev)) {
+			// if found it got pushed on the stack, discard
+			lua_pop(L,1);
+			lua_pushboolean(L,0);
+			lua_pushstring(L,"another connection to that device already exists");
+			return 1;
+		} else if(open_camera_dev(dev,ptp_usb,params)) {
+			lua_pushboolean(L,1);
+			return 1;
+		}
+	}
+	ptp_usb->connected = 0;
+	lua_pushboolean(L,0);
+	lua_pushstring(L,"connection failed");
+	return 1;
+}
+
+static int chdk_disconnect(lua_State *L) {
+  	CHDK_CONNECTION_METHOD;
+
+	close_connection(params,ptp_usb);
+	lua_pushboolean(L,1);
+	return 1;
 }
 
 static int chdk_is_connected(lua_State *L) {
@@ -758,8 +958,51 @@ static int chdk_execlua(lua_State *L) {
 }
 
 /*
-// TODO find a way to make this work while connected
-// TODO we can add additional information here
+push a new table onto the stack
+{
+	"bus" = "dirname", 
+	"dev" = "filename", 
+	"vendor_id" = VENDORID,
+	"product_id" = PRODUCTID,
+}
+TODO may want to include interface/config info
+*/
+static void push_usb_dev_info(lua_State *L,struct usb_device *dev) {
+	lua_createtable(L,0,4);
+	lua_pushstring(L, dev->bus->dirname);
+	lua_setfield(L, -2, "bus");
+	lua_pushstring(L, dev->filename);
+	lua_setfield(L, -2, "dev");
+	lua_pushnumber(L, dev->descriptor.idVendor);
+	lua_setfield(L, -2, "vendor_id");
+	lua_pushnumber(L, dev->descriptor.idProduct);
+	lua_setfield(L, -2, "product_id");
+}
+
+static int chdk_list_usb_devices(lua_State *L) {
+	struct usb_bus *bus;
+	struct usb_device *dev;
+	int found=0;
+	bus=get_busses();
+	lua_newtable(L);
+  	for (; bus; bus = bus->next) {
+    	for (dev = bus->devices; dev; dev = dev->next) {
+			if (!dev->config) {
+				continue;
+			}
+			/* if it's a PTP list it */
+			if ((dev->config->interface->altsetting->bInterfaceClass==USB_CLASS_PTP)) {
+				push_usb_dev_info(L,dev);
+				found++;
+				lua_rawseti(L, -2, found); // add to array
+			}
+		}
+	}
+	return 1;
+}
+
+/*
+TODO this will go away, replaced by list_usb_devices + lua side code
 return array of records like
 {
 	"bus" = "dirname", 
@@ -776,7 +1019,7 @@ static int chdk_list_devices(lua_State *L) {
 
 	// empty table to collect results
 	lua_newtable(L);
-	bus=init_usb();
+	bus=get_busses();
   	for (; bus; bus = bus->next) {
     	for (dev = bus->devices; dev; dev = dev->next) {
 			if (!dev->config) {
@@ -1125,7 +1368,7 @@ static int chdk_get_script_id(lua_State *L) {
 }
 
 /*
-testing
+TEMP testing
 get_status_result,status[0],status[1]=con:dev_status()
 */
 static int chdk_dev_status(lua_State *L) {
@@ -1138,6 +1381,11 @@ static int chdk_dev_status(lua_State *L) {
 	return 3;
 }
 
+static int chdk_get_conlist(lua_State *L) {
+	lua_getfield(L,LUA_REGISTRYINDEX,CHDK_CONNECTION_LIST);
+	return 1;
+}
+
 /*
 most functions return result[,errormessage]
 result is false or nil on error
@@ -1148,7 +1396,9 @@ TODO many errors are still printed to the console
 static const luaL_Reg chdklib[] = {
   {"connection", chdk_connection},
   {"host_api_version", chdk_host_api_version},
-  {"list_devices", chdk_list_devices},
+  {"list_devices", chdk_list_devices}, // TEMP one of these will go away
+  {"list_usb_devices", chdk_list_usb_devices},
+  {"get_conlist", chdk_get_conlist}, // TEMP TESTING
   {NULL, NULL}
 };
 
@@ -1227,6 +1477,14 @@ static int chdkptp_registerlibs(lua_State *L) {
 
 	luaL_register(L, "chdk", chdklib);
 	luaL_register(L, "sys", lua_syslib);
+	// create a table to keep track of connections
+	lua_newtable(L);
+	// metatable for above
+	luaL_newmetatable(L, CHDK_CONNECTION_LIST_META);
+	lua_pushstring(L, "kv");  /* mode values: weak keys, weak values */
+	lua_setfield(L, -2, "__mode");  /* metatable.__mode */
+	lua_setmetatable(L,-2);
+	lua_setfield(L,LUA_REGISTRYINDEX,CHDK_CONNECTION_LIST);
 	return 1;
 }
 
@@ -1294,6 +1552,7 @@ int main(int argc, char ** argv)
 	/* register signal handlers */
 //	signal(SIGINT, ptpcam_siginthandler);
 	int i;
+	usb_init();
 	lua_State *L = lua_open();
 	luaL_openlibs(L);
 	init_lua_globals(L,argc,argv);
