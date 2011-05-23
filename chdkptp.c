@@ -75,6 +75,8 @@
 /* some defines comes here */
 
 /* CHDK additions */
+
+/* lua registry indexes */
 /* meta table for connection objects */
 #define CHDK_CONNECTION_META "chkdptp.connection_meta"
 /* list of opened connections, indexed weakly as t[connection] = true */
@@ -399,6 +401,7 @@ find_endpoints(struct usb_device *dev, int* inep, int* outep, int* intep)
 	}
 }
 
+#if 0
 // TODO retry logic should be in lua
 int
 open_camera (int busn, int devn, short force, PTP_USB *ptp_usb, PTPParams *params, struct usb_device **dev)
@@ -451,7 +454,7 @@ open_camera (int busn, int devn, short force, PTP_USB *ptp_usb, PTPParams *param
 	}
 	return 0;
 }
-
+#endif
 void
 close_camera(PTP_USB *ptp_usb, PTPParams *params, struct usb_device *dev)
 {
@@ -527,25 +530,21 @@ usb_ptp_device_reset(PTP_USB* ptp_usb)
 }
 
 void
-reset_device (int busn, int devn, short force);
+reset_device (struct usb_device *dev);
 void
-reset_device (int busn, int devn, short force)
+reset_device (struct usb_device *dev)
 {
 	PTPParams params;
 	PTP_USB ptp_usb;
-	struct usb_device *dev;
 	uint16_t status;
 	uint16_t devstatus[2] = {0,0};
 	int ret;
 
-#ifdef DEBUG
-	printf("dev %i\tbus %i\n",devn,busn);
-#endif
-	dev=find_device(busn,devn,force);
+	printf("reset_device: dev %s\tbus %s\n",dev->filename,dev->bus->dirname);
+
 	if (dev==NULL) {
-		fprintf(stderr,"could not find any device matching given "
-		"bus/dev numbers\n");
-		exit(-1);
+		printf("reset_device: null dev\n");
+		return;
 	}
 	find_endpoints(dev,&ptp_usb.inep,&ptp_usb.outep,&ptp_usb.intep);
 
@@ -602,7 +601,6 @@ reset_device (int busn, int devn, short force)
 	usb_ptp_get_device_status(&ptp_usb,devstatus);
 
 	close_usb(&ptp_usb, dev);
-
 }
 
 //----------------------------
@@ -1386,6 +1384,13 @@ static int chdk_get_conlist(lua_State *L) {
 	return 1;
 }
 
+static int chdk_reset_device(lua_State *L) {
+	devinfo_lua ldevinfo;
+	if(get_lua_devinfo(L,1,&ldevinfo)) {
+		struct usb_device *dev = find_device_ldev(&ldevinfo);
+		reset_device(dev);
+	}
+}
 /*
 most functions return result[,errormessage]
 result is false or nil on error
@@ -1399,6 +1404,7 @@ static const luaL_Reg chdklib[] = {
   {"list_devices", chdk_list_devices}, // TEMP one of these will go away
   {"list_usb_devices", chdk_list_usb_devices},
   {"get_conlist", chdk_get_conlist}, // TEMP TESTING
+  {"reset_device", chdk_reset_device}, // TEMP TESTING
   {NULL, NULL}
 };
 
