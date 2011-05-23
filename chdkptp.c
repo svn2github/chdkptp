@@ -781,14 +781,38 @@ struct usb_device *find_device_ldev(devinfo_lua *ldev) {
 
 int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
 {
+	uint16_t devstatus[2] = {0,0};
+	int ret;
   	if(!dev) {
+		printf("open_camera_dev: NULL dev\n");
 		return 0;
 	}
 	find_endpoints(dev,&ptp_usb->inep,&ptp_usb->outep,&ptp_usb->intep);
-    init_ptp_usb(params, ptp_usb, dev);   
+	init_ptp_usb(params, ptp_usb, dev);   
 
 	if(ptp_opensession(params,1)!=PTP_RC_OK) {
-		return 0;
+// TODO temp debug - this appears to be needed on linux if other stuff grabbed the dev
+		printf("open_camera_dev: ptp_opensession failed\n");
+		ret = usb_ptp_device_reset(ptp_usb);
+		if (ret<0)perror ("open_camera_dev:usb_ptp_device_reset()");
+		/* get device status (devices likes that regardless of its result)*/
+		ret = usb_ptp_get_device_status(ptp_usb,devstatus);
+		if (ret<0) 
+			perror ("usb_ptp_get_device_status()");
+		else	{
+			if (devstatus[1]==PTP_RC_OK) 
+				printf ("Device status OK\n");
+			else
+				printf ("Device status 0x%04x\n",devstatus[1]);
+		}
+
+		close_usb(ptp_usb, dev);
+		find_endpoints(dev,&ptp_usb->inep,&ptp_usb->outep,&ptp_usb->intep);
+		init_ptp_usb(params, ptp_usb, dev);   
+		if(ptp_opensession(params,1)!=PTP_RC_OK) {
+			printf("open_camera_dev: ptp_opensession 2 failed\n");
+			return 0;
+		}
 	}
 	// TODO we could check camera CHDK, API version, etc here
 	ptp_usb->connected = 1;
