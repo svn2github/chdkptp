@@ -687,7 +687,8 @@ static int compare_ldevinfo(devinfo_lua *ldevinfo,struct usb_device *dev) {
 			&& (ldevinfo->product_id == DEVINFO_LUA_ID_NONE || dev->descriptor.idProduct == ldevinfo->product_id));
 }
 /*
-find existing connection connected to dev, as specified by a devinfo table, push onto stack and return 1 if found, otherwise return 0
+find existing connection connected to dev, as specified by a devinfo table
+push onto stack and return 1 if found, otherwise return 0
 */
 static int find_connection_ldev(lua_State *L, devinfo_lua *ldevinfo) {
 	
@@ -813,6 +814,13 @@ int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
 			printf("open_camera_dev: ptp_opensession 2 failed\n");
 			return 0;
 		}
+
+	}
+	if (ptp_getdeviceinfo(params,&params->deviceinfo)!=PTP_RC_OK) {
+		// TODO do we want to close here ?
+		printf("Could not get device info!\n");
+		close_camera(ptp_usb, params, dev);
+		return 0;
 	}
 	// TODO we could check camera CHDK, API version, etc here
 	ptp_usb->connected = 1;
@@ -825,7 +833,7 @@ chdk_connection=chdk.connection([devinfo])
 if devinfo is absent, the connection is returned in the disconnected state
 otherwise devinfo is a table with bus, dev, vendor_id and product_id
 if an existing, connected connection to the device exists, it is returned
-other try to connecto to the matching device
+otherwise try to connec to to the matching device
 */
 static int chdk_connection(lua_State *L) {
 	devinfo_lua ldevinfo;
@@ -1403,6 +1411,38 @@ static int chdk_dev_status(lua_State *L) {
 	return 3;
 }
 
+/*
+devinfo=con:get_ptp_devinfo()
+devinfo = {
+	manufacturer = "manufacturer"
+	model = "model"
+	device_version = "version""
+	serial_number = "serialnum"
+}
+more fields may be added later
+serial number may be nil
+*/
+static int chdk_get_ptp_devinfo(lua_State *L) {
+  	CHDK_CONNECTION_METHOD;
+	// don't actually need to be connected to get this, but ensures we have valid data
+	if ( !ptp_usb->connected ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"not connected");
+		return 2;
+	}
+	lua_newtable(L);
+	lua_pushstring(L, params->deviceinfo.Model);
+	lua_setfield(L, -2, "model");
+	lua_pushstring(L, params->deviceinfo.Manufacturer);
+	lua_setfield(L, -2, "manufacturer");
+	lua_pushstring(L, params->deviceinfo.DeviceVersion);
+	lua_setfield(L, -2, "device_version");
+	lua_pushstring(L, params->deviceinfo.SerialNumber);
+	lua_setfield(L, -2, "serial_number");
+
+	return 1;
+}
+
 static int chdk_get_conlist(lua_State *L) {
 	lua_getfield(L,LUA_REGISTRYINDEX,CHDK_CONNECTION_LIST);
 	return 1;
@@ -1463,6 +1503,7 @@ static const luaL_Reg chdkconnection[] = {
   {"write_msg", chdk_write_msg},
   {"get_script_id", chdk_get_script_id},
   {"dev_status", chdk_dev_status},
+  {"get_ptp_devinfo", chdk_get_ptp_devinfo},
   {"__gc", chdk_connection_gc},
 /*  {"__index", chdk_conection_index}, */ // might want to use function instead of mt itself
   {NULL, NULL}
