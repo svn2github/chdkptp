@@ -814,8 +814,8 @@ add our methods to connection object meta table
 only needs to be done once
 ]]
 local bound=false
-function chdku.connection()
-	local con = chdk.connection()
+function chdku.connection(devspec)
+	local con = chdk.connection(devspec)
 	if not bound then
 		for k,v in pairs(con_methods) do
 			con.__index[k]=v
