@@ -60,7 +60,7 @@ con> =return get_buildinfo()
 ad hoc scripting on PC side - download some files
 con> !t=chdku.listdir('A/DCIM/100CANON',{match="%.JPG$"})
 con> !for i,n in ipairs(t) do chdk.download("A/DCIM/100CANON/"..n,"C:/TEMP/"..n) end
-note chdku.downloaddir() is a slightly niceer version of the above
+note chdku.downloaddir() is a slightly nicer version of the above
 
 =Running under linux=
 Under linux, the .lua files will not automatically found relative to the executeable directory

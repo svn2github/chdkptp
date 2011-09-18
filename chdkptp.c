@@ -833,7 +833,7 @@ chdk_connection=chdk.connection([devinfo])
 if devinfo is absent, the connection is returned in the disconnected state
 otherwise devinfo is a table with bus, dev, vendor_id and product_id
 if an existing, connected connection to the device exists, it is returned
-otherwise try to connec to to the matching device
+otherwise try to connect to the matching device
 */
 static int chdk_connection(lua_State *L) {
 	devinfo_lua ldevinfo;
@@ -1420,7 +1420,8 @@ devinfo = {
 	serial_number = "serialnum"
 }
 more fields may be added later
-serial number may be nil
+serial number may be NULL (=unset in table)
+version does not match canon firmware version (e.g. d10 100a = "1-6.0.1.0")
 */
 static int chdk_get_ptp_devinfo(lua_State *L) {
   	CHDK_CONNECTION_METHOD;

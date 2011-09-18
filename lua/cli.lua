@@ -163,7 +163,7 @@ end
 
 --[[
 t,args=cli:get_opts(args,optspec)
-optspect is an array of option letters 
+optspec is an array of option letters 
 returns table of option values
 plus arg string with recognized opts removed
 TODO should unify command line processing with main.lua args
@@ -349,7 +349,7 @@ cli:add_commands{
 			end
 			local msg = ''
 			for num,d in ipairs(chdk.list_devices()) do
-				msg = msg .. string.format("%d: %s %s/%s vendor:%x pid:%x\n",num,d.model,d.bus,d.dev,d.vendor_id,d.product_id)
+				msg = msg .. string.format("%d: %s bus:%s dev:%s vendor:%x pid:%x\n",num,d.model,d.bus,d.dev,d.vendor_id,d.product_id)
 			end
 			return true,msg
 		end,
@@ -507,8 +507,7 @@ cli:add_commands{
 			con:disconnect()
 			-- sleep locally to avoid clobbering the reboot, and allow time for the camera to come up before trying to connect
 			sys.sleep(3000)
-			
-			
+
 			return con:connect()
 		end,
 	},
