@@ -234,6 +234,28 @@ end
 ]],
 },
 --[[
+join a path with / as needed
+]]
+{
+	name='joinpath',
+	code=[[
+function joinpath(...)
+	local parts={...}
+	if #parts < 2 then
+		error('joinpath requires at least 2 parts')
+	end
+	local r=parts[1]
+	for i = 2, #parts do
+		if string.sub(r,-1,-1) ~= '/' then
+			r=r..'/'
+		end
+		r=r..parts[i]
+	end
+	return r
+end
+]],
+},
+--[[
 	status[,err]=dir_iter(path,func,opts)
 general purpose directory iterator
 interates over directory 'path', calling
@@ -364,7 +386,7 @@ TODO handle case if 'path' is a file
 ]]
 {
 	name='ls',
-	depend='msg_batcher',
+	depend={'msg_batcher','joinpath'},
 	code=[[
 function ls(path,opts_in)
 	local opts={
@@ -387,7 +409,7 @@ function ls(path,opts_in)
 	for i,v in ipairs(t) do
 		if not opts.match or string.match(v,opts.match) then
 			if opts.stat then
-				local st,msg=os.stat(path..'/'..v)
+				local st,msg=os.stat(joinpath(path,v))
 				if not st then
 					return false,msg
 				end
