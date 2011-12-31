@@ -1711,7 +1711,7 @@ int ptp_chdk_upload(char *local_fn, char *remote_fn, PTPParams* params, PTPDevic
   PTPContainer ptp;
   char *buf = NULL;
   FILE *f;
-  int s,l;
+  unsigned file_len,data_len,file_name_len;
 
   PTP_CNT_INIT(ptp);
   ptp.Code=PTP_OC_CHDK;
@@ -1726,18 +1726,19 @@ int ptp_chdk_upload(char *local_fn, char *remote_fn, PTPParams* params, PTPDevic
   }
 
   fseek(f,0,SEEK_END);
-  s = ftell(f);
+  file_len = ftell(f);
   fseek(f,0,SEEK_SET);
 
-  l = strlen(remote_fn);
-  buf = malloc(4+l+s);
-  memcpy(buf,&l,4);
-  memcpy(buf+4,remote_fn,l);
-  fread(buf+4+l,1,s,f);
+  file_name_len = strlen(remote_fn);
+  data_len = 4 + file_name_len + file_len;
+  buf = malloc(data_len);
+  memcpy(buf,&file_name_len,4);
+  memcpy(buf+4,remote_fn,file_name_len);
+  fread(buf+4+file_name_len,1,file_len,f);
 
   fclose(f);
 
-  ret=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, 4+l+s, &buf);
+  ret=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, data_len, &buf);
 
   free(buf);
 

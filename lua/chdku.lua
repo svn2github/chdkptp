@@ -433,6 +433,73 @@ function ls(path,opts_in)
 end
 ]],
 },
+--[[
+a simple long lived script for interactive testing
+example
+!return con:exec('msg_shell:run()',{libs='msg_shell'})
+putm exec message="hello world"
+putm exec print(message)
+]]
+{
+	name='msg_shell',
+	code=[[
+msg_shell={}
+msg_shell.done=false
+msg_shell.cmds={
+	quit=function(msg)
+		msg_shell.done=true
+	end,
+	echo=function(msg)
+		if write_usb_msg(msg) then
+			print("ok")
+		else 
+			print("fail")
+		end
+	end,
+	exec=function(msg)
+		local f,err=loadstring(string.sub(msg,5));
+		if f then 
+			local r={f()} -- pcall would be safer but anything that yields will fail
+			for i, v in ipairs(r) do
+				write_usb_msg(v)
+			end
+		else
+			write_usb_msg(err)
+			print("loadstring:"..err)
+		end
+	end,
+	pcall=function(msg)
+		local f,err=loadstring(string.sub(msg,6));
+		if f then 
+			local r={pcall(f)}
+			for i, v in ipairs(r) do
+				write_usb_msg(v)
+			end
+		else
+			write_usb_msg(err)
+			print("loadstring:"..err)
+		end
+	end,
+}
+msg_shell.run=function(self)
+	repeat 
+		local msg=read_usb_msg()
+		if msg then
+			local cmd = string.match(msg,'^%w+')
+			if type(self.cmds[cmd]) == 'function' then
+				self.cmds[cmd](msg)
+			elseif type(self.default_cmd) == 'function' then
+				self.default_cmd(msg)
+			else
+				print('undefined command: '..cmd)
+			end
+		else
+			sleep(100)
+		end
+	until self.done
+end
+]],
+},
 }
 
 chdku.rlibs = rlibs
@@ -809,19 +876,36 @@ function con_methods.wait_status(con,opts)
 end
 
 --[[
-TODO temp
-add our methods to connection object meta table
-only needs to be done once
+meta table for wrapped connection object
 ]]
-local bound=false
-function chdku.connection(devspec)
-	local con = chdk.connection(devspec)
-	if not bound then
-		for k,v in pairs(con_methods) do
-			con.__index[k]=v
-		end
-		bound=true
+local con_meta = {
+	__index = function(t,key)
+		return con_methods[key]
 	end
+}
+
+--[[
+proxy connection methods from low level object to chdku
+]]
+local function init_connection_methods()
+	for name,func in pairs(chdk_connection) do
+		if con_methods[name] == nil and type(func) == 'function' then
+			con_methods[name] = function(self,...)
+				return chdk_connection[name](self._con,...)
+			end
+		end
+	end
+end
+
+init_connection_methods()
+
+--[[
+return a connection object wrapped with chdku methods
+]]
+function chdku.connection(devspec)
+	local con = {}
+	setmetatable(con,con_meta)
+	con._con = chdk.connection(devspec)
 	return con
 end
 

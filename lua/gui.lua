@@ -95,11 +95,20 @@ function btn_connect:action()
 		btn_connect.title = "Connect"
 		connect_label.title = string.format("host:%d.%d cam:-.-",host_major,host_minor)
 	else
-		if con:connect() then
-			connect_icon.active = "YES"
-			btn_connect.title = "Disconnect"
-			local cam_major, cam_minor = con:camera_api_version()
-			connect_label.title = string.format("host:%d.%d cam:%d.%d",host_major,host_minor,cam_major,cam_minor)
+		-- TODO temp, connect to the "first" device, need to add cam selection
+		-- mostly copied from cli connect
+		local devs = chdk.list_usb_devices()
+		if #devs > 0 then
+			con = chdku.connection(devs[1])
+			status,msg=con:connect()
+			if status then
+				connect_icon.active = "YES"
+				btn_connect.title = "Disconnect"
+				local cam_major, cam_minor = con:camera_api_version()
+				connect_label.title = string.format("host:%d.%d cam:%d.%d",host_major,host_minor,cam_major,cam_minor)
+			end
+		else
+			add_status(false,"no devices available")
 		end
 	end
 end
@@ -575,9 +584,8 @@ end
 
 function gui:run()
 --	cam_buttons_normalize.normalize="BOTH"
-	device_list = chdk.list_devices()
-
 --[[
+	device_list = chdk.list_devices()
 	local devtext = ""
 	for num,d in ipairs(device_list) do
 		iup.Append(device_menu, iup.item{ title=num .. ": " .. d.model })

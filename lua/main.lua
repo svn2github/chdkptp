@@ -130,8 +130,8 @@ if options.g then
 	end
 else
 	if options.c then
-		-- TODO global connection object
-		con:connect()
+		-- TODO connects to default device, should allow selection
+		cli:print_status(cli:execute("connect"));
 	end
 	-- for the gui, e commands will be run after the gui is started
 	if options.e then
