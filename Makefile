@@ -1,18 +1,5 @@
-HOSTPLATFORM:=$(patsubst MINGW%,MINGW,$(shell uname -s))
-ifeq ($(HOSTPLATFORM),MINGW)
-OSTYPE=Windows
-EXE=.exe
-else
-ifeq ($(HOSTPLATFORM),Linux)
-OSTYPE=Linux
-EXE= 
-endif
-endif
-
-CC=gcc
-CFLAGS=
-LDFLAGS=
-#LD=ld
+TOPDIR=.
+include include.mk
 
 ifeq ($(OSTYPE),Windows)
 SYS_LIBS=-lws2_32 -lkernel32
@@ -23,15 +10,6 @@ ifeq ($(OSTYPE),Linux)
 # need 32 bit libs to do this
 #TARGET_ARCH=-m32
 endif
-
-#default lib names, can be overridden in buildconf
-LUA_LIB=lua
-IUP_LIB=iup
-IUP_LUA_LIB=iuplua51
-LIBUSB_LIB=usb
-
-#see config-sample-*.mk
--include config.mk
 
 LINK_LIBS=-l$(LUA_LIB) -l$(LIBUSB_LIB)
 
@@ -64,39 +42,18 @@ endif
 INC_PATHS+=-I$(CHDK_SRC_DIR)
 CFLAGS+=$(INC_PATHS)
 
-DEP_DIR=.dep
-
 LDFLAGS+=$(LIB_PATHS) $(LINK_LIBS) $(SYS_LIBS)
 
-ifdef DEBUG
-CFLAGS+=-g
-LDFLAGS+=-g
-endif
+SUBDIRS=lfs
 
-all: chdkptp$(EXE)
+EXES=chdkptp$(EXE)
 
-clean:
-	@rm -f *.exe *.o
-
-cleand: clean
-	@rm -f $(DFILES)
-
-%.o: %.c
-	$(CC) -MMD $(CFLAGS) -c -o $@ $<
-	@if [ ! -d $(DEP_DIR) ] ; then mkdir $(DEP_DIR) ; fi; \
-		cp $*.d $(DEP_DIR)/$*.d; \
-		sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
-				-e '/^$$/ d' -e 's/$$/ :/' < $*.d >> $(DEP_DIR)/$*.d; \
-			rm -f $*.d
+all: $(EXES)
 
 SRCS=myusb.c properties.c ptp.c chdkptp.c
 OBJS=$(SRCS:.c=.o)
 
-DFILES=$(SRCS:%.c=$(DEP_DIR)/%.d)
-
 chdkptp$(EXE): $(OBJS)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CC) -o $@ lfs/lfs.o $^ $(LDFLAGS)
 
-.PHONY: all clean cleand
-
--include $(DFILES)
+include bottom.mk

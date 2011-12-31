@@ -71,6 +71,7 @@
 #include <iup.h>
 #include <iuplua.h>
 #endif
+#include "lfs/lfs.h"
 
 /* some defines comes here */
 
@@ -1557,6 +1558,7 @@ int main(int argc, char ** argv)
 	usb_init();
 	lua_State *L = lua_open();
 	luaL_openlibs(L);
+	luaopen_lfs(L);
 	init_lua_globals(L,argc,argv);
 	chdkptp_registerlibs(L);
 	exec_lua_string(L,"require('main')");

@@ -12,10 +12,13 @@ For information about CHDK, see http://chdk.wikia.com/wiki/CHDK
 For information about the CHDK PTP extension, see http://chdk.wikia.com/wiki/PTP_Extension
 
 chdkptp is forked from libptp and ptpcam, as modified by mweerden, the chdkde project developers
-and others. All source is released under GPL and/or MIT licenses
+and others. All source is released under GPL, Lua or MIT licenses
 
 The original ptpcam source, written by Mariusz Woloszyn < emsi[A@T]ipartners.pl >
 is available from http://libptp.sourceforge.net/
+
+chdptp includes the luafilesystem library from http://keplerproject.github.com/luafilesystem/
+luafilesystem is distributed under the Lua license, see lfs/LICENSE.TXT
 
 mweerdens modified version can be found at https://github.com/mweerden/CHDK/tree/ptp
 
