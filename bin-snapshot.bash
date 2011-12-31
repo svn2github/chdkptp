@@ -18,4 +18,6 @@ fi
 PROG="chdkptp$EXE"
 make DEBUG="" clean all
 strip "$PROG"
-zip "$ZIPNAME" "$PROG" chdkptp-sample.sh lua/chdku.lua lua/cli.lua lua/gui.lua lua/main.lua lua/util.lua README USAGE.TXT COPYING THANKS.TXT
+zip "$ZIPNAME" "$PROG" chdkptp-sample.sh \
+	lua/chdku.lua lua/cli.lua lua/gui.lua lua/main.lua lua/util.lua \
+	README.TXT USAGE.TXT COPYING THANKS.TXT
