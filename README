@@ -12,17 +12,16 @@ For information about CHDK, see http://chdk.wikia.com/wiki/CHDK
 For information about the CHDK PTP extension, see http://chdk.wikia.com/wiki/PTP_Extension
 
 chdkptp is forked from libptp and ptpcam, as modified by mweerden, the chdkde project developers
-and others. All source is released under GPL, Lua or MIT licenses
+and others. All source is released under GPL or MIT licenses
 
 The original ptpcam source, written by Mariusz Woloszyn < emsi[A@T]ipartners.pl >
 is available from http://libptp.sourceforge.net/
 
-chdptp includes the luafilesystem library from http://keplerproject.github.com/luafilesystem/
-luafilesystem is distributed under the Lua license, see lfs/LICENSE.TXT
-
 mweerdens modified version can be found at https://github.com/mweerden/CHDK/tree/ptp
 
 the CHDKDE ptpcam source may be found at http://tools.assembla.com/chdkde/browser/trunk/tools/ptpcam
+
+chdkptp includes software from several other projects, see THANKS.TXT for details.
 
 =Dependencies=
 - IUP version 3.4 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work)
@@ -34,7 +33,7 @@ the CHDKDE ptpcam source may be found at http://tools.assembla.com/chdkde/browse
 =Windows development environment=
 Mingw with gcc 4.5+ is the primary development environment. 
 All instructions below assume you are using this.
-Using an mingw bash shell for development is suggested.
+Using a mingw bash shell for development is suggested.
 
 ==Installing mingw==
 http://www.mingw.org/
