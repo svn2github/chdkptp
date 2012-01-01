@@ -458,17 +458,71 @@ cli:add_commands{
 	{
 		names={'connect','c'},
 		help='connect to device',
+		arghelp="[-b<bus>] [-d<dev>] [-p<pid>] [-s<serial>] [model] ",
 		func=function(self,args) 
+			local opt_map = {
+				b='bus',
+				d='dev',
+				p='product_id',
+				s='serial_number',
+			}
+			local match = {bus='.*',dev='.*'}
+			local arg
 			if con:is_connected() then
 				con:disconnect()
 			end
-			-- TODO temp just connect to the default device for now
-			local devs = chdk.list_usb_devices()
-			if #devs > 0 then
-				con = chdku.connection(devs[1])
+			arg,args = cli:get_string_arg(args)
+--			printf("arg %s\n",tostring(arg))
+			while arg do
+				-- no -, assume model name
+				if string.sub(arg,1,1) ~= '-' then
+					match.model = arg
+				else
+					local s,e,opt,val = string.find(arg,'^-([bdps])[:=]?(.*)')
+					if s then
+--						printf("opt %s=%s\n",opt,val)
+						match[opt_map[opt]] = val
+					else
+						return false,"invalid option "..arg
+					end
+				end
+				arg,args = cli:get_string_arg(args)
+--				printf("arg %s\n",tostring(arg))
+			end
+			local devices = chdk.list_usb_devices()
+			local lcon
+			local tempcon
+			for i, devinfo in ipairs(devices) do
+				lcon = nil
+				tempcon = nil
+				if chdku.match_device(devinfo,match) then
+					lcon = chdku.connection(devinfo)
+					if match.model or match.serial_number then
+--						printf('model check %s %s\n',tostring(match.model),tostring(match.serial_number))
+						if not lcon:is_connected() then
+							lcon:connect()
+							tempcon = true
+						end
+						if not lcon:match_ptp_info(match) then
+							if tempcon then
+								lcon:disconnect()
+							end
+							lcon = nil
+						end
+					end
+					if lcon then
+						break
+					end
+				end
+			end
+			if lcon then
+				con = lcon
+				if con:is_connected() then
+					return true
+				end
 				return con:connect()
 			end
-			return false,"no devices available"
+			return false,"no matching devices found"
 		end,
 	},
 	--[[

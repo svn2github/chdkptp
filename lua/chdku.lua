@@ -508,6 +508,24 @@ connection methods, added to the connection object
 ]]
 local con_methods = {}
 --[[
+check whether this cameras model and serial number match those given
+TODO - ugly
+]]
+function con_methods:match_ptp_info(match) 
+	match = util.extend_table({model='.*',serial_number='.*'},match)
+	local ptp_info = self:get_ptp_devinfo()
+	if not ptp_info then
+		return false
+	end
+	-- older cams don't have serial
+	if not ptp_info.serial_number then
+		ptp_info.serial_number = ''
+	end
+--	printf('model %s (%s) serial_number %s (%s)\n',ptp_info.model,match.model,ptp_info.serial_number, match.serial_number)
+	return (string.find(ptp_info.model,match.model) and string.find(ptp_info.serial_number,match.serial_number))
+end
+
+--[[
 return a list of remote directory contents
 dirlist[,err]=chdku.listdir(path,opts)
 path should be directory, without a trailing slash (except in the case of A/...)
@@ -900,7 +918,31 @@ end
 init_connection_methods()
 
 --[[
+bool = chdku.match_device(devinfo,match)
+attempt to find a device specified by the match table 
+{
+	bus='bus pattern'
+	dev='device pattern'
+	product_id = number
+}
+]]
+function chdku.match_device(devinfo,match) 
+	--[[
+	printf('try bus:%s (%s) dev:%s (%s) pid:%s (%s)\n',
+		devinfo.bus, match.dev,
+		devinfo.dev, match.dev,
+		devinfo.product_id, tostring(match.product_id))
+	]]
+	if string.find(devinfo.bus,match.bus) and string.find(devinfo.dev,match.dev) then
+		return (match.product_id == nil or tonumber(match.product_id)==devinfo.product_id)
+	end
+	return false
+end
+--[[
 return a connection object wrapped with chdku methods
+devspec is a table specifying the bus and device name to connect to
+no checking is done on the existence of the device
+if devspec is null, a dummy connection is returned
 ]]
 function chdku.connection(devspec)
 	local con = {}
