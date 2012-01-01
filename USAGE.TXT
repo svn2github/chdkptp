@@ -40,9 +40,12 @@ CLI notes
 connect accepts optional arguments to select from multiple connected cameras.
 All except -p are lua patterns
 
-list displays a list of connected devices, in the following format
+list displays a list of available devices, in the following format
 <status><num><modelname> b=<bus> d=<device> v=<usb vendor> p=<usb pid> s=<serial number>
-status is * if connected, otherwise blank. Not all cameras return a serial number
+status has the following values
+ * connected, and selected for CLI commands (con global variable)
+ + connected outside of cli (e.g using lua via ! commands)
+ blank: not connected
 
 =Examples=
 upload bin/diskboot.bin to A/diskboot.bin, from the command line

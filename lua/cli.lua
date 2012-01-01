@@ -353,7 +353,7 @@ cli:add_commands{
 				local lcon = chdku.connection(desc)
 				local usb_info = lcon:get_usb_devinfo()
 				local tempcon = false
-				local status = "*"
+				local status = "+"
 				if not lcon:is_connected() then
 					tempcon = true
 					status = " "
@@ -367,8 +367,8 @@ cli:add_commands{
 					ptp_info.serial_number ='(none)'
 				end
 
-				if lcon == con then
-					status = status..", CLI"
+				if lcon._con == con._con then
+					status = "*"
 				end
 
 				msg = msg .. string.format("%s%d:%s b=%s d=%s v=0x%x p=0x%x s=%s\n",
