@@ -891,6 +891,10 @@ static int chdk_connect(lua_State *L) {
 	}
 }
 
+/*
+disconnect the connection
+note under windows the device does not appear in in chdk.list_usb_devices() for a short time after disconnecting
+*/
 static int chdk_disconnect(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 
