@@ -43,7 +43,7 @@ cmd_opts = {
 	},
 	{
 		opt="c",
-		help="connect at startup",
+		help='connect at startup, with optional device spec e.g. -c"-d001 -bbus-0"',
 		process=function(rest)
 			if rest then
 				options.c = rest
@@ -55,12 +55,12 @@ cmd_opts = {
 	},
 	{
 		opt="n",
-		help="non-interactive - quit after processing command line options",
+		help="non-interactive - quit after processing command line options (default)",
 		process=bool_opt,
 	},
 	{
 		opt="e",
-		help="execute cli command, multiple allowed",
+		help='execute cli command, multiple allowed, e.g -e"u DISKBOOT.BIN" -ereboot',
 		process=function(rest)
 			if type(options.e) == 'table' then
 				table.insert(options.e,rest)

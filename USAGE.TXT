@@ -8,59 +8,76 @@ Usage: chdkptp [options]
 Options:
   -g    start gui
   -i    start interactive cli
-  -c    connect at startup
+  -c    connect at startup, with optional device spec e.g. -c"-d001 -bbus-0"
   -n    non-interactive - quit after processing command line options (default)
-  -e    execute cli command, multiple allowed
+  -e    execute cli command, multiple allowed, e.g -e"u DISKBOOT.BIN" -ereboot
   -h    help
-
 
 =CLI=
 CLI commands are available from the console, gui and the command line
+help (h)     [cmd]|[-v]  : - help on [cmd] or all commands
+ help -v gives full help on all commands, otherwise as summary is printed
 
-The following CLI commands are available. () indicate short names for the commands
-help (h,?)   [command]   : - help on [command] or all commands
 #                        : - comment
 exec (!)     <lua code>  : - execute local lua
+ Execute lua in chdkptp.
+ The global variable con accesses the current CLI connection.
+ Return values are printed in the console.
+
 quit (q)                 : - quit program
-lua (l,.)    <lua code>  : - execute remote lua
+lua (.)      <lua code>  : - execute remote lua
+ Execute Lua code on the camera.
+ Returns immediately after the script is started.
+ Return values or error messages can be retrieved with getm after the script is completed.
+
 getm                     : - get messages
 putm         <msg string>: - send message
 luar (=)     <lua code>  : - execute remote lua, wait for result
-rmem         <address> [count]: -  read memory
+ Execute Lua code on the camera, waiting for the script to end.
+ Return values or error messages are printed after the script completes.
+
+rmem         <address> [count]: - read memory
 list                     : - list devices
+ Lists all recognized PTP devices in the following format
+  <status><num><modelname> b=<bus> d=<device> v=<usb vendor> p=<usb pid> s=<serial number>
+ status values
+  * connected, current target for CLI commands (con global variable)
+  + connected, not CLI target
+  - not connected
+ serial numbers are not available from all models
+
 upload (u)   <local> [remote]: - upload a file to the camera
+ <local> is the file to upload.
+ [remote] is assumed to be relative to A/ if not given explicitly.
+ If [remote] is not given, the file is uploaded to A/
+ If [remote] ends in /, the file is uploaded to [remote]/<local file name>
+ Some cameras have problems with paths > 32 characters.
+ Dryos cameras do not handle non 8.3 filenames well.
+
 download (d) <remote> [local]: - download a file from the camera
+ <remote> is assumed to be relative to A/ if not given explicitly.
+ If [local] is not given, the file is downloaded to the current directory, using the remote filename.
+ If [local] ends in /, the file is downloaded to [local]/<remote file name>
+
 version (ver)             : - print API versions
 connect (c)  [-b<bus>] [-d<dev>] [-p<pid>] [-s<serial>] [model] : - connect to device
+ If no options are given, connects to the first available device.
+ <pid> is the USB product ID, as a decimal or hexidecimal number.
+ All other options are treated as a Lua pattern. For alphanumerics, this is a case sensitive substring match.
+ If the serial or model are specified, a temporary connection will be made to each device
+ If <model> includes spaces, it must be quoted.
+ If multiple devices match, the first matching device will be connected.
+
+reconnect (r)             : - reconnect to current device
 disconnect (dis)             : - disconnect from device
 ls           [-l] [path] : - list files/directories on camera
 reboot       [file]      : - reboot the camera
-
-CLI notes
-connect accepts optional arguments to select from multiple connected cameras.
-All except -p are lua patterns
-
-list displays a list of available devices, in the following format
-<status><num><modelname> b=<bus> d=<device> v=<usb vendor> p=<usb pid> s=<serial number>
-status has the following values
- * connected, and selected for CLI commands (con global variable)
- + connected outside of cli (e.g using lua via ! commands)
- blank: not connected
+ [file] is an optional file to boot.
+  If not given, the normal boot process is used.
+  The file may be an unencoded binary or on DryOS only, an encoded .FI2
+ chdkptp attempts to reconnect to the camera after it boots.
 
 =Examples=
-upload bin/diskboot.bin to A/diskboot.bin, from the command line
- chdkptp -c -e"u bin/diskboot.bin"
-
-upload diskboot.bin, reboot camera, enter interactive mode
- chdkptp -c -e"u bin/diskboot.bin" -ereboot -i
-
-download A/CHDK/CCHDK.CFG to BACKUP.CFG in the current directory
- chdkptp -c -e"d CHDK/CCHDK.CFG BACKUP.CFG"
-
-connect to the device with name containing D10 on bus "bus-0", 
- chdkptp -c"D10 -b:bus%-0" -i
-note connect -b takes a lua pattern, so % is needed to escapes the -
-
 start chdkptp in interactive mode and connect to the camera
  chdkptp -i -c
 
@@ -71,6 +88,19 @@ con> !return 1+1
 execute lua on the camera, and print the result
 con> =return get_buildinfo()
 1:return:table:{platformid=12732,platform="d10",version="CHDK",platsub="100a",build_number="0.9.9",os="dryos",build_date="May  3 2011",build_time="20:54:20",}
+
+upload diskboot.bin to A/diskboot.bin, reboot camera, enter interactive mode
+ chdkptp -c -e"u bin/diskboot.bin" -ereboot -i
+
+upload interval.lua to A/CHDK/SCRIPTS/interval.lua, from the command line
+ chdkptp -c -e"u interval.lua CHDK/SCRIPTS/"
+
+download A/CHDK/CCHDK.CFG to BACKUP.CFG in the current directory
+ chdkptp -c -e"d CHDK/CCHDK.CFG BACKUP.CFG"
+
+connect to the device with name containing D10 on bus "bus-0", 
+ chdkptp -c"D10 -b:bus%-0" -i
+note connect -b takes a lua pattern, so % is needed to escapes the -
 
 ad hoc scripting on PC side - download some files
 con> !t=con:listdir('A/DCIM/100CANON',{match="%.JPG$"})

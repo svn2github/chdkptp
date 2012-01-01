@@ -33,6 +33,13 @@ cli.cmd_proto = {
 		end
 		return string.format("%-12s %-12s: - %s\n",namestr,self.arghelp,self.help)
 	end,
+	get_help_detail = function(self)
+		local msg=self:get_help()
+		if self.help_detail then
+			msg = msg..self.help_detail..'\n'
+		end
+		return msg
+	end,
 }
 
 cli.cmd_meta = {
@@ -80,7 +87,7 @@ end
 -- message is an error message or printable value
 function cli:execute(line)
 	-- single char shortcuts
-	local s,e,cmd = string.find(line,'^[%c%s]*([!?.#=])[%c%s]*')
+	local s,e,cmd = string.find(line,'^[%c%s]*([!.#=])[%c%s]*')
 	if not cmd then
 		s,e,cmd = string.find(line,'^[%c%s]*([%w_]+)[%c%s]*')
 	end
@@ -209,19 +216,26 @@ end
 
 cli:add_commands{
 	{
-		names={'help','h','?'},
-		arghelp = '[command]';
-		help='help on [command] or all commands',
+		names={'help','h'},
+		arghelp='[cmd]|[-v]',
+		help='help on [cmd] or all commands',
+		help_detail=[[
+ help -v gives full help on all commands, otherwise as summary is printed
+]],
 		func=function(self,args) 
 			if cli.names[args] then
-				return true, cli.names[args]:get_help()
+				return true, cli.names[args]:get_help_detail()
 			end
-			if args and args ~= "" then
+			if args and args ~= "" and args ~= "-v" then
 				return false, string.format("unknown command '%s'\n",args)
 			end
 			msg = ""
 			for i,c in ipairs(cli.cmds) do
-				msg = msg .. c:get_help()
+				if args == "-v" then
+					msg = msg .. c:get_help_detail()
+				else
+					msg = msg .. c:get_help()
+				end
 			end
 			return true, msg
 		end,
@@ -237,6 +251,11 @@ cli:add_commands{
 		names={'exec','!'},
 		help='execute local lua',
 		arghelp='<lua code>',
+		help_detail=[[
+ Execute lua in chdkptp. 
+ The global variable con accesses the current CLI connection.
+ Return values are printed in the console.
+]],
 		func=function(self,args) 
 			local f,r = loadstring(args)
 			if f then
@@ -266,9 +285,14 @@ cli:add_commands{
 		end,
 	},
 	{
-		names={'lua','l','.'},
+		names={'lua','.'},
 		help='execute remote lua',
 		arghelp='<lua code>',
+		help_detail=[[
+ Execute Lua code on the camera.
+ Returns immediately after the script is started.
+ Return values or error messages can be retrieved with getm after the script is completed.
+]],
 		func=function(self,args) 
 			return con:exec(args)
 		end,
@@ -303,6 +327,10 @@ cli:add_commands{
 		names={'luar','='},
 		help='execute remote lua, wait for result',
 		arghelp='<lua code>',
+		help_detail=[[
+ Execute Lua code on the camera, waiting for the script to end.
+ Return values or error messages are printed after the script completes.
+]],
 		func=function(self,args) 
 			local rets={}
 			local msgs={}
@@ -323,7 +351,7 @@ cli:add_commands{
 	{
 		-- TODO support display as words
 		names={'rmem'},
-		help=' read memory',
+		help='read memory',
 		arghelp='<address> [count]',
 		func=function(self,args) 
 			local addr
@@ -346,6 +374,15 @@ cli:add_commands{
 	{
 		names={'list'},
 		help='list devices',
+		help_detail=[[
+ Lists all recognized PTP devices in the following format
+  <status><num><modelname> b=<bus> d=<device> v=<usb vendor> p=<usb pid> s=<serial number>
+ status values
+  * connected, current target for CLI commands (con global variable)
+  + connected, not CLI target
+  - not connected
+ serial numbers are not available from all models
+]],
 		func=function() 
 			local msg = ''
 			local devs = chdk.list_usb_devices()
@@ -356,7 +393,7 @@ cli:add_commands{
 				local status = "+"
 				if not lcon:is_connected() then
 					tempcon = true
-					status = " "
+					status = "-"
 					lcon:connect()
 				end
 				local ptp_info = lcon:get_ptp_devinfo()
@@ -388,6 +425,14 @@ cli:add_commands{
 		names={'upload','u'},
 		help='upload a file to the camera',
 		arghelp="<local> [remote]",
+		help_detail=[[
+ <local> is the file to upload.
+ [remote] is assumed to be relative to A/ if not given explicitly.
+ If [remote] is not given, the file is uploaded to A/
+ If [remote] ends in /, the file is uploaded to [remote]/<local file name>
+ Some cameras have problems with paths > 32 characters.
+ Dryos cameras do not handle non 8.3 filenames well.
+]],
 		func=function(self,args) 
 			local src,args = cli:get_string_arg(args)
 			if not src then
@@ -417,6 +462,12 @@ cli:add_commands{
 		names={'download','d'},
 		help='download a file from the camera',
 		arghelp="<remote> [local]",
+		help_detail=[[
+ <remote> is assumed to be relative to A/ if not given explicitly.
+ If [local] is not given, the file is downloaded to the current directory, using the remote filename.
+ If [local] ends in /, the file is downloaded to [local]/<remote file name>
+]],
+
 		func=function(self,args) 
 			local src,args = cli:get_string_arg(args)
 			if not src then
@@ -463,6 +514,14 @@ cli:add_commands{
 		names={'connect','c'},
 		help='connect to device',
 		arghelp="[-b<bus>] [-d<dev>] [-p<pid>] [-s<serial>] [model] ",
+		help_detail=[[
+ If no options are given, connects to the first available device.
+ <pid> is the USB product ID, as a decimal or hexidecimal number.
+ All other options are treated as a Lua pattern. For alphanumerics, this is a case sensitive substring match.
+ If the serial or model are specified, a temporary connection will be made to each device
+ If <model> includes spaces, it must be quoted.
+ If multiple devices match, the first matching device will be connected.
+]],
 		func=function(self,args) 
 			local opt_map = {
 				b='bus',
@@ -480,6 +539,9 @@ cli:add_commands{
 			while arg do
 				-- no -, assume model name
 				if string.sub(arg,1,1) ~= '-' then
+					if match.model then
+						return false,"unexpected arg: "..arg
+					end
 					match.model = arg
 				else
 					local s,e,opt,val = string.find(arg,'^-([bdps])[:=]?(.*)')
@@ -487,11 +549,14 @@ cli:add_commands{
 --						printf("opt %s=%s\n",opt,val)
 						match[opt_map[opt]] = val
 					else
-						return false,"invalid option "..arg
+						return false,"invalid option: "..arg
 					end
 				end
 				arg,args = cli:get_string_arg(args)
 --				printf("arg %s\n",tostring(arg))
+			end
+			if match.product_id and not tonumber(match.product_id) then
+				return false,"expected number for product id"
 			end
 			local devices = chdk.list_usb_devices()
 			local lcon
@@ -529,19 +594,20 @@ cli:add_commands{
 			return false,"no matching devices found"
 		end,
 	},
-	--[[
-	-- TODO this isn't useful - on win device name can change on reset ?
 	{
 		names={'reconnect','r'},
 		help='reconnect to current device',
+		-- TODO depends on camera coming back on current dev/bus, not guaranteed
+		-- caching model/serial could help
 		func=function(self,args) 
 			if con:is_connected() then
 				con:disconnect()
 			end
+			-- appears to be needed to avoid device numbers changing (reset too soon ?)
+			sys.sleep(2000)
 			return con:connect()
 		end,
 	},
-	]]
 	{
 		names={'disconnect','dis'},
 		help='disconnect from device',
@@ -592,6 +658,14 @@ cli:add_commands{
 		names={'reboot'},
 		help='reboot the camera',
 		arghelp="[file]",
+		help_detail=[[
+ [file] is an optional file to boot.
+  If not given, the normal boot process is used.
+  The file may be an unencoded binary or on DryOS only, an encoded .FI2
+ chdkptp attempts to reconnect to the camera after it boots.
+]],
+		-- TODO depends on camera coming back on current dev/bus, not guaranteed
+		-- caching model/serial could help
 		func=function(self,args) 
 			local bootfile=cli:get_string_arg(args)
 			if bootfile then
