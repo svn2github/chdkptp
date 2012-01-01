@@ -527,13 +527,13 @@ end
 
 --[[
 return a list of remote directory contents
-dirlist[,err]=chdku.listdir(path,opts)
+dirlist[,err]=con:listdir(path,opts)
 path should be directory, without a trailing slash (except in the case of A/...)
 opts may be a table, or a string containing lua code for a table
 returns directory listing as table, or false,error
 note may return an empty table if target is not a directory
 ]]
-function con_methods.listdir(con,path,opts) 
+function con_methods:listdir(path,opts) 
 	if type(opts) == 'table' then
 		opts = serialize(opts)
 	elseif type(opts) ~= 'string' and type(opts) ~= 'nil' then
@@ -546,7 +546,7 @@ function con_methods.listdir(con,path,opts)
 	end
 	local results={}
 	local i=1
-	local status,err=con:execwait("return ls('"..path.."'"..opts..")",{
+	local status,err=self:execwait("return ls('"..path.."'"..opts..")",{
 		libs='ls',
 		msgs=chdku.msg_unbatcher(results),
 	})
@@ -561,10 +561,10 @@ end
 simple batch download. This will change or go away later!
 download matching files in a directory
 does not handle recursive downloads, will fail if pattern matches a directory
-status[,err]=chdku.downloaddir(srcpath,dstpath,pattern)
+status[,err]=con:downloaddir(srcpath,dstpath,pattern)
 ]]
-function con_methods.downloaddir(con,srcpath,dstpath,pattern)
-	local filenames,err = con:listdir(srcpath,{match=pattern})
+function con_methods:downloaddir(srcpath,dstpath,pattern)
+	local filenames,err = self:listdir(srcpath,{match=pattern})
 	if not filenames then
 		return false,err
 	end
@@ -572,7 +572,7 @@ function con_methods.downloaddir(con,srcpath,dstpath,pattern)
 		local src = joinpath(srcpath,name)
 		local dst = joinpath(dstpath,name)
 		printf("%s -> %s\n",src,dst)
-		status,err = con:download(src,dst)
+		status,err = self:download(src,dst)
 		if not status then
 			return status,err
 		end
@@ -586,14 +586,14 @@ delete files from directory, optionally matching pattern
 note directory should not end in a /, unless it is A/
 only *files* will be deleted, directories will not be touched
 ]]
-function con_methods.deletefiles(con,dir,pattern)
-	local files,err=con:listdir(dir,{stat="*",match=pattern})
+function con_methods:deletefiles(dir,pattern)
+	local files,err=self:listdir(dir,{stat="*",match=pattern})
 	if not files then
 		return false, err
 	end
 	for i,st in ipairs(files) do
 		if st.is_file then
-			local status,err=con:execwait("return os.remove('"..joinpath(dir,st.name).."')")
+			local status,err=self:execwait("return os.remove('"..joinpath(dir,st.name).."')")
 			if not status then
 				return false,err
 			end
@@ -621,16 +621,16 @@ end
 --[[
 read pending messages and return error from current script, if available
 ]]
-function con_methods.get_error_msg(con)
+function con_methods:get_error_msg()
 	while true do
-		local msg,err = con:read_msg()
+		local msg,err = self:read_msg()
 		if not msg then
 			return false
 		end
 		if msg.type == 'none' then
 			return false
 		end
-		if msg.type == 'error' and msg.script_id == con:get_script_id() then
+		if msg.type == 'error' and msg.script_id == self:get_script_id() then
 			return msg.value
 		end
 		warnf("chdku.get_error_msg: ignoring message %s\n",chdku.format_script_msg(msg))
@@ -667,9 +667,9 @@ end
 --[[
 read and discard all pending messages. Returns false,error if message functions fails, otherwise true
 ]]
-function con_methods.flushmsgs(con)
+function con_methods:flushmsgs()
 	repeat
-		local msg,err=con:read_msg()
+		local msg,err=self:read_msg()
 		if not msg then
 			return false, err
 		end
@@ -699,7 +699,7 @@ function chdku.msg_unbatcher(t)
 end
 --[[ 
 wrapper for chdk.execlua, using optional code from rlibs
-status[,err]=chdku.exec("code",opts)
+status[,err]=con:exec("code",opts)
 opts {
 	libs={"rlib name1","rlib name2"...} -- rlib code to be prepended to "code"
 	wait=bool -- wait for script to complete, return values will be returned after status if true
@@ -725,11 +725,11 @@ chdku.default_libs={
 --[[
 convenience, defaults wait=true
 ]]
-function con_methods.execwait(con,code,opts_in)
-	return con:exec(code,extend_table({wait=true},opts_in))
+function con_methods:execwait(code,opts_in)
+	return self:exec(code,extend_table({wait=true},opts_in))
 end
 
-function con_methods.exec(con,code,opts_in)
+function con_methods:exec(code,opts_in)
 	-- setup the options
 	local opts = extend_table({flushmsgs=true},opts_in)
 	local liblist={}
@@ -747,7 +747,7 @@ function con_methods.exec(con,code,opts_in)
 
 	-- check for already running script and flush messages
 	if not opts.clobber then
-		local status,err = con:script_status()
+		local status,err = self:script_status()
 		if not status then
 			return false,err
 		end
@@ -755,7 +755,7 @@ function con_methods.exec(con,code,opts_in)
 			return false,"a script is already running"
 		end
 		if opts.flushmsgs and status.msg then
-			status,err=con:flushmsgs()
+			status,err=self:flushmsgs()
 			if not status then
 				return false,err
 			end
@@ -767,11 +767,11 @@ function con_methods.exec(con,code,opts_in)
 	code = libs:code() .. code
 
 	-- try to start the script
-	local status,err=con:execlua(code)
+	local status,err=self:execlua(code)
 	if not status then
 		-- syntax error, try to fetch the error message
 		if err == 'syntax' then
-			local msg = con:get_error_msg()
+			local msg = self:get_error_msg()
 			if msg then
 				return false,format_exec_error(libs,code,msg)
 			end
@@ -792,16 +792,16 @@ function con_methods.exec(con,code,opts_in)
 
 	-- process messages and wait for script to end
 	while true do
-		status,err=con:wait_status{ msg=true, run=false }
+		status,err=self:wait_status{ msg=true, run=false }
 		if not status then
 			return false,tostring(err)
 		end
 		if status.msg then
-			local msg,err=con:read_msg()
+			local msg,err=self:read_msg()
 			if not msg then
 				return false, err
 			end
-			if msg.script_id ~= con:get_script_id() then
+			if msg.script_id ~= self:get_script_id() then
 				warnf("chdku.exec: message from unexpected script %s\n",msg.script_id,chdku.format_script_msg(msg))
 			elseif msg.type == 'user' then
 				if type(opts.msgs) == 'function' then
@@ -863,7 +863,7 @@ opts:
 status: table with msg and run set to last status, and timeout set if timeout expired, or false,errormessage on error
 TODO for gui, this should yield in lua, resume from timer or something
 ]]
-function con_methods.wait_status(con,opts)
+function con_methods:wait_status(opts)
 	local timeleft = opts.timeout
 	local sleeptime = opts.poll
 	if not timeleft then
@@ -873,7 +873,7 @@ function con_methods.wait_status(con,opts)
 		sleeptime=250
 	end
 	while true do
-		local status,msg = con:script_status()
+		local status,msg = self:script_status()
 		if not status then
 			return false,msg
 		end
