@@ -31,10 +31,18 @@ list                     : - list devices
 upload (u)   <local> [remote]: - upload a file to the camera
 download (d) <remote> [local]: - download a file from the camera
 version (ver)             : - print API versions
-connect (c)              : - (re)connect to device
+connect (c)  [-b<bus>] [-d<dev>] [-p<pid>] [-s<serial>] [model] : - connect to device
 disconnect (dis)             : - disconnect from device
 ls           [-l] [path] : - list files/directories on camera
 reboot       [file]      : - reboot the camera
+
+CLI notes
+connect accepts optional arguments to select from multiple connected cameras.
+All except -p are lua patterns
+
+list displays a list of connected devices, in the following format
+<status><num><modelname> b=<bus> d=<device> v=<usb vendor> p=<usb pid> s=<serial number>
+status is * if connected, otherwise blank. Not all cameras return a serial number
 
 =Examples=
 upload bin/diskboot.bin to A/diskboot.bin, from the command line
@@ -62,8 +70,17 @@ con> !t=con:listdir('A/DCIM/100CANON',{match="%.JPG$"})
 con> !for i,n in ipairs(t) do con:download("A/DCIM/100CANON/"..n,"C:/TEMP/"..n) end
 note con:downloaddir() is a slightly nicer version of the above
 
+list devices and connect to a specific camera
+___> list
+ 1:Canon PowerShot D10 b=bus-0 d=\\.\libusb0-0001--0x04a9-0x31bc v=0x4a9 p=0x31bc s=12345678123456781234567812345678
+ 2:Canon PowerShot A540 b=bus-0 d=\\.\libusb0-0002--0x04a9-0x311b v=0x4a9 p=0x311b s=(none)
+___> c 540
+con> list
+ 1:Canon PowerShot D10 b=bus-0 d=\\.\libusb0-0001--0x04a9-0x31bc v=0x4a9 p=0x31bc s=12345678123456781234567812345678
+*2:Canon PowerShot A540 b=bus-0 d=\\.\libusb0-0002--0x04a9-0x311b v=0x4a9 p=0x311b s=(none)
+
 =Running under linux=
-Under linux, the .lua files will not automatically found relative to the executeable directory
+Under linux, the .lua files will not automatically found relative to the executable directory
 You can set LUA_PATH on the command line to allow them to be located:
 $ LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp ...
 

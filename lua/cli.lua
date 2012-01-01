@@ -353,26 +353,30 @@ cli:add_commands{
 				local lcon = chdku.connection(desc)
 				local usb_info = lcon:get_usb_devinfo()
 				local tempcon = false
-				local status = "CONNECTED"
+				local status = "*"
 				if not lcon:is_connected() then
 					tempcon = true
-					status = "NOT CONNECTED"
+					status = " "
 					lcon:connect()
 				end
 				local ptp_info = lcon:get_ptp_devinfo()
 				if not ptp_info then
 					ptp_info = { model = "<unknown>" }
 				end
+				if not ptp_info.serial_number then
+					ptp_info.serial_number ='(none)'
+				end
 
 				if lcon == con then
 					status = status..", CLI"
 				end
 
-				msg = msg .. string.format("%d: %s bus:%s dev:%s vendor:%x pid:%x [%s]\n",
-											i, ptp_info.model,
+				msg = msg .. string.format("%s%d:%s b=%s d=%s v=0x%x p=0x%x s=%s\n",
+											status, i,
+											ptp_info.model,
 											usb_info.bus, usb_info.dev,
 											usb_info.vendor_id, usb_info.product_id,
-											status)
+											ptp_info.serial_number)
 				if tempcon then
 					lcon:disconnect()
 				end
