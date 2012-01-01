@@ -44,7 +44,14 @@ cmd_opts = {
 	{
 		opt="c",
 		help="connect at startup",
-		process=bool_opt,
+		process=function(rest)
+			if rest then
+				options.c = rest
+			else
+				options.c = true
+			end
+			return true,options.c
+		end,
 	},
 	{
 		opt="n",
@@ -130,8 +137,11 @@ if options.g then
 	end
 else
 	if options.c then
-		-- TODO connects to default device, should allow selection
-		cli:print_status(cli:execute("connect"));
+		local cmd="connect"
+		if type(options.c) == 'string' then
+			cmd = cmd .. ' ' .. options.c
+		end
+		cli:print_status(cli:execute(cmd));
 	end
 	-- for the gui, e commands will be run after the gui is started
 	if options.e then

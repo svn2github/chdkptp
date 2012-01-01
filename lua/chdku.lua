@@ -929,10 +929,10 @@ attempt to find a device specified by the match table
 function chdku.match_device(devinfo,match) 
 	--[[
 	printf('try bus:%s (%s) dev:%s (%s) pid:%s (%s)\n',
-		devinfo.bus, match.dev,
+		devinfo.bus, match.bus,
 		devinfo.dev, match.dev,
 		devinfo.product_id, tostring(match.product_id))
-	]]
+	--]]
 	if string.find(devinfo.bus,match.bus) and string.find(devinfo.dev,match.dev) then
 		return (match.product_id == nil or tonumber(match.product_id)==devinfo.product_id)
 	end

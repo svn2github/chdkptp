@@ -54,6 +54,10 @@ upload diskboot.bin, reboot camera, enter interactive mode
 download A/CHDK/CCHDK.CFG to BACKUP.CFG in the current directory
  chdkptp -c -e"d CHDK/CCHDK.CFG BACKUP.CFG"
 
+connect to the device with name containing D10 on bus "bus-0", 
+ chdkptp -c"D10 -b:bus%-0" -i
+note connect -b takes a lua pattern, so % is needed to escapes the -
+
 start chdkptp in interactive mode and connect to the camera
  chdkptp -i -c
 

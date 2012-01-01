@@ -495,13 +495,13 @@ cli:add_commands{
 			end
 			local devices = chdk.list_usb_devices()
 			local lcon
-			local tempcon
 			for i, devinfo in ipairs(devices) do
 				lcon = nil
-				tempcon = nil
 				if chdku.match_device(devinfo,match) then
 					lcon = chdku.connection(devinfo)
+					-- if we are looking for model or serial, need to connect to the dev to check
 					if match.model or match.serial_number then
+						local tempcon = false
 --						printf('model check %s %s\n',tostring(match.model),tostring(match.serial_number))
 						if not lcon:is_connected() then
 							lcon:connect()
