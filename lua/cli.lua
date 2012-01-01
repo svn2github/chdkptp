@@ -335,12 +335,12 @@ cli:add_commands{
 			if not count then
 				count = 1
 			end
-			printf("0x%x %u\n",addr,count)
+
 			r,msg = con:getmem(addr,count)
 			if not r then
 				return false,msg
 			end
-			return true,hexdump(r,addr)
+			return true,string.format("0x%x %u\n",addr,count)..hexdump(r,addr)
 		end,
 	},
 	{

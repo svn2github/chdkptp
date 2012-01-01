@@ -19,6 +19,13 @@ common generic lua utilties
 utilities that depend on the chdkptp api go in chdku
 ]]
 local util={}
+
+--[[
+to allow overriding, e.g. for gui
+--]]
+util.util_stderr = io.stderr
+util.util_stdout = io.stdout
+
 function util.fprintf(f,...)
 	local args={...}
 	if #args == 0 or type(args[1]) ~= 'string' then
@@ -28,15 +35,15 @@ function util.fprintf(f,...)
 end
 
 function util.printf(...)
-	fprintf(io.stdout,...)
+	fprintf(util.util_stdout,...)
 end
 
 function util.warnf(format,...)
-	fprintf(io.stderr,"WARNING: " .. format,...)
+	fprintf(util.util_stderr,"WARNING: " .. format,...)
 end
 
 function util.errf(format,...)
-	fprintf(io.stderr,"ERROR: " .. format,...)
+	fprintf(util.util_stderr,"ERROR: " .. format,...)
 end
 
 util.extend_table_max_depth = 10

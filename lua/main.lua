@@ -126,6 +126,25 @@ end
 
 process_options()
 
+function do_connect_option()
+	if options.c then
+		local cmd="connect"
+		if type(options.c) == 'string' then
+			cmd = cmd .. ' ' .. options.c
+		end
+		cli:print_status(cli:execute(cmd));
+	end
+end
+
+function do_execute_option()
+	if options.e then
+		for i=1,#options.e do
+--			printf("e:%s\n",options.e[i])
+			cli:print_status(cli:execute(options.e[i]))
+		end
+	end
+end
+
 con=chdku.connection()
 
 if options.g then
@@ -136,25 +155,8 @@ if options.g then
 		error('gui not supported')
 	end
 else
-	if options.c then
-		local cmd="connect"
-		if type(options.c) == 'string' then
-			cmd = cmd .. ' ' .. options.c
-		end
-		cli:print_status(cli:execute(cmd));
-	end
-	-- for the gui, e commands will be run after the gui is started
-	if options.e then
-		for i=1,#options.e do
---			printf("e:%s\n",options.e[i])
-			local status,msg=cli:execute(options.e[i])
-			if not status then
-				errf("%s\n",msg)
-			elseif msg then
-				fprintf(io.stderr,"%s\n",msg)
-			end
-		end
-	end
+	do_connect_option()
+	do_execute_option()
 	if options.i then
 		return cli:run()
 	end

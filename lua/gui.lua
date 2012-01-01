@@ -87,30 +87,35 @@ btn_connect = iup.button{
 	size = "48x"
 }
 
-function btn_connect:action()
+function update_connection_status()
 	local host_major, host_minor = chdk.host_api_version()
 	if con:is_connected() then
-		con:disconnect()
+		connect_icon.active = "YES"
+		btn_connect.title = "Disconnect"
+		local cam_major, cam_minor = con:camera_api_version()
+		connect_label.title = string.format("host:%d.%d cam:%d.%d",host_major,host_minor,cam_major,cam_minor)
+	else
 		connect_icon.active = "NO"
 		btn_connect.title = "Connect"
 		connect_label.title = string.format("host:%d.%d cam:-.-",host_major,host_minor)
+	end
+end
+
+function btn_connect:action()
+	if con:is_connected() then
+		con:disconnect()
 	else
 		-- TODO temp, connect to the "first" device, need to add cam selection
 		-- mostly copied from cli connect
 		local devs = chdk.list_usb_devices()
 		if #devs > 0 then
 			con = chdku.connection(devs[1])
-			status,msg=con:connect()
-			if status then
-				connect_icon.active = "YES"
-				btn_connect.title = "Disconnect"
-				local cam_major, cam_minor = con:camera_api_version()
-				connect_label.title = string.format("host:%d.%d cam:%d.%d",host_major,host_minor,cam_major,cam_minor)
-			end
+			add_status(con:connect())
 		else
 			add_status(false,"no devices available")
 		end
 	end
+	update_connection_status()
 end
 
 -- creates a text box
@@ -559,6 +564,15 @@ function inputtext:k_any(k)
 	end
 end
 
+--[[
+mock file object that sends to gui console
+]]
+status_out = {
+	write=function(self,...)
+		statusprint(...)
+	end
+}
+
 function add_status(status,msg)
 	if status then
 		if msg then
@@ -575,6 +589,10 @@ function btn_exec:action()
 --	local status,err = chdk.execlua(inputtext.value)
 	add_status(cli:execute(inputtext.value))
 	inputtext.value=''
+	-- handle cli exit
+	if cli.finished then
+		dlg:hide()
+	end
 end
 
 -- callback called when the exit button is activated
@@ -599,6 +617,12 @@ function gui:run()
 	--status_timer.run = "YES"
 	camfiletree.addbranch0="dummy"
 	camfiletree:set_data(0,{name='A/',stat={is_dir=true},path=''})
+
+	util.util_stdout = status_out
+	util.util_stderr = status_out
+	do_connect_option()
+	update_connection_status()
+	do_execute_option()
 
 	if (iup.MainLoopLevel()==0) then
 	  iup.MainLoop()
