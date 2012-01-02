@@ -593,7 +593,7 @@ function con_methods:deletefiles(dir,pattern)
 	end
 	for i,st in ipairs(files) do
 		if st.is_file then
-			local status,err=self:execwait("return os.remove('"..joinpath(dir,st.name).."')")
+			local status,err=self:remove(joinpath(dir,st.name))
 			if not status then
 				return false,err
 			end
@@ -602,6 +602,44 @@ function con_methods:deletefiles(dir,pattern)
 	end
 	return true
 end
+
+--[[
+wrapper for remote functions, serialize args, combine remote and local error status 
+func must be a string that evaluates to a function on the camera
+returns remote function return values on success, false + message on failure
+]]
+function con_methods:call_remote(func,...)
+	local args = {...}
+	local argstrs = {}
+	-- preserve nils between values (not trailing ones but shouldn't matter in most cases)
+	for i = 1,table.maxn(args) do
+		argstrs[i] = serialize(args[i])
+	end
+
+	local code = "return "..func.."("..table.concat(argstrs,',')..")"
+--	printf("%s\n",code)
+	local results = {self:execwait(code)}
+	-- if local status is good, return remote
+	if results[1] then
+		-- start at 2 to discard local status
+		return unpack(results,2,table.maxn(results)) -- maxn expression preserves nils
+	end
+	-- else return local error
+	return false,results[2]
+end
+
+function con_methods:stat(path)
+	return self:call_remote('os.stat',path)
+end
+
+function con_methods:mdkir(path)
+	return self:call_remote('os.mkdir',path)
+end
+
+function con_methods:remove(path)
+	return self:call_remote('os.remove',path)
+end
+
 
 --[[
 sort an array of stat+name by directory status, name

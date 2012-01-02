@@ -165,7 +165,13 @@ end
 local serialize_r
 serialize_r = function(v,opts,seen,depth)
 	local vt = type(v)
-	if vt == 'nil' or  vt == 'boolean' or vt == 'number' then
+	if vt == 'nil' or  vt == 'boolean' then
+		return tostring(v)
+ 	elseif vt == 'number' then
+		-- camera has problems with decimal constants that would be negative
+		if opts.fix_bignum and v > 0x7FFFFFFF then
+			return string.format("0x%x",v)
+		end
 		return tostring(v)
 	elseif vt == 'string' then
 		return string.format('%q',v)
@@ -219,6 +225,7 @@ util.serialize_defaults = {
 	err_type=true, -- bad type, e.g. function, userdata
 	err_cycle=true, -- cyclic references
 	pretty=true, -- indents and newlines
+	fix_bignum=true, -- send values > 2^31 as hex, to avoid problems with camera conversion from decimal
 --	forceint=false, -- TODO convert numbers to integer
 }
 
