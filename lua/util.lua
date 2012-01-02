@@ -121,6 +121,19 @@ function util.in_table(table,value)
 	end
 end
 
+--[[
+very simple meta-table inheritance
+]]
+function util.mt_inherit(t,base)
+	local mt={
+		__index=function(table, key)
+			return base[key]
+		end
+	}
+	setmetatable(t,mt)
+	return t
+end
+
 function util.hexdump(str,offset)
 	local c, result, byte
 	if not offset then

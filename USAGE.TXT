@@ -15,6 +15,22 @@ Options:
 
 =CLI=
 CLI commands are available from the console, gui and the command line
+
+==CLI parsing==
+The cli commands lua, luar, exec and putm all accept a single line of free-form text
+and pass it unmodified to the underlying function.
+
+Most other commands parse the remaining input into switches and arguments
+Switches are in the for -switchname and may take values with -switch=value
+Arguments are any other sequence of non-space or quoted characters.
+
+Both switches and words may be quoted as follows:
+The characters " or ' can be used to quote arguments or switch values that contain spaces
+Inside double quotes "",  backslash \ is treated as an escape character.
+
+==Command reference==
+output of help -v
+
 help (h)     [cmd]|[-v]  : - help on [cmd] or all commands
  help -v gives full help on all commands, otherwise as summary is printed
 
@@ -60,9 +76,9 @@ download (d) <remote> [local]: - download a file from the camera
  If [local] ends in /, the file is downloaded to [local]/<remote file name>
 
 version (ver)             : - print API versions
-connect (c)  [-b<bus>] [-d<dev>] [-p<pid>] [-s<serial>] [model] : - connect to device
+connect (c)  [-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] : - connect to device
  If no options are given, connects to the first available device.
- <pid> is the USB product ID, as a decimal or hexidecimal number.
+ <pid> is the USB product ID, as a decimal or hexadecimal number.
  All other options are treated as a Lua pattern. For alphanumerics, this is a case sensitive substring match.
  If the serial or model are specified, a temporary connection will be made to each device
  If <model> includes spaces, it must be quoted.

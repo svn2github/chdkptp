@@ -21,6 +21,131 @@ local cli = {
 	finished = false,
 }
 
+--[[
+get command args of the form -a[=value] -bar[=value] .. [wordarg1] [wordarg2] [wordarg...]
+--]]
+local argparser = { }
+cli.argparser = argparser
+
+-- trim leading spaces
+function argparser:trimspace(str)
+	local s, e = string.find(str,'^[%c%s]*')
+	return string.sub(str,e+1)
+end
+--[[
+get a 'word' argument, either a sequence of non-white space characters, or a quoted string
+inside " \ is treated as an escape character
+return word, end position on success or false, error message
+]]
+function argparser:get_word(str)
+	local result = ''
+	local esc = false
+	local qchar = false
+	local pos = 1
+	while pos <= string.len(str) do
+		local c = string.sub(str,pos,pos)
+		-- in escape, append next character unconditionally
+		if esc then
+			result = result .. c
+			esc = false
+		-- inside double quote, start escape and discard backslash
+		elseif qchar == '"' and c == '\\' then
+			esc = true
+		-- character is the current quote char, close quote and discard
+		elseif c == qchar then
+			qchar = false
+		-- not hit a space and not inside a quote, end
+		elseif not qchar and string.match(c,"[%c%s]") then
+			break
+		-- hit a quote and not inside a quote, enter quote and discard
+		elseif not qchar and c == '"' or c == "'" then
+			qchar = c
+		-- anything else, copy
+		else
+			result = result .. c
+		end
+		pos = pos + 1
+	end
+	if esc then
+		return false,"unexpected \\"
+	end
+	if qchar then
+		return false,"unclosed " .. qchar
+	end
+	return result,pos
+end
+
+function argparser:parse_words(str)
+	local words={}
+	str = self:trimspace(str)
+	while string.len(str) > 0 do
+		local w,pos = self:get_word(str)
+		if not w then
+			return false,pos -- pos is error string
+		end
+		table.insert(words,w)
+		str = string.sub(str,pos)
+		str = self:trimspace(str)
+	end
+	return words
+end
+
+--[[
+parse a command string into switches and word arguments
+switches are in the form -swname[=value]
+word arguments are anything else
+any portion of the string may be quoted with '' or ""
+inside "", \ is treated as an escape
+on success returns table with args as array elements and switches as named elements
+on failure returns false, error
+defs defines the valid switches and their default values. Can also define default values of numeric args
+TODO enforce switch values, number of args, integrate with help
+]]
+function argparser:parse(str)
+	-- default values
+	local results=util.extend_table({},self.defs)
+	local words,errmsg=self:parse_words(str)
+	if not words then
+		return false,errmsg
+	end
+	for i, w in ipairs(words) do
+		-- look for -name
+		local s,e,swname=string.find(w,'^-(%a[%w_-]*)')
+		-- found a switch
+		if s then		
+			if type(self.defs[swname]) == 'nil' then
+				return false,'unknown switch '..swname
+			end
+			local swval
+			-- no value
+			if e == string.len(w) then
+				swval = true
+			elseif string.sub(w,e+1,e+1) == '=' then
+				-- note, may be empty string but that's ok
+				swval = string.sub(w,e+2)
+			else
+				return false,"invalid switch value "..string.sub(w,e+1)
+			end
+			results[swname]=swval
+		else
+			table.insert(results,w)
+		end
+	end
+	return results
+end
+
+-- a default for comands that want the raw string
+argparser.nop = {
+	parse =function(self,str)
+		return str
+	end
+}
+
+function argparser.create(defs)
+	local r={ defs=defs }
+	return util.mt_inherit(r,argparser)
+end
+
 cli.cmd_proto = {
 	get_help = function(self)
 		local namestr = self.names[1]
@@ -58,6 +183,9 @@ function cli:add_commands(cmds)
 		if not cmd.arghelp then
 			cmd.arghelp = ''
 		end
+		if not cmd.args then
+			cmd.args = argparser.nop
+		end
 		for _,name in ipairs(cmd.names) do
 			if self.names[name] then
 				warnf("duplicate command name %s\n",name)
@@ -94,7 +222,12 @@ function cli:execute(line)
 	if s then
 		local args = string.sub(line,e+1)
 		if self.names[cmd] then
-			local status,msg = self.names[cmd](args)
+			local status,msg
+			args,msg = self.names[cmd].args:parse(args)
+			if not args then
+				return false,msg
+			end
+			status,msg = self.names[cmd](args)
 			if not status and not msg then
 				msg=cmd .. " failed"
 			end
@@ -148,90 +281,26 @@ function cli:make_camera_path(path)
 	return 'A/' .. path
 end
 
--- returns <str>, <remaining arg string>
--- accepts quoted strings or space delimited
-function cli:get_string_arg(arg)
-	if type(arg) ~= 'string' then
-		return
-	end
-	local path
-	-- trim leading spaces
-	local s, e = string.find(arg,'^[%c%s]*')
-	arg = string.sub(arg,e+1)
-	-- check for quotes
-	s, e, str = string.find(arg,'^["]([^"]+)["]')
-	if s then
-		return str, string.sub(arg,e+1)
-	end
-	-- try without quotes
-	s, e, str = string.find(arg,'^([^%c%s]+)')
-	if s then
-		return str, string.sub(arg,e+1)
-	end
-	return nil
-end
-
---[[
-t,args=cli:get_opts(args,optspec)
-optspec is an array of option letters 
-returns table of option values
-plus arg string with recognized opts removed
-TODO should unify command line processing with main.lua args
-]]
-function cli:get_opts(arg,optspec)
-	local r={}
-	for i,v in ipairs(optspec) do
-		arg = string.gsub(arg,'-'..v,function() 
-			r[v]=true
-			return ''
-		end)
-	end
-	return r,arg
-end
-
--- returns num, <remaining arg string>
--- num can be signed hex or decimal
-function cli:get_num_arg(arg)
-	if type(arg) ~= 'string' then
-		return
-	end
-	local hex,num
-	local s, e, neg=string.find(arg,'^[%c%s]*(-?)')
-	if not s then
-		neg = ''
-	end
-	arg = string.sub(arg,e+1)
-	s, e, hex=string.find(arg,'^(0[Xx])')
-	if s then
-		arg = string.sub(arg,e+1)
-		s, e, num=string.find(arg,'^([%x]+)')
-	else
-		hex = ''
-		s, e, num=string.find(arg,'^([%d]+)')
-	end
-	if s then
-		return tonumber(neg..hex..num), string.sub(arg,e+1)
-	end
-end
-
 cli:add_commands{
 	{
 		names={'help','h'},
 		arghelp='[cmd]|[-v]',
+		args=argparser.create{v=false},
 		help='help on [cmd] or all commands',
 		help_detail=[[
  help -v gives full help on all commands, otherwise as summary is printed
 ]],
 		func=function(self,args) 
-			if cli.names[args] then
-				return true, cli.names[args]:get_help_detail()
+			cmd = args[1]
+			if cmd and cli.names[cmd] then
+				return true, cli.names[cmd]:get_help_detail()
 			end
-			if args and args ~= "" and args ~= "-v" then
-				return false, string.format("unknown command '%s'\n",args)
+			if cmd then
+				return false, string.format("unknown command '%s'\n",cmd)
 			end
 			msg = ""
 			for i,c in ipairs(cli.cmds) do
-				if args == "-v" then
+				if args.v then
 					msg = msg .. c:get_help_detail()
 				else
 					msg = msg .. c:get_help()
@@ -352,11 +421,11 @@ cli:add_commands{
 		-- TODO support display as words
 		names={'rmem'},
 		help='read memory',
+		args=argparser.create(), -- only word args
 		arghelp='<address> [count]',
 		func=function(self,args) 
-			local addr
-			addr,args = cli:get_num_arg(args)
-			local count = cli:get_num_arg(args)
+			local addr = tonumber(args[1])
+			local count = tonumber(args[2])
 			if not addr then
 				return false, "bad args"
 			end
@@ -425,6 +494,7 @@ cli:add_commands{
 		names={'upload','u'},
 		help='upload a file to the camera',
 		arghelp="<local> [remote]",
+		args=argparser.create(),
 		help_detail=[[
  <local> is the file to upload.
  [remote] is assumed to be relative to A/ if not given explicitly.
@@ -434,11 +504,11 @@ cli:add_commands{
  Dryos cameras do not handle non 8.3 filenames well.
 ]],
 		func=function(self,args) 
-			local src,args = cli:get_string_arg(args)
+			local src = args[1]
 			if not src then
 				return false, "missing source"
 			end
-			local dst = cli:get_string_arg(args)
+			local dst = args[2]
 			-- no dst, use filename of source
 			if not dst then
 				dst = util.basename(src)
@@ -462,6 +532,7 @@ cli:add_commands{
 		names={'download','d'},
 		help='download a file from the camera',
 		arghelp="<remote> [local]",
+		args=argparser.create(),
 		help_detail=[[
  <remote> is assumed to be relative to A/ if not given explicitly.
  If [local] is not given, the file is downloaded to the current directory, using the remote filename.
@@ -469,11 +540,11 @@ cli:add_commands{
 ]],
 
 		func=function(self,args) 
-			local src,args = cli:get_string_arg(args)
+			local src = args[1]
 			if not src then
 				return false, "missing source"
 			end
-			local dst = cli:get_string_arg(args)
+			local dst = args[2]
 			-- use final component
 			if not dst then
 				dst = util.basename(src)
@@ -513,48 +584,43 @@ cli:add_commands{
 	{
 		names={'connect','c'},
 		help='connect to device',
-		arghelp="[-b<bus>] [-d<dev>] [-p<pid>] [-s<serial>] [model] ",
+		arghelp="[-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] ",
+		args=argparser.create{
+			b='.*',
+			d='.*',
+			p=false,
+			s=false,
+		},
+		
 		help_detail=[[
  If no options are given, connects to the first available device.
- <pid> is the USB product ID, as a decimal or hexidecimal number.
+ <pid> is the USB product ID, as a decimal or hexadecimal number.
  All other options are treated as a Lua pattern. For alphanumerics, this is a case sensitive substring match.
  If the serial or model are specified, a temporary connection will be made to each device
  If <model> includes spaces, it must be quoted.
  If multiple devices match, the first matching device will be connected.
 ]],
 		func=function(self,args) 
+			local match = {}
 			local opt_map = {
 				b='bus',
 				d='dev',
 				p='product_id',
 				s='serial_number',
+				[1]='model',
 			}
-			local match = {bus='.*',dev='.*'}
-			local arg
+			for k,v in pairs(opt_map) do
+				-- TODO matches expect nil
+				if type(args[k]) == 'string' then
+					match[v] = args[k]
+				end
+--				printf('%s=%s\n',v,tostring(args[k]))
+			end
+
 			if con:is_connected() then
 				con:disconnect()
 			end
-			arg,args = cli:get_string_arg(args)
---			printf("arg %s\n",tostring(arg))
-			while arg do
-				-- no -, assume model name
-				if string.sub(arg,1,1) ~= '-' then
-					if match.model then
-						return false,"unexpected arg: "..arg
-					end
-					match.model = arg
-				else
-					local s,e,opt,val = string.find(arg,'^-([bdps])[:=]?(.*)')
-					if s then
---						printf("opt %s=%s\n",opt,val)
-						match[opt_map[opt]] = val
-					else
-						return false,"invalid option: "..arg
-					end
-				end
-				arg,args = cli:get_string_arg(args)
---				printf("arg %s\n",tostring(arg))
-			end
+
 			if match.product_id and not tonumber(match.product_id) then
 				return false,"expected number for product id"
 			end
@@ -618,13 +684,13 @@ cli:add_commands{
 	{
 		names={'ls'},
 		help='list files/directories on camera',
+		args=argparser.create{l=false},
 		arghelp="[-l] [path]",
 		func=function(self,args) 
-			local opts,listops
-			opts,args=cli:get_opts(args,{'l'})
-			local path=cli:get_string_arg(args)
+			local listops
+			local path=args[1]
 			path = cli:make_camera_path(path)
-			if opts.l then
+			if args.l then
 				listopts = { stat='*' }
 			else
 				listopts = { stat='/' }
@@ -632,7 +698,7 @@ cli:add_commands{
 			local list,msg = con:listdir(path,listopts)
 			if type(list) == 'table' then
 				local r = ''
-				if opts.l then
+				if args.l then
 					-- alphabetic sort TODO sorting/grouping options
 					chdku.sortdir_stat(list)
 					for i,st in ipairs(list) do
@@ -658,16 +724,17 @@ cli:add_commands{
 		names={'reboot'},
 		help='reboot the camera',
 		arghelp="[file]",
+		args=argparser.create(),
 		help_detail=[[
  [file] is an optional file to boot.
   If not given, the normal boot process is used.
   The file may be an unencoded binary or on DryOS only, an encoded .FI2
  chdkptp attempts to reconnect to the camera after it boots.
 ]],
-		-- TODO depends on camera coming back on current dev/bus, not guaranteed
+		-- TODO reconnect depends on camera coming back on current dev/bus, not guaranteed
 		-- caching model/serial could help
 		func=function(self,args) 
-			local bootfile=cli:get_string_arg(args)
+			local bootfile=args[1]
 			if bootfile then
 				bootfile = cli:make_camera_path(bootfile)
 				bootfile = string.format("'%s'",bootfile)
