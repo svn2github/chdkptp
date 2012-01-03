@@ -531,12 +531,13 @@ cli:add_commands{
 	{
 		names={'download','d'},
 		help='download a file from the camera',
-		arghelp="<remote> [local]",
-		args=argparser.create(),
+		arghelp="[-nostat] <remote> [local]",
+		args=argparser.create{nostat=false},
 		help_detail=[[
  <remote> is assumed to be relative to A/ if not given explicitly.
  If [local] is not given, the file is downloaded to the current directory, using the remote filename.
- If [local] ends in /, the file is downloaded to [local]/<remote file name>
+ If [local] is a directory, the file will be downloaded into it
+ -nostat skips stat check on camera, to allow download while running script
 ]],
 
 		func=function(self,args) 
@@ -545,18 +546,33 @@ cli:add_commands{
 				return false, "missing source"
 			end
 			local dst = args[2]
-			-- use final component
 			if not dst then
+				-- no dest, use final component of source path
 				dst = util.basename(src)
-			-- trailing slash, append filename of source
-			-- TODO should use stat to figure out if target is a directory
-			elseif string.find(dst,'[\\/]$') then
-				dst = dst .. util.basename(src)
+			elseif string.match(dst,'[\\/]+$') then
+				-- explicit / treat it as a directory
+				dst = util.joinpath(dst,util.basename(src))
+				-- and check if it is
+				local dst_dir = util.dirname(dst)
+				-- TODO should create it
+				if lfs.attributes(dst_dir,'mode') ~= 'directory' then
+					return false,'not a directory: '..dst_dir
+				end
+			elseif lfs.attributes(dst,'mode') == 'directory' then
+				-- if target is a directory download into it
+				dst = util.joinpath(dst,util.basename(src))
 			end
-			if not dst then
-				return false, "bad/missing args ?"
-			end
+
 			src = cli:make_camera_path(src)
+			if not args.nostat then
+				local src_st,err = con:stat(src)
+				if not src_st then
+					return false, 'stat source '..src..' failed: ' .. err
+				end
+				if not src_st.is_file then
+					return false, src..' is not a file'
+				end
+			end
 			local msg=string.format("%s->%s\n",src,dst)
 			local r, msg2 = con:download(src,dst)
 			if msg2 then

@@ -30,7 +30,6 @@ Inside double quotes "",  backslash \ is treated as an escape character.
 
 ==Command reference==
 output of help -v
-
 help (h)     [cmd]|[-v]  : - help on [cmd] or all commands
  help -v gives full help on all commands, otherwise as summary is printed
 
@@ -70,10 +69,11 @@ upload (u)   <local> [remote]: - upload a file to the camera
  Some cameras have problems with paths > 32 characters.
  Dryos cameras do not handle non 8.3 filenames well.
 
-download (d) <remote> [local]: - download a file from the camera
+download (d) [-nostat] <remote> [local]: - download a file from the camera
  <remote> is assumed to be relative to A/ if not given explicitly.
  If [local] is not given, the file is downloaded to the current directory, using the remote filename.
- If [local] ends in /, the file is downloaded to [local]/<remote file name>
+ If [local] is a directory, the file will be downloaded into it
+ -nostat skips stat check on camera, to allow download while running script
 
 version (ver)             : - print API versions
 connect (c)  [-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] : - connect to device
