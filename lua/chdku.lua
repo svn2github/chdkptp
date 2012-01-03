@@ -246,10 +246,11 @@ function joinpath(...)
 	end
 	local r=parts[1]
 	for i = 2, #parts do
-		if string.sub(r,-1,-1) ~= '/' then
+		local v = string.gsub(parts[i],'^/','')
+		if not string.match(r,'/$') then
 			r=r..'/'
 		end
-		r=r..parts[i]
+		r=r..v
 	end
 	return r
 end

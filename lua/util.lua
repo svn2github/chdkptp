@@ -275,8 +275,30 @@ function util.basename(path,sfx)
 	return bn
 end
 
+--[[
+similar to unix dirname
+]]
+function util.dirname(path)
+	if not path then
+		return nil
+	end
+	-- remove trailing blah/?
+	dn=string.gsub(path,'[^\\/]+[\\/]*$','')
+	if dn == '' then
+		return '.'
+	end
+	-- remove any trailing /
+	dn = string.gsub(dn,'[\\/]*$','')
+	-- all /
+	if dn == '' then
+		return '/'
+	end
+	return dn
+end
+
 --[[ 
-add / between components, only if needed. / is ok for windows in most cases, don't mess with backslash
+add / between components, only if needed.
+accepts \ as an existing separator, even though it's not a separator on camera or *nix
 ]]
 function util.joinpath(...)
 	local parts={...}
@@ -285,13 +307,15 @@ function util.joinpath(...)
 	end
 	local r=parts[1]
 	for i = 2, #parts do
-		if string.sub(r,-1,-1) ~= '/' then
+		local v = string.gsub(parts[i],'^[\\/]','')
+		if not string.match(r,'[\\/]$') then
 			r=r..'/'
 		end
-		r=r..parts[i]
+		r=r..v
 	end
 	return r
 end
+
 --[[
 hacky hacky
 "import" values from a table into globals
