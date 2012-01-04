@@ -1114,6 +1114,7 @@ static int chdk_script_support(lua_State *L) {
     if ( !ptp_chdk_get_script_support(params,&params->deviceinfo,&status) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"ptp error");
+		return 2;
 	}
 	lua_pushnumber(L,status);
 	return 1;
@@ -1134,6 +1135,7 @@ static int chdk_script_status(lua_State *L) {
 	if ( !ptp_chdk_get_script_status(params,&params->deviceinfo,&status) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"ptp error");
+		return 2;
 	}
 	lua_createtable(L,0,2);
 	lua_pushboolean(L, status & PTP_CHDK_SCRIPT_STATUS_RUN);
