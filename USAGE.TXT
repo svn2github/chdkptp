@@ -61,19 +61,25 @@ list                     : - list devices
   - not connected
  serial numbers are not available from all models
 
-upload (u)   <local> [remote]: - upload a file to the camera
- <local> is the file to upload.
- [remote] is assumed to be relative to A/ if not given explicitly.
- If [remote] is not given, the file is uploaded to A/
- If [remote] ends in /, the file is uploaded to [remote]/<local file name>
- Some cameras have problems with paths > 32 characters.
- Dryos cameras do not handle non 8.3 filenames well.
+upload (u)   [-nolua] <local> [remote]: - upload a file to the camera
+ <local>  file to upload
+ [remote] destination
+   If not specified, file is uploaded to A/
+   If remote is a directory or ends in / uploaded to remote/<local file name>
+ -nolua   skip lua based checks on remote
+   Allows upload while running script
+   Prevents detecting if remote is a directory
+ Some cameras have problems with paths > 32 characters
+ Dryos cameras do not handle non 8.3 filenames well
 
-download (d) [-nostat] <remote> [local]: - download a file from the camera
- <remote> is assumed to be relative to A/ if not given explicitly.
- If [local] is not given, the file is downloaded to the current directory, using the remote filename.
- If [local] is a directory, the file will be downloaded into it
- -nostat skips stat check on camera, to allow download while running script
+download (d) [-nolua] <remote> [local]: - download a file from the camera
+ <remote> file to download
+        A/ is prepended if not present
+ [local]  destination
+   If not specified, the file will be downloaded to the current directory
+   If a directory, the file will be downloaded into it
+ -nolua   skip lua based checks on remote
+   Allows download while running script
 
 version (ver)             : - print API versions
 connect (c)  [-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] : - connect to device

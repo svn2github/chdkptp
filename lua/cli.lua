@@ -493,33 +493,58 @@ cli:add_commands{
 	{
 		names={'upload','u'},
 		help='upload a file to the camera',
-		arghelp="<local> [remote]",
-		args=argparser.create(),
+		arghelp="[-nolua] <local> [remote]",
+		args=argparser.create{nolua=false},
 		help_detail=[[
- <local> is the file to upload.
- [remote] is assumed to be relative to A/ if not given explicitly.
- If [remote] is not given, the file is uploaded to A/
- If [remote] ends in /, the file is uploaded to [remote]/<local file name>
- Some cameras have problems with paths > 32 characters.
- Dryos cameras do not handle non 8.3 filenames well.
+ <local>  file to upload
+ [remote] destination
+   If not specified, file is uploaded to A/
+   If remote is a directory or ends in / uploaded to remote/<local file name>
+ -nolua   skip lua based checks on remote
+   Allows upload while running script
+   Prevents detecting if remote is a directory
+ Some cameras have problems with paths > 32 characters
+ Dryos cameras do not handle non 8.3 filenames well
 ]],
 		func=function(self,args) 
 			local src = args[1]
 			if not src then
 				return false, "missing source"
 			end
+			if lfs.attributes(src,'mode') ~= 'file' then
+				return false, 'src is not a file: '..src
+			end
+
+			local dst_dir
 			local dst = args[2]
 			-- no dst, use filename of source
-			if not dst then
-				dst = util.basename(src)
-			-- trailing slash, append filename of source
-			elseif string.find(dst,'[\\/]$') then
-				dst = dst .. util.basename(src)
+			if dst then
+				dst = cli:make_camera_path(dst)
+				if string.find(dst,'[\\/]$') then
+					-- trailing slash, append filename of source
+					dst = string.sub(dst,1,-2)
+					if not args.nolua then
+						local st,err = con:stat(dst)
+						if not st then
+							return false, 'stat dest '..dst..' failed: ' .. err
+						end
+						if not st.is_dir then
+							return false, 'not a directory: '..dst
+						end
+					end
+					dst = util.joinpath(dst,util.basename(src))
+				else
+					if not args.nolua then
+						local st = con:stat(dst)
+						if st and st.is_dir then
+							dst = util.joinpath(dst,util.basename(src))
+						end
+					end
+				end
+			else
+				dst = cli:make_camera_path(util.basename(src))
 			end
-			if not (src and dst) then
-				return false, "bad/missing args ?"
-			end
-			dst = cli:make_camera_path(dst)
+
 			local msg=string.format("%s->%s\n",src,dst)
 			local r, msg2 = con:upload(src,dst)
 			if msg2 then
@@ -531,13 +556,16 @@ cli:add_commands{
 	{
 		names={'download','d'},
 		help='download a file from the camera',
-		arghelp="[-nostat] <remote> [local]",
-		args=argparser.create{nostat=false},
+		arghelp="[-nolua] <remote> [local]",
+		args=argparser.create{nolua=false},
 		help_detail=[[
- <remote> is assumed to be relative to A/ if not given explicitly.
- If [local] is not given, the file is downloaded to the current directory, using the remote filename.
- If [local] is a directory, the file will be downloaded into it
- -nostat skips stat check on camera, to allow download while running script
+ <remote> file to download
+ 	A/ is prepended if not present
+ [local]  destination
+   If not specified, the file will be downloaded to the current directory
+   If a directory, the file will be downloaded into it
+ -nolua   skip lua based checks on remote
+   Allows download while running script
 ]],
 
 		func=function(self,args) 
@@ -564,7 +592,7 @@ cli:add_commands{
 			end
 
 			src = cli:make_camera_path(src)
-			if not args.nostat then
+			if not args.nolua then
 				local src_st,err = con:stat(src)
 				if not src_st then
 					return false, 'stat source '..src..' failed: ' .. err
