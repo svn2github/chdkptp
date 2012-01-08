@@ -225,6 +225,77 @@ function serialize(v,opts)
 end
 ]],
 },
+--[[
+extend_table from util
+note deep will fail unless you include extend_table_r
+]]
+{
+	name='extend_table',
+	code=[[
+function extend_table(target,source,deep)
+	if type(target) ~= 'table' then
+		error('extend_table: target not table')
+	end
+	if source == nil then
+		return target
+	end
+	if type(source) ~= 'table' then 
+		error('extend_table: source not table')
+	end
+	if source == target then
+		error('extend_table: source == target')
+	end
+	if deep then
+		return extend_table_r(target, source)
+	else 
+		for k,v in pairs(source) do
+			target[k]=v
+		end
+		return target
+	end
+end
+]],
+},
+--[[
+recursive version of extend_table
+not meant to be used on its own 
+depends are intentially weird, requiring this will pull in extend_table
+]]
+{
+	name='extend_table_r',
+	depend='extend_table',
+	code=[[
+extend_table_max_depth = 10
+function extend_table_r(target,source,seen,depth) 
+	if not seen then
+		seen = {}
+	end
+	if not depth then
+		depth = 1
+	end
+	if depth > extend_table_max_depth then
+		error('extend_table: max depth');
+	end
+	-- a source could have refernces to the target, don't want to do that
+	seen[target]=true
+	if seen[source] then
+		error('extend_table: cycles');
+	end
+	seen[source]=true
+	for k,v in pairs(source) do
+		if type(v) == 'table' then
+			if type(target[k]) ~= 'table' then
+				target[k] = {}
+			end
+			extend_table_r(target[k],v,seen,depth+1)
+		else
+			target[k]=v
+		end
+	end
+	return target
+end
+]],
+},
 -- override default table serialization for messages
 {
 	name='serialize_msgs',
@@ -257,35 +328,6 @@ end
 ]],
 },
 --[[
-	status[,err]=dir_iter(path,func,opts)
-general purpose directory iterator
-interates over directory 'path', calling
-func(path,filename,opts.fdata) on each item
-func is called with a nil filename after listing is complete
-]]
-{
-	name='dir_iter',
-	code=[[
-function dir_iter(path,func,opts)
-	if not opts then
-		opts = {}
-	end
-		
-	local t,err=os.listdir(path,opts.listall)
-	if not t then
-		return false,err
-	end
-	for i,v in ipairs(t) do
-		local status,err=func(path,v,opts)
-		if not status then
-			return status,err
-		end
-	end
-	return func(path,nil,opts)
-end
-]],
-},
---[[
 function to batch stuff in groups of messages
 each batch is sent as a numeric array
 b=msg_batcher{
@@ -298,18 +340,13 @@ b:flush() sends any remaining items
 ]]
 {
 	name='msg_batcher',
-	depend='serialize_msgs',
+	depend={'serialize_msgs','extend_table'},
 	code=[[
-function msg_batcher(opts_in)
-	local t = {
+function msg_batcher(opts)
+	local t = extend_table({
 		batchsize=50,
 		timeout=100000
-	}
-	if opts_in then
-		for k,v in pairs(opts_in) do
-			t[k] = v
-		end
-	end
+	},opts)
 	t.data={}
 	t.n=0
 	t.write=function(self,val)
@@ -357,11 +394,207 @@ end
 ]],
 },
 --[[
+	status[,err]=dir_iter(path,opts)
+iterater over a directory, possibly recursing into subdirectories
+opts={
+	check_path=function
+	process_sub=function
+	process=function
+}
+callbacks are passed (opts,data)
+for all callbacks, data contains 
+	name=<filename>
+	dir=<directory path>
+	fullname=<dir/file>
+and for process_sub and process, it also contains
+	st=<stat(filename)>
+
+check_path 
+	return false to stop processing based on name alone
+
+process_sub
+	return <status>,[recurse|errror msg>
+
+process
+	return <status>,[error msg]
+
+]]
+{
+	name='dir_iter',
+	depend={'serialize_msgs','joinpath','extend_table'},
+	code=[[
+function dir_iter_single(dir,name,opts)
+	local data={
+		dir=dir,
+		name=name,
+		fullname=joinpath(dir,name),
+	}
+	if not opts:check_path(data) then
+		return true
+	end
+	local st,err = os.stat(data.fullname)
+	if not st then
+		return false,err
+	end
+	data.st = st
+	if st.is_dir and name ~= '.' and name ~= '..' then
+		local status,recurse=opts:process_sub(data)
+		if not status then
+			return false,recurse
+		end
+		if recurse then
+			opts.depth = opts.depth + 1
+			local status,err = dir_iter_r(data.fullname,opts)
+			opts.depth = opts.depth - 1
+			if not status then
+				return false,err
+			end
+		end
+	end
+	return opts:process(data)
+end
+
+function dir_iter_r(path,opts)
+	local t,err=os.listdir(path,opts.listall)
+	if not t then
+		return false,err
+	end
+	for i,name in ipairs(t) do
+		local status, err = dir_iter_single(path,name,opts)
+		if not status then
+			return false,err
+		end
+	end
+	return true
+end
+
+function dir_iter(path,opts)
+	opts=extend_table({
+		check_path=function(opts,data)
+			return true
+		end,
+		process_sub=function(opts,data)
+			return true,true
+		end,
+		process=function(opts,data)
+			return true
+		end,
+	},opts)
+	opts.depth=0
+	local st,err = os.stat(path)
+	if not st then
+		return false,err
+	end
+	if not st.is_dir then
+		return false,"not a directory"
+	end
+	return dir_iter_r(path,opts)
+end
+]],
+},
+--[[
+process directory tree with matching
+status,err = find_files(dir,opts)
+opts={
+	func=function(opts,data) -- function to operate on files/directories
+	fmatch='<pattern>', -- match on names of files, default any
+	dmatch='<pattern>', -- match on names of directories, default any 
+	pathmatch='<pattern>', -- match on whole path
+	dirs=true, -- pass directories to func. otherwise only files sent to func, but dirs are still recursed
+	dirsfirst=false, -- process directories before contained files
+	maxdepth=100, -- maxium number of directories to recurse into. 0 = only initial dir
+	stat=bool -- return stat information in default func
+	batch=bool -- provide message batcher to func in opts.batcher
+}
+NOTE failure to match on a directory with dmatch or pathmatch will prevent recursing into it
+. and .. are never processes
+func defaults to batching the file names or names+stat, as controlled by options.stat
+unless dirsfirst is set, directories will be recursed into before calling func on the containing directory
+TODO
+improve directory match vs recurse
+match on stat fields (newer, older etc)
+match by path components e.g. /foo[ab]/bar/.*%.lua
+]]
+{
+	depend={'dir_iter','msg_batcher','extend_table'},
+	name='find_files',
+	code=[[
+function find_files(path,opts)
+	opts=extend_table({
+		dirs=true,
+		dirsfirst=false,
+		maxdepth=100,
+	},opts)
+	if not opts.func then
+		opts.batch = true
+		opts.func=function(opts,data)
+			if opts.stat then
+				data.st.fullname = data.fullname
+				return opts.batcher:write(data.st)
+			end
+			return opts.batcher:write(data.fullname)
+		end
+	end
+	if opts.batch then
+		opts.batcher=msg_batcher()
+	end
+
+	opts.check_path=function(opts,data)
+		if opts.pathmatch and not string.match(data.fullname,opts.pathmatch) then
+			return false
+		end
+		return true
+	end
+
+	opts.process_sub=function(opts,data)
+		if opts.dmatch and not string.match(data.name,opts.dmatch) then
+			return true,false
+		end
+		if opts.dirs and opts.dirsfirst then
+			opts:func(data)
+		end
+		if opts.depth >= opts.maxdepth then
+			return true,false
+		end
+		return true,true
+	end
+
+	opts.process=function(opts,data)
+		if data.st.is_dir then
+			if not opts.dirs then
+				return true
+			end
+			if opts.dirsfirst then
+				return true
+			end
+			if opts.dmatch and not string.match(data.name,opts.dmatch) then
+				return true
+			end
+		else
+			if opts.fmatch and not string.match(data.name,opts.fmatch) then
+				return true
+			end
+		end
+		return opts:func(data)
+	end
+
+	local status,err=dir_iter(path,opts)
+	if not status then
+		return false,err
+	end
+	if opts.batch then
+		return opts.batcher:flush()
+	end
+	return true,'done'
+end
+]],
+},
+--[[
 TODO rework this to a general iterate over directory function
 sends file listing as serialized tables with write_usb_msg
 returns true, or false,error message
 opts={
-	stat=bool|{table},
+	stat=bool|{table}|'/'|'*',
 	listall=bool, 
 	msglimit=number,
 	match="pattern",
