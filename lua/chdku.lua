@@ -226,6 +226,23 @@ end
 ]],
 },
 --[[
+mt_inherit from util
+]]
+{
+	name='mt_inherit',
+	code=[[
+function mt_inherit(t,base)
+	local mt={
+		__index=function(table, key)
+			return base[key]
+		end
+	}
+	setmetatable(t,mt)
+	return t
+end
+]],
+},
+--[[
 extend_table from util
 note deep will fail unless you include extend_table_r
 ]]
@@ -394,73 +411,80 @@ end
 ]],
 },
 --[[
-	status[,err]=dir_iter(path,opts)
-iterater over a directory, possibly recursing into subdirectories
-opts={
-	check_path=function
-	process_sub=function
-	process=function
+object to aid interating over directories
+di=dir_iter.new{
+	callback=function(di)
+	listall=bool -- pass to os.listdir; currently broken, stat on . or .. fails
+	-- users may add their own methods or members
 }
-callbacks are passed (opts,data)
-for all callbacks, data contains 
-	name=<filename>
-	dir=<directory path>
-	fullname=<dir/file>
-and for process_sub and process, it also contains
-	st=<stat(filename)>
+status,err=di:run(dir)
 
-check_path 
-	return false to stop processing based on name alone
-
-process_sub
-	return <status>,[recurse|errror msg>
-
-process
-	return <status>,[error msg]
-
+callback must return true to continue processing, or false optionally followed by an error message on error
+the following are available to callback
+di.cur={
+	st=<stat information>
+	full=<full path and filename>
+	dir=<directory part>
+	name=<basename>
+}
+di.path an array of path elements representing the directories recursed into
+	di.path[1] is always the initial path passed to run(), no matter how many subdirectories deep it is
+di:depth() depth of recursion, initial directory is 1
+di:can_recurse() to check if the current items is valid to recurse into
+di:recurse() to recurse into a directory
 ]]
 {
 	name='dir_iter',
-	depend={'serialize_msgs','joinpath','extend_table'},
+	depend={'serialize_msgs','joinpath','mt_inherit','extend_table'},
 	code=[[
-function dir_iter_single(dir,name,opts)
-	local data={
-		dir=dir,
-		name=name,
-		fullname=joinpath(dir,name),
-	}
-	if not opts:check_path(data) then
-		return true
+dir_iter={}
+function dir_iter.new(t)
+	if not t then
+		t={}
 	end
-	local st,err = os.stat(data.fullname)
-	if not st then
-		return false,err
-	end
-	data.st = st
-	if st.is_dir and name ~= '.' and name ~= '..' then
-		local status,recurse=opts:process_sub(data)
-		if not status then
-			return false,recurse
-		end
-		if recurse then
-			opts.depth = opts.depth + 1
-			local status,err = dir_iter_r(data.fullname,opts)
-			opts.depth = opts.depth - 1
-			if not status then
-				return false,err
-			end
-		end
-	end
-	return opts:process(data)
+	mt_inherit(t,dir_iter)
+	return t
 end
 
-function dir_iter_r(path,opts)
-	local t,err=os.listdir(path,opts.listall)
+function dir_iter:depth()
+	return #self.path
+end
+
+function dir_iter:can_recurse()
+	if not self.cur.st.is_dir or self.cur.name == '.' or self.cur.name == '..' then
+		return false
+	end
+	return true
+end
+
+function dir_iter:recurse()
+	if not self:can_recurse() then
+		return false
+	end
+	table.insert(self.path,self.cur.name)
+	local save_cur = self.cur
+	local save_curdir = self.cur_dir
+	self.cur_dir = joinpath(self.cur_dir,self.cur.name)
+	local status,err = self:singledir()
+	self.cur_dir = save_curdir
+	self.cur = save_cur
+	table.remove(self.path)
+	return status,err
+end
+
+function dir_iter:singledir()
+	local t,err=os.listdir(self.cur_dir,self.listall)
 	if not t then
 		return false,err
 	end
 	for i,name in ipairs(t) do
-		local status, err = dir_iter_single(path,name,opts)
+		self.cur={name=name,dir=self.cur_dir,full=joinpath(self.cur_dir,name)}
+		local st,err = os.stat(self.cur.full)
+		if not st then
+			return false,err
+		end
+		self.cur.st = st
+		local status, err = self:callback()
 		if not status then
 			return false,err
 		end
@@ -468,27 +492,18 @@ function dir_iter_r(path,opts)
 	return true
 end
 
-function dir_iter(path,opts)
-	opts=extend_table({
-		check_path=function(opts,data)
-			return true
-		end,
-		process_sub=function(opts,data)
-			return true,true
-		end,
-		process=function(opts,data)
-			return true
-		end,
-	},opts)
-	opts.depth=0
-	local st,err = os.stat(path)
+function dir_iter:run(dir)
+	self.path={dir}
+	self.cur_dir=dir
+	self.cur={}
+	local st,err=os.stat(dir)
 	if not st then
 		return false,err
 	end
 	if not st.is_dir then
 		return false,"not a directory"
 	end
-	return dir_iter_r(path,opts)
+	return self:singledir()
 end
 ]],
 },
@@ -496,22 +511,19 @@ end
 process directory tree with matching
 status,err = find_files(dir,opts)
 opts={
-	func=function(opts,data) -- function to operate on files/directories
+	func=function(<dir_iter>,<opts>) -- function to operate on files/directories
 	fmatch='<pattern>', -- match on names of files, default any
 	dmatch='<pattern>', -- match on names of directories, default any 
-	pathmatch='<pattern>', -- match on whole path
+	rmatch='<pattern>', -- recurse into directories matching, default any 
 	dirs=true, -- pass directories to func. otherwise only files sent to func, but dirs are still recursed
 	dirsfirst=false, -- process directories before contained files
-	maxdepth=100, -- maxium number of directories to recurse into. 0 = only initial dir
+	maxdepth=100, -- maxium number of directories to recurse into. 1 = only initial dir
+	martians=bool -- return non-file, not directory items (vol label,???) default false
 	stat=bool -- return stat information in default func
-	batch=bool -- provide message batcher to func in opts.batcher
 }
-NOTE failure to match on a directory with dmatch or pathmatch will prevent recursing into it
-. and .. are never processes
 func defaults to batching the file names or names+stat, as controlled by options.stat
 unless dirsfirst is set, directories will be recursed into before calling func on the containing directory
 TODO
-improve directory match vs recurse
 match on stat fields (newer, older etc)
 match by path components e.g. /foo[ab]/bar/.*%.lua
 ]]
@@ -519,73 +531,86 @@ match by path components e.g. /foo[ab]/bar/.*%.lua
 	depend={'dir_iter','msg_batcher','extend_table'},
 	name='find_files',
 	code=[[
+function find_files_default_func(di,opts)
+	if opts.stat then
+		return di:ff_bwrite(extend_table({path=di.cur.full},di.cur.st))
+	end
+	return di:ff_bwrite(di.cur.full)
+end
+
 function find_files(path,opts)
 	opts=extend_table({
 		dirs=true,
 		dirsfirst=false,
 		maxdepth=100,
+		func=find_files_default_func,
 	},opts)
-	if not opts.func then
-		opts.batch = true
-		opts.func=function(opts,data)
-			if opts.stat then
-				data.st.fullname = data.fullname
-				return opts.batcher:write(data.st)
-			end
-			return opts.batcher:write(data.fullname)
-		end
-	end
-	if opts.batch then
-		opts.batcher=msg_batcher()
-	end
 
-	opts.check_path=function(opts,data)
-		if opts.pathmatch and not string.match(data.fullname,opts.pathmatch) then
+	local d=dir_iter.new({
+		ff_check_match=function(self,opts)
+			if self.cur.st.is_file then
+				return not opts.fmatch or string.match(self.cur.name,opts.fmatch)
+			end
+			if self.cur.st.is_dir then
+				return not opts.dmatch or string.match(self.cur.name,opts.dmatch)
+			end
+			if opts.martians then
+				return true
+			end
 			return false
-		end
-		return true
-	end
-
-	opts.process_sub=function(opts,data)
-		if opts.dmatch and not string.match(data.name,opts.dmatch) then
-			return true,false
-		end
-		if opts.dirs and opts.dirsfirst then
-			opts:func(data)
-		end
-		if opts.depth >= opts.maxdepth then
-			return true,false
-		end
-		return true,true
-	end
-
-	opts.process=function(opts,data)
-		if data.st.is_dir then
-			if not opts.dirs then
+		end,
+		ff_bwrite=function(self,data)
+			if not self.ff_batcher then
+				self.ff_batcher = msg_batcher()
+			end
+			return self.ff_batcher:write(data)
+		end,
+		ff_func=opts.func,
+		ff_item=function(self,opts)
+			if not self:ff_check_match(opts) then
 				return true
 			end
-			if opts.dirsfirst then
-				return true
+			return self:ff_func(opts)
+		end,
+		callback=function(self)
+			if self.cur.st.is_dir then
+				if opts.dirs and opts.dirsfirst then
+					local status,err = self:ff_item(opts)
+					if not status then
+						return false,err
+					end
+				end
+				if self:depth() < opts.maxdepth and self:can_recurse() then
+					if not opts.rmatch or string.match(self.cur.name,opts.rmatch) then
+						local status,err = self:recurse()
+						if not status then
+							return false,err
+						end
+					end
+				end
+				if opts.dirs and not opts.dirsfirst then
+					local status,err = self:ff_item(opts)
+					if not status then
+						return false,err
+					end
+				end
+			else
+				local status,err = self:ff_item(opts)
+				if not status then
+					return false,err
+				end
 			end
-			if opts.dmatch and not string.match(data.name,opts.dmatch) then
-				return true
-			end
-		else
-			if opts.fmatch and not string.match(data.name,opts.fmatch) then
-				return true
-			end
+			return true
 		end
-		return opts:func(data)
-	end
-
-	local status,err=dir_iter(path,opts)
+	})
+	local status,err = d:run(path)
 	if not status then
 		return false,err
 	end
-	if opts.batch then
-		return opts.batcher:flush()
+	if d.ff_batcher then
+		return d.ff_batcher:flush()
 	end
-	return true,'done'
+	return true
 end
 ]],
 },
