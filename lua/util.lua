@@ -277,6 +277,7 @@ end
 
 --[[
 similar to unix dirname
+TODO windows drive specs turn into .
 ]]
 function util.dirname(path)
 	if not path then
@@ -314,6 +315,53 @@ function util.joinpath(...)
 		r=r..v
 	end
 	return r
+end
+
+--[[
+split a path into an array of compontents
+]]
+function util.splitpath(path)
+	local parts={}
+	while true do
+		local part=util.basename(path)
+		path = util.dirname(path)
+		table.insert(parts,1,part)
+		if path == '.' or path == '/' then
+			-- TODO windows only case for drive letters (should be handled in dirname)
+			if not (path == '.' and string.find(part,'^%a:$')) then
+				table.insert(parts,1,path)
+			end
+			return parts
+		end
+	end
+end
+--[[
+make multiple subdirectories
+]]
+function util.mkdir_m(path)
+	local mode = lfs.attributes(path,'mode')
+	if mode == 'directory' then
+		return true
+	end
+	if mode then
+		return false,'path exists, not directory'
+	end
+	local parts = util.splitpath(path)
+	-- never try to create the initial . or /
+	local p=parts[1]
+	for i=2, #parts do
+		p = util.joinpath(p,parts[i])
+		local mode = lfs.attributes(p,'mode')
+		if not mode then
+			local status,err = lfs.mkdir(p)
+			if not status then
+				return false,err
+			end
+		elseif mode ~= 'directory' then
+			return false,'path exists, not directory'
+		end
+	end
+	return true
 end
 
 --[[

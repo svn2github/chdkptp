@@ -509,9 +509,8 @@ end
 },
 --[[
 process directory tree with matching
-status,err = find_files(dir,opts)
+status,err = find_files(dir,opts,func)
 opts={
-	func=function(<dir_iter>,<opts>) -- function to operate on files/directories
 	fmatch='<pattern>', -- match on names of files, default any
 	dmatch='<pattern>', -- match on names of directories, default any 
 	rmatch='<pattern>', -- recurse into directories matching, default any 
@@ -519,9 +518,8 @@ opts={
 	dirsfirst=false, -- process directories before contained files
 	maxdepth=100, -- maxium number of directories to recurse into. 1 = only initial dir
 	martians=bool -- return non-file, not directory items (vol label,???) default false
-	stat=bool -- return stat information in default func
 }
-func defaults to batching the file names or names+stat, as controlled by options.stat
+func defaults to batching the file names
 unless dirsfirst is set, directories will be recursed into before calling func on the containing directory
 TODO
 match on stat fields (newer, older etc)
@@ -531,19 +529,22 @@ match by path components e.g. /foo[ab]/bar/.*%.lua
 	depend={'dir_iter','msg_batcher','extend_table'},
 	name='find_files',
 	code=[[
-function find_files_default_func(di,opts)
-	if opts.stat then
-		return di:ff_bwrite(extend_table({path=di.cur.full},di.cur.st))
-	end
+function find_files_full_fn(di,opts,func)
 	return di:ff_bwrite(di.cur.full)
 end
 
-function find_files(path,opts)
+function find_files_stat_fn(di,opts,func)
+	return di:ff_bwrite(extend_table({path=di.cur.full},di.cur.st))
+end
+
+function find_files(path,opts,func)
+	if not func then
+		func=find_files_default_fn
+	end
 	opts=extend_table({
 		dirs=true,
 		dirsfirst=false,
 		maxdepth=100,
-		func=find_files_default_func,
 	},opts)
 
 	local d=dir_iter.new({
@@ -565,7 +566,7 @@ function find_files(path,opts)
 			end
 			return self.ff_batcher:write(data)
 		end,
-		ff_func=opts.func,
+		ff_func=func,
 		ff_item=function(self,opts)
 			if not self:ff_check_match(opts) then
 				return true
@@ -611,6 +612,34 @@ function find_files(path,opts)
 		return d.ff_batcher:flush()
 	end
 	return true
+end
+]],
+},
+--[[
+camera side support for mdownload
+]]
+{
+	depend={'find_files'},
+	name='ff_mdownload',
+	code=[[
+function ff_mdownload_fn(self,opts)
+	local r={}
+	r.st = self.cur.st
+	if #self.path == 1 then
+		r.relname = self.cur.name
+	else
+		if #self.path == 2 then
+			r.relname =  self.path[2]
+		elseif #self.path > 2 then
+			r.relname = joinpath(unpack(self.path,2))
+		end
+		r.relname = joinpath(r.relname,self.cur.name)
+	end
+	return self:ff_bwrite(r)
+end
+
+function ff_mdownload(dir,opts)
+	return find_files(dir,opts,ff_mdownload_fn)
 end
 ]],
 },
@@ -817,23 +846,58 @@ function con_methods:listdir(path,opts)
 end
 
 --[[
-simple batch download. This will change or go away later!
-download matching files in a directory
-does not handle recursive downloads, will fail if pattern matches a directory
-status[,err]=con:downloaddir(srcpath,dstpath,pattern)
+download files and directories
+status[,err]=con:mdownload(srcpath,dstpath,opts)
+opts are passed to find_files
 ]]
-function con_methods:downloaddir(srcpath,dstpath,pattern)
-	local filenames,err = self:listdir(srcpath,{match=pattern})
-	if not filenames then
+function con_methods:mdownload(srcpath,dstpath,opts)
+	if not dstpath then
+		dstpath = '.'
+	end
+	opts=extend_table({},opts)
+	opts.dirsfirst=true
+	if lfs.attributes(dstpath,'mode') ~= 'directory' then
+		local status,err = util.mkdir_m(dstpath)
+		if not status then
+			return false,err
+		end
+	end
+	local files={}
+	local status,err = self:execwait('ff_mdownload("'..srcpath..'",'..serialize(opts)..')',
+										{libs={'ff_mdownload'},msgs=chdku.msg_unbatcher(files)})
+
+	if not status then
 		return false,err
 	end
-	for i,name in ipairs(filenames) do
-		local src = joinpath(srcpath,name)
-		local dst = joinpath(dstpath,name)
-		printf("%s -> %s\n",src,dst)
-		status,err = self:download(src,dst)
-		if not status then
-			return status,err
+
+	if #files == 0 then
+		warnf("no matching files\n");
+		return true
+	end
+
+	for i,finfo in ipairs(files) do
+		if finfo.st.is_dir then
+--			printf('util.mkdir_m(%s)\n',joinpath(dstpath,finfo.relname))
+			local status,err = util.mkdir_m(joinpath(dstpath,finfo.relname))
+			if not status then
+				return false,err
+			end
+		else
+			local dst_dir = util.dirname(finfo.relname)
+			if dst_dir ~= '.' then
+--				printf('util.mkdir_m(%s)\n',util.joinpath(dstpath,dst_dir))
+				local status,err = util.mkdir_m(util.joinpath(dstpath,dst_dir))
+				if not status then
+					return false,err
+				end
+			end
+			src = joinpath(srcpath,finfo.relname)
+			dst = joinpath(dstpath,finfo.relname)
+			printf("%s->%s\n",src,dst);
+			local status,err = self:download(src,dst)
+			if not status then
+				return status,err
+			end
 		end
 	end
 	return true
