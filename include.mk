@@ -10,7 +10,7 @@ endif
 endif
 
 CC=gcc
-CFLAGS=
+CFLAGS=-DCHDKPTP_OSTYPE=\"$(OSTYPE)\"
 LDFLAGS=
 #LD=ld
 

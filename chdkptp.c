@@ -1466,8 +1466,14 @@ static int syslib_sleep(lua_State *L) {
 	return 0;
 }
 
+static int syslib_ostype(lua_State *L) {
+	lua_pushstring(L,CHDKPTP_OSTYPE);
+	return 1;
+}
+
 static const luaL_Reg lua_syslib[] = {
   {"sleep", syslib_sleep},
+  {"ostype", syslib_ostype},
   {NULL, NULL}
 };
 
