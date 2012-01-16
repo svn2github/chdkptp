@@ -102,8 +102,10 @@ t.joinpath = function()
 	assert(joinpath('/foo','bar')=='/foo/bar')
 	assert(joinpath('/foo/','bar')=='/foo/bar')
 	assert(joinpath('/foo/','/bar')=='/foo/bar')
-	assert(joinpath('/foo\\','/bar')=='/foo\\bar')
 	assert(joinpath('/foo/','bar','/mod')=='/foo/bar/mod')
+	if sys.ostype() == 'Windows' then
+		assert(joinpath('/foo\\','/bar')=='/foo\\bar')
+	end
 end
 
 t.fsmisc = function()
