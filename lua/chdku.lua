@@ -345,6 +345,89 @@ end
 ]],
 },
 --[[
+basename_cam from util
+]]
+{
+	name='basename',
+	code=[[
+function basename(path)
+	if not path then
+		return nil
+	end
+	if path == 'A/' then
+		return nil
+	end
+	local s,e,bn=string.find(path,'([^/]+)/?$')
+	if not s then
+		return nil
+	end
+	if sfx and string.len(sfx) < string.len(bn) then
+		if string.sub(bn,-string.len(sfx)) == sfx then
+			bn=string.sub(bn,1,string.len(bn) - string.len(sfx))
+		end
+	end
+	return bn
+end
+]],
+},
+--[[
+dirname_cam from util
+note A/ is ambiguous
+]]
+{
+	name='dirname',
+	code=[[
+function dirname(path)
+	if not path then
+		return nil
+	end
+	if path == 'A/' then
+		return path
+	end
+	-- remove trailing blah/?
+	dn=string.gsub(path,'[^/]+/*$','')
+	-- invalid, 
+	if dn == '' then
+		return nil
+	end
+	-- remove any trailing /
+	dn = string.gsub(dn,'/*$','')
+	if dn == 'A' then
+		return 'A/'
+	end
+	-- all /, invalid
+	if dn == '' then
+		return nil
+	end
+	return dn
+end
+]],
+},
+--[[
+splitpath_cam from util
+]]
+{
+	name='splitpath',
+	depend={'basename','dirname'},
+	code=[[
+	local parts={}
+function splitpath(path)
+	while true do
+		local part=basename(path)
+		path = dirname(path)
+		table.insert(parts,1,part)
+		if path == 'A/' then
+			table.insert(parts,1,path)
+			return parts
+		end
+		if path == nil then
+			return parts
+		end
+	end
+end
+]],
+},
+--[[
 function to batch stuff in groups of messages
 each batch is sent as a numeric array
 b=msg_batcher{

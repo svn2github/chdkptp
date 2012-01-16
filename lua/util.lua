@@ -15,7 +15,7 @@
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 --]]
 --[[
-common generic lua utilties
+common generic lua utilities
 utilities that depend on the chdkptp api go in chdku
 ]]
 local util={}
@@ -58,7 +58,7 @@ extend_table_r = function(target,source,seen,depth)
 	if depth > util.extend_table_max_depth then
 		error('extend_table: max depth');
 	end
-	-- a source could have refernces to the target, don't want to do that
+	-- a source could have references to the target, don't want to do that
 	seen[target]=true
 	if seen[source] then
 		error('extend_table: cycles');
@@ -256,6 +256,13 @@ function util.unserialize(s)
 	return false,r
 end
 
+function util.dir_sep_chars()
+	if sys.ostype() == 'Windows' then
+		return '\\/'
+	end
+	return '/'
+end
+
 --[[
 similar to unix basename
 ]]
@@ -263,7 +270,46 @@ function util.basename(path,sfx)
 	if not path then
 		return nil
 	end
-	local s,e,bn=string.find(path,'([^\\/]+)[\\/]?$')
+	local drive
+	-- drive is discarded, like leading /
+	drive,path = util.splitdrive(path)
+	local s,e,bn=string.find(path,'([^'..util.dir_sep_chars()..']+)['..util.dir_sep_chars()..']?$')
+	if not s then
+		return nil
+	end
+	if sfx and string.len(sfx) < string.len(bn) then
+		if string.sub(bn,-string.len(sfx)) == sfx then
+			bn=string.sub(bn,1,string.len(bn) - string.len(sfx))
+		end
+	end
+	return bn
+end
+
+function util.splitdrive(path)
+	if sys.ostype() ~= 'Windows' then
+		return '',path
+	end
+	local s,e,drive,rest=string.find(path,'^(%a:)(.*)')
+	if not drive then
+		drive = ''
+		rest = path
+	end
+	if not rest then
+		rest = ''
+	end
+	return drive,rest
+end
+--[[
+note A/=>nil
+]]
+function util.basename_cam(path,sfx)
+	if not path then
+		return nil
+	end
+	if path == 'A/' then
+		return nil
+	end
+	local s,e,bn=string.find(path,'([^/]+)/?$')
 	if not s then
 		return nil
 	end
@@ -276,40 +322,97 @@ function util.basename(path,sfx)
 end
 
 --[[
-similar to unix dirname
-TODO windows drive specs turn into .
+similar to unix dirname, with some workarounds to make it more useful on windows
+UNC paths are not supported
 ]]
 function util.dirname(path)
 	if not path then
 		return nil
 	end
+	local drive=''
+	-- windows - save the drive, if present, and perform dirname on the rest of the path
+	drive,path=util.splitdrive(path)
 	-- remove trailing blah/?
-	dn=string.gsub(path,'[^\\/]+[\\/]*$','')
+	local dn=string.gsub(path,'[^'..util.dir_sep_chars()..']+['..util.dir_sep_chars()..']*$','')
 	if dn == '' then
-		return '.'
+		if drive == '' then
+			return '.'
+		else
+			return drive
+		end
 	end
 	-- remove any trailing /
-	dn = string.gsub(dn,'[\\/]*$','')
+	dn = string.gsub(dn,'['..util.dir_sep_chars()..']*$','')
 	-- all /
 	if dn == '' then
-		return '/'
+		return drive..'/'
+	end
+	return drive..dn
+end
+
+--[[
+dirname variant for camera paths
+note, A/ is ambiguous if used on relative paths, treated specially
+has trailing directory removed, except for A/ (camera functions trailing / on A/ and reject on subdirs) 
+A/ must be uppercase (as required by dryos)
+]]
+function util.dirname_cam(path)
+	if not path then
+		return nil
+	end
+	if path == 'A/' then
+		return path
+	end
+	-- remove trailing blah/?
+	dn=string.gsub(path,'[^/]+/*$','')
+	-- invalid, 
+	if dn == '' then
+		return nil
+	end
+	-- remove any trailing /
+	dn = string.gsub(dn,'/*$','')
+	if dn == 'A' then
+		return 'A/'
+	end
+	-- all /, invalid
+	if dn == '' then
+		return nil
 	end
 	return dn
 end
 
 --[[ 
 add / between components, only if needed.
-accepts \ as an existing separator, even though it's not a separator on camera or *nix
+accepts / or \ as a separator on windows
+TODO joinpath('c:','foo') becomes c:/foo
 ]]
 function util.joinpath(...)
 	local parts={...}
+	-- TODO might be more useful to handle empty/missing parts
 	if #parts < 2 then
 		error('joinpath requires at least 2 parts')
 	end
 	local r=parts[1]
 	for i = 2, #parts do
-		local v = string.gsub(parts[i],'^[\\/]','')
-		if not string.match(r,'[\\/]$') then
+		local v = string.gsub(parts[i],'^['..util.dir_sep_chars()..']','')
+		if not string.match(r,'['..util.dir_sep_chars()..']$') then
+			r=r..'/'
+		end
+		r=r..v
+	end
+	return r
+end
+
+function util.joinpath_cam(...)
+	local parts={...}
+	-- TODO might be more useful to handle empty/missing parts
+	if #parts < 2 then
+		error('joinpath requires at least 2 parts')
+	end
+	local r=parts[1]
+	for i = 2, #parts do
+		local v = string.gsub(parts[i],'^/','')
+		if not string.match(r,'/$') then
 			r=r..'/'
 		end
 		r=r..v
@@ -318,7 +421,8 @@ function util.joinpath(...)
 end
 
 --[[
-split a path into an array of compontents
+split a path into an array of components
+the leading component will may have a /, drive or .
 ]]
 function util.splitpath(path)
 	local parts={}
@@ -326,11 +430,24 @@ function util.splitpath(path)
 		local part=util.basename(path)
 		path = util.dirname(path)
 		table.insert(parts,1,part)
-		if path == '.' or path == '/' then
-			-- TODO windows only case for drive letters (should be handled in dirname)
-			if not (path == '.' and string.find(part,'^%a:$')) then
-				table.insert(parts,1,path)
-			end
+		if path == '.' or path == '/' or (sys.ostype() == 'Windows' and string.match(path,'^%a:/?$')) then
+			table.insert(parts,1,path)
+			return parts
+		end
+	end
+end
+
+function util.splitpath_cam(path)
+	local parts={}
+	while true do
+		local part=util.basename_cam(path)
+		path = util.dirname_cam(path)
+		table.insert(parts,1,part)
+		if path == 'A/' then
+			table.insert(parts,1,path)
+			return parts
+		end
+		if path == nil then
 			return parts
 		end
 	end
