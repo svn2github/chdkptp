@@ -390,7 +390,7 @@ function util.joinpath(...)
 	local parts={...}
 	-- TODO might be more useful to handle empty/missing parts
 	if #parts < 2 then
-		error('joinpath requires at least 2 parts')
+		error('joinpath requires at least 2 parts',2)
 	end
 	local r=parts[1]
 	for i = 2, #parts do
@@ -407,7 +407,7 @@ function util.joinpath_cam(...)
 	local parts={...}
 	-- TODO might be more useful to handle empty/missing parts
 	if #parts < 2 then
-		error('joinpath requires at least 2 parts')
+		error('joinpath requires at least 2 parts',2)
 	end
 	local r=parts[1]
 	for i = 2, #parts do
