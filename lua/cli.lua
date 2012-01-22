@@ -532,17 +532,17 @@ cli:add_commands{
 							return false, 'not a directory: '..dst
 						end
 					end
-					dst = util.joinpath(dst,util.basename(src))
+					dst = fsutil.joinpath(dst,fsutil.basename(src))
 				else
 					if not args.nolua then
 						local st = con:stat(dst)
 						if st and st.is_dir then
-							dst = util.joinpath(dst,util.basename(src))
+							dst = fsutil.joinpath(dst,fsutil.basename(src))
 						end
 					end
 				end
 			else
-				dst = cli:make_camera_path(util.basename(src))
+				dst = cli:make_camera_path(fsutil.basename(src))
 			end
 
 			local msg=string.format("%s->%s\n",src,dst)
@@ -576,19 +576,19 @@ cli:add_commands{
 			local dst = args[2]
 			if not dst then
 				-- no dest, use final component of source path
-				dst = util.basename(src)
+				dst = fsutil.basename(src)
 			elseif string.match(dst,'[\\/]+$') then
 				-- explicit / treat it as a directory
-				dst = util.joinpath(dst,util.basename(src))
+				dst = fsutil.joinpath(dst,fsutil.basename(src))
 				-- and check if it is
-				local dst_dir = util.dirname(dst)
+				local dst_dir = fsutil.dirname(dst)
 				-- TODO should create it
 				if lfs.attributes(dst_dir,'mode') ~= 'directory' then
 					return false,'not a directory: '..dst_dir
 				end
 			elseif lfs.attributes(dst,'mode') == 'directory' then
 				-- if target is a directory download into it
-				dst = util.joinpath(dst,util.basename(src))
+				dst = fsutil.joinpath(dst,fsutil.basename(src))
 			end
 
 			src = cli:make_camera_path(src)

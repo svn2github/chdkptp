@@ -128,7 +128,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	end
 
 	if not dstmode then
-		local status,err=util.mkdir_m(dstpath)
+		local status,err=fsutil.mkdir_m(dstpath)
 		if not status then
 			return false,err
 		end
@@ -144,21 +144,21 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 			if #finfo.path == 2 then
 				relpath = finfo.path[2]
 			else
-				relpath = util.joinpath(unpack(finfo.path,2))
+				relpath = fsutil.joinpath(unpack(finfo.path,2))
 			end
 		end
-		dst=joinpath(dstpath,relpath)
+		dst=fsutil.joinpath(dstpath,relpath)
 		if finfo.st.is_dir then
---			printf('util.mkdir_m(%s)\n',dst)
-			local status,err = util.mkdir_m(dst)
+--			printf('fsutil.mkdir_m(%s)\n',dst)
+			local status,err = fsutil.mkdir_m(dst)
 			if not status then
 				return false,err
 			end
 		else
-			local dst_dir = util.dirname(dst)
+			local dst_dir = fsutil.dirname(dst)
 			if dst_dir ~= '.' then
---				printf('util.mkdir_m(%s)\n',dst_dir)
-				local status,err = util.mkdir_m(dst_dir)
+--				printf('fsutil.mkdir_m(%s)\n',dst_dir)
+				local status,err = fsutil.mkdir_m(dst_dir)
 				if not status then
 					return false,err
 				end
@@ -180,6 +180,17 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	end
 	return true
 end
+
+local function mupload_r(src,dst,opts)
+	
+end
+--[[
+upload files and directories
+status[,err]=con:mupload(srcpaths,dstpath,opts)
+]]
+function con_methods:mupload(srcpaths,dstpath,opts)
+end
+
 --[[
 quick and dirty bulk delete, this may change or go away
 
@@ -194,7 +205,7 @@ function con_methods:deletefiles(dir,pattern)
 	end
 	for i,st in ipairs(files) do
 		if st.is_file then
-			local status,err=self:remove(joinpath(dir,st.name))
+			local status,err=self:remove(fsutil.joinpath(dir,st.name))
 			if not status then
 				return false,err
 			end

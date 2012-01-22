@@ -16,6 +16,7 @@
 ]]
 util=require('util')
 util:import()
+fsutil=require('fsutil')
 chdku=require('chdku')
 cli=require('cli')
 --[[

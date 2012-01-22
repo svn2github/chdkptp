@@ -283,7 +283,7 @@ function do_download_dialog(remotepath)
 		title = "Download "..remotepath, 
 		filter = "*.*", 
 		filterinfo = "all files",
-		file = util.basename(remotepath)
+		file = fsutil.basename(remotepath)
 	} 
 
 -- Shows file dialog in the center of the screen
@@ -334,12 +334,12 @@ function do_upload_dialog(remotepath)
 		end
 	end
 	if #multi == 0 then
-		statusprint("u "..value.."->"..joinpath(remotepath,basename(value)))
-		add_status(con:upload(value,joinpath(remotepath,basename(value))))
+		statusprint("u "..value.."->"..fsutil.joinpath(remotepath,fsutil.basename(value)))
+		add_status(con:upload(value,fsutil.joinpath(remotepath,fsutil.basename(value))))
 	else
 		for i = 2, #multi do
-			statusprint("u "..multi[1] .. '/' .. multi[i].."->"..joinpath(remotepath,multi[i]))
-			add_status(con:upload(multi[1] .. '/' .. multi[i],joinpath(remotepath,multi[i])))
+			statusprint("u "..multi[1] .. '/' .. multi[i].."->"..fsutil.joinpath(remotepath,multi[i]))
+			add_status(con:upload(multi[1] .. '/' .. multi[i],fsutil.joinpath(remotepath,multi[i])))
 		end
 	end
 end

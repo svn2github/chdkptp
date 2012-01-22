@@ -31,6 +31,16 @@ local function tas(cond,msg,level)
 	end
 	error(msg,level)
 end
+
+local function spoof_fsutil_ostype(name)
+	fsutil.ostype = function()
+		return name
+	end
+end
+local function unspoof_fsutil_ostype()
+	fsutil.ostype = sys.ostype
+end
+
 t.argparser = function()
 	local function get_word(val,eword,epos) 
 		local word,pos = cli.argparser:get_word(val)
@@ -53,68 +63,68 @@ t.argparser = function()
 end
 
 t.dirname = function()
-	assert(dirname('/')=='/')
-	assert(dirname('//')=='/')
-	assert(dirname('/a/b/')=='/a')
-	assert(dirname('//a//b//')=='//a')
-	assert(dirname()==nil)
-	assert(dirname('a')=='.')
-	assert(dirname('')=='.')
-	assert(dirname('/a')=='/')
-	assert(dirname('a/b')=='a')
-	-- TODO should spoof ostype, so test runs on all platforms
-	if sys.ostype() == 'Windows' then
-		assert(dirname('c:\\')=='c:/')
-		assert(dirname('c:')=='c:')
-	end
+	assert(fsutil.dirname('/')=='/')
+	assert(fsutil.dirname('//')=='/')
+	assert(fsutil.dirname('/a/b/')=='/a')
+	assert(fsutil.dirname('//a//b//')=='//a')
+	assert(fsutil.dirname()==nil)
+	assert(fsutil.dirname('a')=='.')
+	assert(fsutil.dirname('')=='.')
+	assert(fsutil.dirname('/a')=='/')
+	assert(fsutil.dirname('a/b')=='a')
+
+	spoof_fsutil_ostype('Windows')
+	assert(fsutil.dirname('c:\\')=='c:/')
+	assert(fsutil.dirname('c:')=='c:')
+	unspoof_fsutil_ostype()
 end
 
 t.basename = function()
-	assert(basename('foo/bar')=='bar')
-	assert(basename('foo/bar.txt','.txt')=='bar')
-	assert(basename('bar')=='bar')
-	assert(basename('bar/')=='bar')
-	if sys.ostype() == 'Windows' then
-		assert(basename('c:/')==nil)
-		assert(basename('c:/bar')=='bar')
-	end
+	assert(fsutil.basename('foo/bar')=='bar')
+	assert(fsutil.basename('foo/bar.txt','.txt')=='bar')
+	assert(fsutil.basename('bar')=='bar')
+	assert(fsutil.basename('bar/')=='bar')
+	spoof_fsutil_ostype('Windows')
+	assert(fsutil.basename('c:/')==nil)
+	assert(fsutil.basename('c:/bar')=='bar')
+	unspoof_fsutil_ostype()
 end
 
 t.basename_cam = function()
-	assert(basename_cam('A/')==nil)
-	assert(basename_cam('A/DISKBOOT.BIN')=='DISKBOOT.BIN')
-	assert(basename_cam('bar/')=='bar')
+	assert(fsutil.basename_cam('A/')==nil)
+	assert(fsutil.basename_cam('A/DISKBOOT.BIN')=='DISKBOOT.BIN')
+	assert(fsutil.basename_cam('bar/')=='bar')
 end
 
 t.dirname_cam = function()
-	assert(dirname_cam('A/')=='A/')
-	assert(dirname_cam('A/DISKBOOT.BIN')=='A/')
-	assert(dirname_cam('bar/')==nil)
-	assert(dirname_cam('A/CHDK/SCRIPTS')=='A/CHDK')
+	assert(fsutil.dirname_cam('A/')=='A/')
+	assert(fsutil.dirname_cam('A/DISKBOOT.BIN')=='A/')
+	assert(fsutil.dirname_cam('bar/')==nil)
+	assert(fsutil.dirname_cam('A/CHDK/SCRIPTS')=='A/CHDK')
 end
 
 t.splitjoin_cam = function()
-	assert(joinpath(unpack(splitpath_cam('A/FOO'))) == 'A/FOO')
-	assert(joinpath(unpack(splitpath_cam('foo/bar/mod'))) == 'foo/bar/mod')
+	assert(fsutil.joinpath(unpack(fsutil.splitpath_cam('A/FOO'))) == 'A/FOO')
+	assert(fsutil.joinpath(unpack(fsutil.splitpath_cam('foo/bar/mod'))) == 'foo/bar/mod')
 end
 
 t.joinpath = function()
-	assert(joinpath('/foo','bar')=='/foo/bar')
-	assert(joinpath('/foo/','bar')=='/foo/bar')
-	assert(joinpath('/foo/','/bar')=='/foo/bar')
-	assert(joinpath('/foo/','bar','/mod')=='/foo/bar/mod')
-	if sys.ostype() == 'Windows' then
-		assert(joinpath('/foo\\','/bar')=='/foo\\bar')
-	end
+	assert(fsutil.joinpath('/foo','bar')=='/foo/bar')
+	assert(fsutil.joinpath('/foo/','bar')=='/foo/bar')
+	assert(fsutil.joinpath('/foo/','/bar')=='/foo/bar')
+	assert(fsutil.joinpath('/foo/','bar','/mod')=='/foo/bar/mod')
+	spoof_fsutil_ostype('Windows')
+	assert(fsutil.joinpath('/foo\\','/bar')=='/foo\\bar')
+	unspoof_fsutil_ostype()
 end
 
 t.fsmisc = function()
-	if sys.ostype() == 'Windows' then
-		assert(joinpath(unpack(splitpath('d:/foo/bar/mod'))) == 'd:/foo/bar/mod')
-		-- assert(joinpath(unpack(splitpath('d:foo/bar/mod'))) == 'd:foo/bar/mod')
-	end
-	assert(joinpath(unpack(splitpath('/foo/bar/mod'))) == '/foo/bar/mod')
-	assert(joinpath(unpack(splitpath('foo/bar/mod'))) == './foo/bar/mod')
+	spoof_fsutil_ostype('Windows')
+	assert(fsutil.joinpath(unpack(fsutil.splitpath('d:/foo/bar/mod'))) == 'd:/foo/bar/mod')
+	-- assert(fsutil.joinpath(unpack(fsutil.splitpath('d:foo/bar/mod'))) == 'd:foo/bar/mod')
+	unspoof_fsutil_ostype()
+	assert(fsutil.joinpath(unpack(fsutil.splitpath('/foo/bar/mod'))) == '/foo/bar/mod')
+	assert(fsutil.joinpath(unpack(fsutil.splitpath('foo/bar/mod'))) == './foo/bar/mod')
 end
 
 function m:run(name)
