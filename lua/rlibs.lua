@@ -516,7 +516,9 @@ function fs_iter:recurse()
 		return false
 	end
 	table.insert(self.rpath,self.cur.path[#self.cur.path])
+	local save_cur = self.cur
 	local status,err = self:singledir()
+	self.cur = save_cur
 	table.remove(self.rpath)
 	return status,err
 end
