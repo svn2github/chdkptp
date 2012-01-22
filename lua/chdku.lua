@@ -1,6 +1,4 @@
 --[[
-lua helper functions for working with the chdk.* c api
-
  Copyright (C) 2010-2011 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -15,7 +13,11 @@ lua helper functions for working with the chdk.* c api
   along with this program; if not, write to the Free Software
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
---]]
+]]
+--[[
+lua helper functions for working with the chdk.* c api
+]]
+
 local chdku={}
 -- format a script message in a human readable way
 function chdku.format_script_msg(msg)
@@ -330,7 +332,7 @@ join a path with / as needed
 function joinpath(...)
 	local parts={...}
 	if #parts < 2 then
-		error('joinpath requires at least 2 parts')
+		error('joinpath requires at least 2 parts',2)
 	end
 	local r=parts[1]
 	for i = 2, #parts do
@@ -494,31 +496,32 @@ end
 ]],
 },
 --[[
-object to aid interating over directories
+object to aid interating over files and directories
 di=dir_iter.new{
 	callback=function(di)
 	listall=bool -- pass to os.listdir; currently broken, stat on . or .. fails
 	-- users may add their own methods or members
 }
-status,err=di:run(dir)
+status,err=di:run(paths)
 
 callback must return true to continue processing, or false optionally followed by an error message on error
 the following are available to callback
 di.cur={
 	st=<stat information>
-	full=<full path and filename>
-	dir=<directory part>
+	full=<full path and filename as string>
+	path=<array of initial path, path components recursed into, name>
 	name=<basename>
 }
-di.path an array of path elements representing the directories recursed into
-	di.path[1] is always the initial path passed to run(), no matter how many subdirectories deep it is
-di:depth() depth of recursion, initial directory is 1
+in the case of the root directory full='A/' and name='A/'
+di.rpath an array of path elements representing the directories recursed into
+
+di:depth() depth of recursion, 0 for initial paths
 di:can_recurse() to check if the current items is valid to recurse into
 di:recurse() to recurse into a directory
 ]]
 {
 	name='dir_iter',
-	depend={'serialize_msgs','joinpath','mt_inherit','extend_table'},
+	depend={'serialize_msgs','joinpath','dirname','basename','mt_inherit','extend_table'},
 	code=[[
 dir_iter={}
 function dir_iter.new(t)
@@ -530,7 +533,7 @@ function dir_iter.new(t)
 end
 
 function dir_iter:depth()
-	return #self.path
+	return #self.rpath
 end
 
 function dir_iter:can_recurse()
@@ -544,30 +547,40 @@ function dir_iter:recurse()
 	if not self:can_recurse() then
 		return false
 	end
-	table.insert(self.path,self.cur.name)
-	local save_cur = self.cur
-	local save_curdir = self.cur_dir
-	self.cur_dir = joinpath(self.cur_dir,self.cur.name)
+	table.insert(self.rpath,self.cur.path[#self.cur.path])
 	local status,err = self:singledir()
-	self.cur_dir = save_curdir
-	self.cur = save_cur
-	table.remove(self.path)
+	table.remove(self.rpath)
 	return status,err
 end
 
+function dir_iter:singleitem(path)
+	local st,err=os.stat(path)
+	if not st then
+		return false,err
+	end
+	self.cur={st=st,full=path}
+	if path == 'A/' then
+		self.cur.name = 'A/'
+	else
+		self.cur.name = basename(path)
+	end
+	if #self.rpath == 0 then
+		self.cur.path = {path}
+	else
+		self.cur.path = {unpack(self.rpath)}
+		table.insert(self.cur.path,self.cur.name)
+	end
+	return self:callback()
+end
+
 function dir_iter:singledir()
-	local t,err=os.listdir(self.cur_dir,self.listall)
+	local cur_dir = self.cur.full
+	local t,err=os.listdir(cur_dir,self.listall)
 	if not t then
 		return false,err
 	end
 	for i,name in ipairs(t) do
-		self.cur={name=name,dir=self.cur_dir,full=joinpath(self.cur_dir,name)}
-		local st,err = os.stat(self.cur.full)
-		if not st then
-			return false,err
-		end
-		self.cur.st = st
-		local status, err = self:callback()
+		local status, err = self:singleitem(joinpath(cur_dir,name))
 		if not status then
 			return false,err
 		end
@@ -575,34 +588,32 @@ function dir_iter:singledir()
 	return true
 end
 
-function dir_iter:run(dir)
-	self.path={dir}
-	self.cur_dir=dir
-	self.cur={}
-	local st,err=os.stat(dir)
-	if not st then
-		return false,err
+function dir_iter:run(paths)
+	for i,path in ipairs(paths) do
+		self.rpath={}
+		local status,err=self:singleitem(path)
+		if not status then
+			return false,err
+		end
 	end
-	if not st.is_dir then
-		return false,"not a directory"
-	end
-	return self:singledir()
+	return true
 end
 ]],
 },
 --[[
 process directory tree with matching
-status,err = find_files(dir,opts,func)
+status,err = find_files(paths,opts,func)
+paths=<array of paths to process>
 opts={
 	fmatch='<pattern>', -- match on names of files, default any
 	dmatch='<pattern>', -- match on names of directories, default any 
 	rmatch='<pattern>', -- recurse into directories matching, default any 
 	dirs=true, -- pass directories to func. otherwise only files sent to func, but dirs are still recursed
 	dirsfirst=false, -- process directories before contained files
-	maxdepth=100, -- maxium number of directories to recurse into. 1 = only initial dir
-	martians=bool -- return non-file, not directory items (vol label,???) default false
+	maxdepth=100, -- maxium depth of directories to recurse into, 0=just process paths passed in, don't recurse
+	martians=bool -- process non-file, not directory items (vol label,???) default false
 }
-func defaults to batching the file names
+func defaults to batching the full path of each file
 unless dirsfirst is set, directories will be recursed into before calling func on the containing directory
 TODO
 match on stat fields (newer, older etc)
@@ -612,17 +623,17 @@ match by path components e.g. /foo[ab]/bar/.*%.lua
 	depend={'dir_iter','msg_batcher','extend_table'},
 	name='find_files',
 	code=[[
-function find_files_full_fn(di,opts,func)
+function find_files_all_fn(di,opts)
+	return di:ff_bwrite(di.cur)
+end
+
+function find_files_fullname_fn(di,opts)
 	return di:ff_bwrite(di.cur.full)
 end
 
-function find_files_stat_fn(di,opts,func)
-	return di:ff_bwrite(extend_table({path=di.cur.full},di.cur.st))
-end
-
-function find_files(path,opts,func)
+function find_files(paths,opts,func)
 	if not func then
-		func=find_files_default_fn
+		func=find_files_fullname_fn
 	end
 	opts=extend_table({
 		dirs=true,
@@ -687,7 +698,7 @@ function find_files(path,opts,func)
 			return true
 		end
 	})
-	local status,err = d:run(path)
+	local status,err = d:run(paths)
 	if not status then
 		return false,err
 	end
@@ -706,23 +717,14 @@ camera side support for mdownload
 	name='ff_mdownload',
 	code=[[
 function ff_mdownload_fn(self,opts)
-	local r={}
-	r.st = self.cur.st
-	if #self.path == 1 then
-		r.relname = self.cur.name
-	else
-		if #self.path == 2 then
-			r.relname =  self.path[2]
-		elseif #self.path > 2 then
-			r.relname = joinpath(unpack(self.path,2))
-		end
-		r.relname = joinpath(r.relname,self.cur.name)
+	if #self.rpath == 0 and self.cur.st.is_dir then
+		return true
 	end
-	return self:ff_bwrite(r)
+	return self:ff_bwrite(self.cur)
 end
 
-function ff_mdownload(dir,opts)
-	return find_files(dir,opts,ff_mdownload_fn)
+function ff_mdownload(paths,opts)
+	return find_files(paths,opts,ff_mdownload_fn)
 end
 ]],
 },
@@ -930,27 +932,28 @@ end
 
 --[[
 download files and directories
-status[,err]=con:mdownload(srcpath,dstpath,opts)
+status[,err]=con:mdownload(srcpaths,dstpath,opts)
 opts are passed to find_files
 ]]
-function con_methods:mdownload(srcpath,dstpath,opts)
+function con_methods:mdownload(srcpaths,dstpath,opts)
 	if not dstpath then
 		dstpath = '.'
 	end
 	opts=extend_table({},opts)
 	opts.dirsfirst=true
-	if lfs.attributes(dstpath,'mode') ~= 'directory' then
-		local status,err = util.mkdir_m(dstpath)
-		if not status then
-			return false,err
-		end
+	local dstmode = lfs.attributes(dstpath,'mode')
+	if dstmode and dstmode ~= 'directory' then
+		return false,'mdownload: dest must be a directory'
 	end
 	local files={}
-	local status,err = self:execwait('ff_mdownload("'..srcpath..'",'..serialize(opts)..')',
+	local status,rstatus,rerr = self:execwait('return ff_mdownload('..serialize(srcpaths)..','..serialize(opts)..')',
 										{libs={'ff_mdownload'},msgs=chdku.msg_unbatcher(files)})
 
 	if not status then
-		return false,err
+		return false,rstatus
+	end
+	if not rstatus then
+		return false,rerr
 	end
 
 	if #files == 0 then
@@ -958,29 +961,55 @@ function con_methods:mdownload(srcpath,dstpath,opts)
 		return true
 	end
 
+	if not dstmode then
+		local status,err=util.mkdir_m(dstpath)
+		if not status then
+			return false,err
+		end
+	end
+
 	for i,finfo in ipairs(files) do
+		local relpath
+		local src,dst
+		src = finfo.full
+		if #finfo.path == 1 then
+			relpath = finfo.name
+		else
+			if #finfo.path == 2 then
+				relpath = finfo.path[2]
+			else
+				relpath = util.joinpath(unpack(finfo.path,2))
+			end
+		end
+		dst=joinpath(dstpath,relpath)
 		if finfo.st.is_dir then
---			printf('util.mkdir_m(%s)\n',joinpath(dstpath,finfo.relname))
-			local status,err = util.mkdir_m(joinpath(dstpath,finfo.relname))
+--			printf('util.mkdir_m(%s)\n',dst)
+			local status,err = util.mkdir_m(dst)
 			if not status then
 				return false,err
 			end
 		else
-			local dst_dir = util.dirname(finfo.relname)
+			local dst_dir = util.dirname(dst)
 			if dst_dir ~= '.' then
---				printf('util.mkdir_m(%s)\n',util.joinpath(dstpath,dst_dir))
-				local status,err = util.mkdir_m(util.joinpath(dstpath,dst_dir))
+--				printf('util.mkdir_m(%s)\n',dst_dir)
+				local status,err = util.mkdir_m(dst_dir)
 				if not status then
 					return false,err
 				end
 			end
-			src = joinpath(srcpath,finfo.relname)
-			dst = joinpath(dstpath,finfo.relname)
 			printf("%s->%s\n",src,dst);
-			local status,err = self:download(src,dst)
-			if not status then
-				return status,err
+			-- ptp download fails on zero byte files (zero size data phase, possibly other problems)
+			if finfo.st.size > 0 then
+				-- TODO check newer/older etc
+				local status,err = self:download(src,dst)
+				if not status then
+					return status,err
+				end
+			else
+				local f,err=io.open(dst,"wb")
+				f:close()
 			end
+			-- TODO optionally set timestamps (need to translate)
 		end
 	end
 	return true
