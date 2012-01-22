@@ -612,7 +612,8 @@ opts={
 	dirs=true, -- pass directories to func. otherwise only files sent to func, but dirs are still recursed
 	dirsfirst=false, -- process directories before contained files
 	maxdepth=100, -- maxium depth of directories to recurse into, 0=just process paths passed in, don't recurse
-	martians=bool -- process non-file, not directory items (vol label,???) default false
+	martians=bool, -- process non-file, not directory items (vol label,???) default false
+	batchsize=20, -- passed to msg_batcher, if used
 }
 func defaults to batching the full path of each file
 unless dirsfirst is set, directories will be recursed into before calling func on the containing directory
