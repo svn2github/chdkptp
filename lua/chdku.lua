@@ -497,53 +497,47 @@ end
 },
 --[[
 object to aid interating over files and directories
-di=dir_iter.new{
-	callback=function(di)
+status,err=fs_iter.run({paths},opts)
+opts={
+	callback=function(self)
+	end_callback=function(self,status,msg)
 	listall=bool -- pass to os.listdir; currently broken, stat on . or .. fails
 	-- users may add their own methods or members
-}
-status,err=di:run(paths)
-
-callback must return true to continue processing, or false optionally followed by an error message on error
+})
+self in callbacks is the fs_iter object, merged with opts
+callback is called on each file/directory 
+must return true to continue processing, or false optionally followed by an error message on error
 the following are available to callback
-di.cur={
+self.cur={
 	st=<stat information>
 	full=<full path and filename as string>
-	path=<array of initial path, path components recursed into, name>
+	path=<array of {initial path, path components recursed into,..., name}>
 	name=<basename>
 }
 in the case of the root directory full='A/' and name='A/'
-di.rpath an array of path elements representing the directories recursed into
-
-di:depth() depth of recursion, 0 for initial paths
-di:can_recurse() to check if the current items is valid to recurse into
-di:recurse() to recurse into a directory
+self.rpath an array of path elements representing the directories recursed into
+self:depth() depth of recursion, 0 for initial paths
+self:can_recurse() to check if the current items is valid to recurse into
+self:recurse() to recurse into a directory
 ]]
 {
-	name='dir_iter',
-	depend={'serialize_msgs','joinpath','dirname','basename','mt_inherit','extend_table'},
+	name='fs_iter',
+	depend={'serialize_msgs','joinpath','basename','mt_inherit','extend_table'},
 	code=[[
-dir_iter={}
-function dir_iter.new(t)
-	if not t then
-		t={}
-	end
-	mt_inherit(t,dir_iter)
-	return t
-end
+fs_iter={}
 
-function dir_iter:depth()
+function fs_iter:depth()
 	return #self.rpath
 end
 
-function dir_iter:can_recurse()
+function fs_iter:can_recurse()
 	if not self.cur.st.is_dir or self.cur.name == '.' or self.cur.name == '..' then
 		return false
 	end
 	return true
 end
 
-function dir_iter:recurse()
+function fs_iter:recurse()
 	if not self:can_recurse() then
 		return false
 	end
@@ -553,7 +547,7 @@ function dir_iter:recurse()
 	return status,err
 end
 
-function dir_iter:singleitem(path)
+function fs_iter:singleitem(path)
 	local st,err=os.stat(path)
 	if not st then
 		return false,err
@@ -573,7 +567,7 @@ function dir_iter:singleitem(path)
 	return self:callback()
 end
 
-function dir_iter:singledir()
+function fs_iter:singledir()
 	local cur_dir = self.cur.full
 	local t,err=os.listdir(cur_dir,self.listall)
 	if not t then
@@ -588,15 +582,22 @@ function dir_iter:singledir()
 	return true
 end
 
-function dir_iter:run(paths)
+function fs_iter:end_callback(status,msg)
+	return status,msg
+end
+
+function fs_iter.run(paths,opts)
+	local t=extend_table({},opts)
+	mt_inherit(t,fs_iter)
+
 	for i,path in ipairs(paths) do
-		self.rpath={}
-		local status,err=self:singleitem(path)
+		t.rpath={}
+		local status,err=t:singleitem(path)
 		if not status then
-			return false,err
+			return t:end_callback(false,err)
 		end
 	end
-	return true
+	return t:end_callback(true)
 end
 ]],
 },
@@ -620,7 +621,7 @@ match on stat fields (newer, older etc)
 match by path components e.g. /foo[ab]/bar/.*%.lua
 ]]
 {
-	depend={'dir_iter','msg_batcher','extend_table'},
+	depend={'fs_iter','msg_batcher','extend_table'},
 	name='find_files',
 	code=[[
 function find_files_all_fn(di,opts)
@@ -639,9 +640,10 @@ function find_files(paths,opts,func)
 		dirs=true,
 		dirsfirst=false,
 		maxdepth=100,
+		batchsize=20,
 	},opts)
 
-	local d=dir_iter.new({
+	return fs_iter.run(paths,{
 		ff_check_match=function(self,opts)
 			if self.cur.st.is_file then
 				return not opts.fmatch or string.match(self.cur.name,opts.fmatch)
@@ -656,9 +658,15 @@ function find_files(paths,opts,func)
 		end,
 		ff_bwrite=function(self,data)
 			if not self.ff_batcher then
-				self.ff_batcher = msg_batcher()
+				self.ff_batcher = msg_batcher({batchsize=opts.batchsize})
 			end
 			return self.ff_batcher:write(data)
+		end,
+		ff_bflush=function(self)
+			if not self.ff_batcher then
+				return true
+			end
+			return self.ff_batcher:flush()
 		end,
 		ff_func=func,
 		ff_item=function(self,opts)
@@ -696,16 +704,15 @@ function find_files(paths,opts,func)
 				end
 			end
 			return true
+		end,
+		end_callback=function(self,status,err)
+			if not status then
+				self:ff_bflush()
+				return false,err
+			end
+			return self:ff_bflush()
 		end
 	})
-	local status,err = d:run(paths)
-	if not status then
-		return false,err
-	end
-	if d.ff_batcher then
-		return d.ff_batcher:flush()
-	end
-	return true
 end
 ]],
 },
