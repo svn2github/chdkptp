@@ -749,6 +749,21 @@ cli:add_commands{
 		end,
 	},
 	{
+		names={'mkdir'},
+		help='create directories on camera',
+		arghelp="<directory>",
+		args=argparser.create{ },
+		help_detail=[[
+ <directory> directory to create. Intermediate directories will be created as needed
+]],
+		func=function(self,args)
+			if #args ~= 1 then
+				return false,'expected exactly one arg'
+			end
+			return con:mkdir_m(fsutil.make_camera_path(args[1]))
+		end
+	},
+	{
 		names={'version','ver'},
 		help='print API versions',
 		func=function(self,args) 

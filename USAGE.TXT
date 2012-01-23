@@ -117,6 +117,9 @@ delete (rm)  [options] <target, target,...>: - delete file/directories from the 
    -skip_topdirs     don't delete directories given in command line, only contents
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 
+mkdir        <directory> : - create directories on camera
+ <directory> directory to create. Intermediate directories will be created as needed
+
 version (ver)             : - print API versions
 connect (c)  [-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] : - connect to device
  If no options are given, connects to the first available device.
