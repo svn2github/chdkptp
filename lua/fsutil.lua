@@ -222,6 +222,9 @@ function fsutil.splitpath_cam(path)
 	end
 end
 
+--[[
+ensure path starts with A/, replace \ with / 
+]]
 function fsutil.make_camera_path(path)
 	if not path then
 		return 'A/'
