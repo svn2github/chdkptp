@@ -264,23 +264,6 @@ function cli:run()
 	end
 end
 
--- add/correct A/ as needed, replace \ with /
-function cli:make_camera_path(path)
-	if not path then
-		return 'A/'
-	end
-	-- fix slashes
-	path = string.gsub(path,'\\','/')
-	local pfx = string.sub(path,1,2)
-	if pfx == 'A/' then
-		return path
-	end
-	if pfx == 'a/' then
-		return 'A' .. string.sub(path,2,-1)
-	end
-	return 'A/' .. path
-end
-
 cli:add_commands{
 	{
 		names={'help','h'},
@@ -519,7 +502,7 @@ cli:add_commands{
 			local dst = args[2]
 			-- no dst, use filename of source
 			if dst then
-				dst = cli:make_camera_path(dst)
+				dst = fsutil.make_camera_path(dst)
 				if string.find(dst,'[\\/]$') then
 					-- trailing slash, append filename of source
 					dst = string.sub(dst,1,-2)
@@ -542,7 +525,7 @@ cli:add_commands{
 					end
 				end
 			else
-				dst = cli:make_camera_path(fsutil.basename(src))
+				dst = fsutil.make_camera_path(fsutil.basename(src))
 			end
 
 			local msg=string.format("%s->%s\n",src,dst)
@@ -591,7 +574,7 @@ cli:add_commands{
 				dst = fsutil.joinpath(dst,fsutil.basename(src))
 			end
 
-			src = cli:make_camera_path(src)
+			src = fsutil.make_camera_path(src)
 			if not args.nolua then
 				local src_st,err = con:stat(src)
 				if not src_st then
@@ -733,7 +716,7 @@ cli:add_commands{
 		func=function(self,args) 
 			local listops
 			local path=args[1]
-			path = cli:make_camera_path(path)
+			path = fsutil.make_camera_path(path)
 			if args.l then
 				listopts = { stat='*' }
 			else
@@ -780,7 +763,7 @@ cli:add_commands{
 		func=function(self,args) 
 			local bootfile=args[1]
 			if bootfile then
-				bootfile = cli:make_camera_path(bootfile)
+				bootfile = fsutil.make_camera_path(bootfile)
 				bootfile = string.format("'%s'",bootfile)
 			else
 				bootfile = ''

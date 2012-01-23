@@ -221,6 +221,23 @@ function fsutil.splitpath_cam(path)
 		end
 	end
 end
+
+function fsutil.make_camera_path(path)
+	if not path then
+		return 'A/'
+	end
+	-- fix slashes
+	path = string.gsub(path,'\\','/')
+	local pfx = string.sub(path,1,2)
+	if pfx == 'A/' then
+		return path
+	end
+	if pfx == 'a/' then
+		return 'A' .. string.sub(path,2,-1)
+	end
+	return 'A/' .. path
+end
+
 --[[
 make multiple subdirectories
 ]]
