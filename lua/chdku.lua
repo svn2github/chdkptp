@@ -184,6 +184,8 @@ end
 --[[
 upload files and directories
 status[,err]=con:mupload(srcpaths,dstpath,opts)
+opts are as for find_files, plus
+	pretend: just print what would be done
 ]]
 local function mupload_fn(self,opts)
 	local con=opts.con
@@ -258,27 +260,23 @@ function con_methods:mupload(srcpaths,dstpath,opts)
 end
 
 --[[
-quick and dirty bulk delete, this may change or go away
-
-delete files from directory, optionally matching pattern
-note directory should not end in a /, unless it is A/
-only *files* will be deleted, directories will not be touched
+delete files and directories
+opts are as for find_files, plus
+	pretend:only return file name and action, don't delete
+	skip_topdirs: top level directories passed in paths will not be removed 
+		e.g. mdelete({'A/FOO'},{skip_topdirs=true}) will delete everything in FOO, but not foo itself
+	ignore_errors: ignore failed deletes
 ]]
-function con_methods:deletefiles(dir,pattern)
-	local files,err=self:listdir(dir,{stat="*",match=pattern})
-	if not files then
-		return false, err
+function con_methods:mdelete(paths,opts)
+	opts=extend_table({},opts)
+	opts.dirsfirst=false -- delete directories only after recursing into
+	local results={}
+	local status,err = self:call_remote('ff_mdelete',{libs={'ff_mdelete'},msgs=chdku.msg_unbatcher(results)},paths,opts)
+
+	if not status then
+		return false,err
 	end
-	for i,st in ipairs(files) do
-		if st.is_file then
-			local status,err=self:remove(fsutil.joinpath(dir,st.name))
-			if not status then
-				return false,err
-			end
---			print('del '..st.name)
-		end
-	end
-	return true
+	return results
 end
 
 --[[

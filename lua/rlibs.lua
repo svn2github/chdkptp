@@ -747,6 +747,35 @@ end
 ]],
 },
 --[[
+camera side support for mdelete
+]]
+{
+	depend={'find_files'},
+	name='ff_mdelete',
+	code=[[
+function ff_mdelete_fn(self,opts)
+	local status,msg
+	if self.cur.full == 'A/' or (opts.skip_topdirs and self.cur.st.is_dir == true and #self.rpath == 0) then
+		return self:ff_bwrite({file=self.cur.full,status=true,msg='skipped'})
+	end
+	if not opts.pretend then
+		status,msg=os.remove(self.cur.full)
+		if not status and not opts.ignore_errors then
+			self:ff_bwrite({file=self.cur.full,status=status,msg=msg})
+			return false, msg
+		end
+	else
+		status=true
+	end
+	return self:ff_bwrite({file=self.cur.full,status=status,msg=msg})
+end
+
+function ff_mdelete(paths,opts)
+	return find_files(paths,opts,ff_mdelete_fn)
+end
+]],
+},
+--[[
 TODO rework this to a general iterate over directory function
 sends file listing as serialized tables with write_usb_msg
 returns true, or false,error message
