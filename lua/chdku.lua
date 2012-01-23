@@ -181,14 +181,80 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	return true
 end
 
-local function mupload_r(src,dst,opts)
-	
-end
 --[[
 upload files and directories
 status[,err]=con:mupload(srcpaths,dstpath,opts)
 ]]
+local function mupload_fn(self,opts)
+	local con=opts.con
+	if #self.rpath == 0 and self.cur.st.mode == 'directory' then
+		return true
+	end
+	if self.cur.name == '.' or self.cur.name == '..' then
+		return true
+	end
+	local relpath
+	local src=self.cur.full
+	if #self.cur.path == 1 then
+		relpath = self.cur.name
+	else
+		if #self.cur.path == 2 then
+			relpath = self.cur.path[2]
+		else
+			relpath = fsutil.joinpath(unpack(self.cur.path,2))
+		end
+	end
+	local dst=fsutil.joinpath_cam(opts.mu_dst,relpath)
+	if self.cur.st.mode == 'directory' then
+		if opts.pretend then
+			printf('remote mkdir_m(%s)\n',dst)
+		else
+			local status,err=con:mkdir_m(dst)
+			if not status then
+				return false,err
+			end
+		end
+	else
+		-- TODO this means we stat a directory once per file uploaded to it
+		-- could cache, or do all the dirs first
+		local dst_dir=fsutil.dirname_cam(dst)
+		local st,err=con:stat(dst_dir)
+		if st then
+			if not st.is_dir then
+				return false, 'not a directory: '..dst_dir
+			end
+		else
+			if opts.pretend then
+				printf('remote mkdir_m(%s)\n',dst_dir)
+			else
+				local status,err=con:mkdir_m(dst_dir)
+				if not status then
+					return false,err
+				end
+			end
+		end
+		st,err=con:stat(dst)
+		if st and not st.is_file then
+			return false, 'not a file: '..dst
+		end
+		-- TODO timestamp comparison
+		printf('%s->%s\n',src,dst)
+		if not opts.pretend then
+			local status,err = con:upload(src,dst)
+			if not status then
+				return false,err
+			end
+		end
+	end
+	return true
+end
+
 function con_methods:mupload(srcpaths,dstpath,opts)
+	opts = util.extend_table({},opts)
+	opts.dirsfirst=true
+	opts.mu_dst=dstpath
+	opts.con=self
+	return fsutil.find_files(srcpaths,opts,mupload_fn)
 end
 
 --[[
@@ -220,7 +286,7 @@ wrapper for remote functions, serialize args, combine remote and local error sta
 func must be a string that evaluates to a function on the camera
 returns remote function return values on success, false + message on failure
 ]]
-function con_methods:call_remote(func,...)
+function con_methods:call_remote(func,opts,...)
 	local args = {...}
 	local argstrs = {}
 	-- preserve nils between values (not trailing ones but shouldn't matter in most cases)
@@ -230,7 +296,7 @@ function con_methods:call_remote(func,...)
 
 	local code = "return "..func.."("..table.concat(argstrs,',')..")"
 --	printf("%s\n",code)
-	local results = {self:execwait(code)}
+	local results = {self:execwait(code,opts)}
 	-- if local status is good, return remote
 	if results[1] then
 		-- start at 2 to discard local status
@@ -241,17 +307,20 @@ function con_methods:call_remote(func,...)
 end
 
 function con_methods:stat(path)
-	return self:call_remote('os.stat',path)
+	return self:call_remote('os.stat',nil,path)
 end
 
 function con_methods:mdkir(path)
-	return self:call_remote('os.mkdir',path)
+	return self:call_remote('os.mkdir',nil,path)
 end
 
 function con_methods:remove(path)
-	return self:call_remote('os.remove',path)
+	return self:call_remote('os.remove',nil,path)
 end
 
+function con_methods:mkdir_m(path)
+	return self:call_remote('mkdir_m',{libs='mkdir_m'},path)
+end
 
 --[[
 sort an array of stat+name by directory status, name

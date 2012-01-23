@@ -250,4 +250,182 @@ function fsutil.mkdir_m(path)
 	return true
 end
 
+--[[
+iterate over files/directories, borrowed from rlib
+TODO there's probably better ways to do this
+]]
+local fs_iter={}
+
+function fs_iter:depth()
+	return #self.rpath
+end
+
+function fs_iter:can_recurse()
+	if self.cur.st.mode ~= 'directory' or self.cur.name == '..' then
+		return false
+	end
+	-- need to be able to recurse into . if it's the initial directory
+	if #self.rpath ~= 0 and self.cur.name == '.' then
+		return false
+	end
+	return true
+end
+
+function fs_iter:recurse()
+	if not self:can_recurse() then
+		return false
+	end
+	table.insert(self.rpath,self.cur.path[#self.cur.path])
+	local save_cur = self.cur
+	local status,err = self:singledir()
+	self.cur = save_cur
+	table.remove(self.rpath)
+	return status,err
+end
+
+function fs_iter:singleitem(path)
+	local st,err=lfs.attributes(path)
+	if not st then
+		return false,err
+	end
+	self.cur={st=st,full=path,name=fsutil.basename(path)}
+	-- root directory (or bare drive on win) returns nil
+	if not self.cur.name then
+		self.cur.name = path
+	end
+
+	if #self.rpath == 0 then
+		self.cur.path = {path}
+	else
+		self.cur.path = {unpack(self.rpath)}
+		table.insert(self.cur.path,self.cur.name)
+	end
+	return self:callback()
+end
+
+function fs_iter:singledir()
+	local cur_dir = self.cur.full
+	for name in lfs.dir(cur_dir) do
+		local status, err = self:singleitem(fsutil.joinpath(cur_dir,name))
+		if not status then
+			return false,err
+		end
+	end
+	return true
+end
+
+function fs_iter:end_callback(status,msg)
+	return status,msg
+end
+
+function fs_iter.run(paths,opts)
+	local t=extend_table({},opts)
+	util.mt_inherit(t,fs_iter)
+
+	for i,path in ipairs(paths) do
+		t.rpath={}
+		local status,err=t:singleitem(path)
+		if not status then
+			return t:end_callback(false,err)
+		end
+	end
+	return t:end_callback(true)
+end
+
+fsutil.fs_iter = fs_iter
+
+function fsutil.find_files_all_fn(self,opts)
+	self:ff_store(self.cur)
+	return true
+end
+
+function fsutil.find_files_fullname_fn(self,opts)
+	--print(di.cur.full)
+	self:ff_store(self.cur.full)
+	return true
+end
+
+function fsutil.find_files(paths,opts,func)
+	if not func then
+		func=fsutil.find_files_fullname_fn
+	end
+	opts=util.extend_table({
+		dirs=true,
+		dirsfirst=false,
+		maxdepth=100,
+	},opts)
+
+	-- optional place to store callback data
+	local results
+
+	return fs_iter.run(paths,{
+		ff_check_match=function(self,opts)
+			if self.cur.st.mode == 'file' then
+				return not opts.fmatch or string.match(self.cur.name,opts.fmatch)
+			end
+			if self.cur.st.mode == 'directory' then
+				return not opts.dmatch or string.match(self.cur.name,opts.dmatch)
+			end
+			if opts.martians then
+				return true
+			end
+			return false
+		end,
+		ff_func=func,
+		ff_item=function(self,opts)
+			if not self:ff_check_match(opts) then
+				return true
+			end
+			return self:ff_func(opts)
+		end,
+		ff_store=function(self,data)
+			if not results then
+				results={data}
+			else
+				table.insert(results,data)
+			end
+			return true
+		end,
+		callback=function(self)
+			if self.cur.st.mode == 'directory' then
+				if opts.dirs and opts.dirsfirst then
+					local status,err = self:ff_item(opts)
+					if not status then
+						return false,err
+					end
+				end
+				if self:depth() < opts.maxdepth and self:can_recurse() then
+					if not opts.rmatch or string.match(self.cur.name,opts.rmatch) then
+						local status,err = self:recurse()
+						if not status then
+							return false,err
+						end
+					end
+				end
+				if opts.dirs and not opts.dirsfirst then
+					local status,err = self:ff_item(opts)
+					if not status then
+						return false,err
+					end
+				end
+			else
+				local status,err = self:ff_item(opts)
+				if not status then
+					return false,err
+				end
+			end
+			return true
+		end,
+		end_callback=function(self,status,msg)
+			if not status then
+				return false,msg
+			end
+			if results then
+				return results
+			end
+			return true
+		end
+	})
+end
+
 return fsutil

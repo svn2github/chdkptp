@@ -321,7 +321,7 @@ end
 ]],
 },
 --[[
-basename_cam from util
+basename_cam from fsutil
 ]]
 {
 	name='basename',
@@ -347,7 +347,7 @@ end
 ]],
 },
 --[[
-dirname_cam from util
+dirname_cam from fsutil
 note A/ is ambiguous
 ]]
 {
@@ -400,6 +400,40 @@ function splitpath(path)
 			return parts
 		end
 	end
+end
+]],
+},
+--[[
+make multiple levels of directories, as needed
+modified from fsutil
+]]
+{
+	name='mkdir_m',
+	depend={'splitpath','joinpath'},
+	code=[[
+function mkdir_m(path)
+	local st = os.stat(path)
+	if st then
+		if st.is_dir then
+			return true
+		end
+		return false,'path exists, not directory'
+	end
+	local parts = splitpath(path)
+	local p=parts[1]
+	for i=2, #parts do
+		p = joinpath(p,parts[i])
+		local st = os.stat(p)
+		if not st then
+			local status,err = os.mkdir(p)
+			if not status then
+				return false,err
+			end
+		elseif not st.is_dir then
+			return false,'path exists, not directory'
+		end
+	end
+	return true
 end
 ]],
 },
