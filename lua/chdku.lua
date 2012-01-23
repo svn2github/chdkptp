@@ -270,13 +270,24 @@ opts are as for find_files, plus
 function con_methods:mdelete(paths,opts)
 	opts=extend_table({},opts)
 	opts.dirsfirst=false -- delete directories only after recursing into
-	local results={}
-	local status,err = self:call_remote('ff_mdelete',{libs={'ff_mdelete'},msgs=chdku.msg_unbatcher(results)},paths,opts)
+	local results
+	local msg_handler
+	if opts.msg_handler then
+		msg_handler = opts.msg_handler
+		opts.msg_handler = nil -- don't serialize
+	else
+		results={}
+		msg_handler = chdku.msg_unbatcher(results)
+	end
+	local status,err = self:call_remote('ff_mdelete',{libs={'ff_mdelete'},msgs=msg_handler},paths,opts)
 
 	if not status then
 		return false,err
 	end
-	return results
+	if results then
+		return results
+	end
+	return true
 end
 
 --[[

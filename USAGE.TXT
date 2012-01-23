@@ -81,6 +81,42 @@ download (d) [-nolua] <remote> [local]: - download a file from the camera
  -nolua   skip lua based checks on remote
    Allows download while running script
 
+mdownload (mdl) [options] <remote, remote, ...> <target dir>: - download file/directories from the camera
+ <remote...> files/directories to download
+ <target dir> directory to download into
+ options:
+   -fmatch=<pattern> download only file with names matching <pattern>
+   -dmatch=<pattern> only create directories with names matching <pattern>
+   -rmatch=<pattern> only recurse into directories with names matching <pattern>
+   -nodirs           only create directories
+   -maxdepth=n       only recurse into N levels of directory
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+
+mupload (mup) [options] <local, local, ...> <target dir>: - upload file/directories to the camera
+ <local...> files/directories to upload
+ <target dir> directory to upload into
+ options:
+   -fmatch=<pattern> upload only file with names matching <pattern>
+   -dmatch=<pattern> only create directories with names matching <pattern>
+   -rmatch=<pattern> only recurse into directories with names matching <pattern>
+   -nodirs           only create directories
+   -maxdepth=n       only recurse into N levels of directory
+   -pretend          print actions instead of doing them
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+
+delete (rm)  [options] <target, target,...>: - delete file/directories from the camera
+ <target...> files/directories to remote
+ options:
+   -fmatch=<pattern> upload only file with names matching <pattern>
+   -dmatch=<pattern> only delete directories with names matching <pattern>
+   -rmatch=<pattern> only recurse into directories with names matching <pattern>
+   -nodirs           don't delete drictories recursed into, only files
+   -maxdepth=n       only recurse into N levels of directory
+   -pretend          print actions instead of doing them
+   -ignore_errors    don't abort if delete fails, continue to next item
+   -skip_topdirs     don't delete directories given in command line, only contents
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+
 version (ver)             : - print API versions
 connect (c)  [-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] : - connect to device
  If no options are given, connects to the first available device.
@@ -124,10 +160,19 @@ connect to the device with name containing D10 on bus "bus-0",
  chdkptp -c"D10 -b:bus%-0" -i
 note connect -b takes a lua pattern, so % is needed to escapes the -
 
+download some jpeg images (in 100CANON etc folders)
+con> mdl -fmatch:%.JPG$ DCIM C:\temp
+
+delete some raw images
+con> rm -nodirs -fmatch:%.CRW$ DCIM
+
+upload some scripts
+con> mup c:\CHDK\SCRIPTS CHDK/SCRIPTS
+
 ad hoc scripting on PC side - download some files
 con> !t=con:listdir('A/DCIM/100CANON',{match="%.JPG$"})
 con> !for i,n in ipairs(t) do con:download("A/DCIM/100CANON/"..n,"C:/TEMP/"..n) end
-note con:downloaddir() is a slightly nicer version of the above
+note the mdownload cli command above is probably more convenient
 
 list devices and connect to a specific camera
 ___> list

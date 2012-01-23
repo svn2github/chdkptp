@@ -593,6 +593,162 @@ cli:add_commands{
 		end,
 	},
 	{
+		names={'mdownload','mdl'},
+		help='download file/directories from the camera',
+		arghelp="[options] <remote, remote, ...> <target dir>",
+		args=argparser.create{
+			fmatch=false,
+			dmatch=false,
+			rmatch=false,
+			nodirs=false,
+			maxdepth=100,
+		},
+		help_detail=[[
+ <remote...> files/directories to download
+ <target dir> directory to download into
+ options:
+   -fmatch=<pattern> download only file with names matching <pattern>
+   -dmatch=<pattern> only create directories with names matching <pattern>
+   -rmatch=<pattern> only recurse into directories with names matching <pattern>
+   -nodirs           only create directories  
+   -maxdepth=n       only recurse into N levels of directory
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+]],
+
+		func=function(self,args) 
+			if #args < 2 then
+				return false,'expected source(s) and destination'
+			end
+			local dst=table.remove(args)
+			local srcs={}
+			for i,v in ipairs(args) do
+				srcs[i]=fsutil.make_camera_path(v)
+			end
+			-- TODO some of these need translating, so can't pass direct
+			local opts={
+				fmatch=args.fmatch,
+				dmatch=args.dmatch,
+				rmatch=args.rmatch,
+				dirs=not args.nodirs,
+				maxdepth=tonumber(args.maxdepth),
+			}
+			return con:mdownload(srcs,dst,opts)
+		end,
+	},
+	{
+		names={'mupload','mup'},
+		help='upload file/directories to the camera',
+		arghelp="[options] <local, local, ...> <target dir>",
+		args=argparser.create{
+			fmatch=false,
+			dmatch=false,
+			rmatch=false,
+			nodirs=false,
+			maxdepth=100,
+			pretend=false,
+		},
+		help_detail=[[
+ <local...> files/directories to upload
+ <target dir> directory to upload into
+ options:
+   -fmatch=<pattern> upload only file with names matching <pattern>
+   -dmatch=<pattern> only create directories with names matching <pattern>
+   -rmatch=<pattern> only recurse into directories with names matching <pattern>
+   -nodirs           only create directories  
+   -maxdepth=n       only recurse into N levels of directory
+   -pretend          print actions instead of doing them
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+]],
+
+		func=function(self,args) 
+			if #args < 2 then
+				return false,'expected source(s) and destination'
+			end
+			local dst=fsutil.make_camera_path(table.remove(args))
+			local srcs={}
+			-- args has other stuff in it, copy array parts
+			srcs={unpack(args)}
+			-- TODO some of these need translating, so can't pass direct
+			local opts={
+				fmatch=args.fmatch,
+				dmatch=args.dmatch,
+				rmatch=args.rmatch,
+				dirs=not args.nodirs,
+				maxdepth=tonumber(args.maxdepth),
+				pretend=args.pretend,
+			}
+			return con:mupload(srcs,dst,opts)
+		end,
+	},
+	{
+		names={'delete','rm'},
+		help='delete file/directories from the camera',
+		arghelp="[options] <target, target,...>",
+		args=argparser.create{
+			fmatch=false,
+			dmatch=false,
+			rmatch=false,
+			nodirs=false,
+			maxdepth=100,
+			pretend=false,
+			ignore_errors=false,
+			skip_topdirs=false,
+		},
+		help_detail=[[
+ <target...> files/directories to remote
+ options:
+   -fmatch=<pattern> upload only file with names matching <pattern>
+   -dmatch=<pattern> only delete directories with names matching <pattern>
+   -rmatch=<pattern> only recurse into directories with names matching <pattern>
+   -nodirs           don't delete drictories recursed into, only files
+   -maxdepth=n       only recurse into N levels of directory
+   -pretend          print actions instead of doing them
+   -ignore_errors    don't abort if delete fails, continue to next item
+   -skip_topdirs     don't delete directories given in command line, only contents
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+]],
+
+		func=function(self,args) 
+			if #args < 1 then
+				return false,'expected at least one target'
+			end
+			-- args has other stuff in it, copy array parts
+			local tgts={}
+			for i,v in ipairs(args) do
+				tgts[i]=fsutil.make_camera_path(v)
+			end
+			-- TODO some of these need translating, so can't pass direct
+			local opts={
+				fmatch=args.fmatch,
+				dmatch=args.dmatch,
+				rmatch=args.rmatch,
+				dirs=not args.nodirs,
+				maxdepth=tonumber(args.maxdepth),
+				pretend=args.pretend,
+				ignore_errors=args.ignore_errors,
+				skip_topdirs=args.skip_topdirs,
+			}
+			-- TODO use msg_handler to print as they are deleted instead of all at the end
+			local results,err = con:mdelete(tgts,opts)
+			if not results then
+				return false,err
+			end
+			for i,v in ipairs(results) do
+				printf("%s: ",v.file)
+				if v.status then
+					printf('OK')
+				else
+					printf('FAILED')
+				end
+				if v.msg then
+					printf(": %s",v.msg)
+				end
+				printf('\n')
+			end
+			return true
+		end,
+	},
+	{
 		names={'version','ver'},
 		help='print API versions',
 		func=function(self,args) 
