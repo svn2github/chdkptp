@@ -444,6 +444,9 @@ opts {
 	msgs={table|callback} -- table or function to receive user script messages
 	rets={table|callback} -- table or function to receive script return values, instead of returning them
 	fdata={any lua value} -- data to be passed as second argument to callbacks
+	initwait={ms|false} -- passed to wait_status, wait before first poll
+	poll={ms} -- passed to wait_status, poll interval after ramp up
+	pollstart={ms|false} -- passed to wait_status, initial poll interval, ramps up to poll
 }
 callbacks
 	status[,err] = f(message,fdata)
@@ -458,7 +461,7 @@ chdku.default_libs={
 convenience, defaults wait=true
 ]]
 function con_methods:execwait(code,opts_in)
-	return self:exec(code,extend_table({wait=true},opts_in))
+	return self:exec(code,extend_table({wait=true,initwait=5},opts_in))
 end
 
 function con_methods:exec(code,opts_in)
@@ -479,6 +482,9 @@ function con_methods:exec(code,opts_in)
 
 	-- check for already running script and flush messages
 	if not opts.clobber then
+		-- TODO this causes a round trip.
+		-- Could track locally if a script has been started since last script_status call showed complete/no messages
+		-- wouldn't be safe vs scripts started in cam ui
 		local status,err = self:script_status()
 		if not status then
 			return false,err
@@ -524,7 +530,13 @@ function con_methods:exec(code,opts_in)
 
 	-- process messages and wait for script to end
 	while true do
-		status,err=self:wait_status{ msg=true, run=false }
+		status,err=self:wait_status{
+			msg=true,
+			run=false,
+			initwait=opts.initwait,
+			poll=opts.poll,
+			pollstart=opts.pollstart
+		}
 		if not status then
 			return false,tostring(err)
 		end
@@ -591,7 +603,8 @@ opts:
 	run=bool
 	timeout=<number> -- timeout in ms
 	poll=<number> -- polling interval in ms
-	pollstart=<number> -- if set (not false), start polling at pollstart, double interval each iteration until poll is reached
+	pollstart=<number> -- if not false, start polling at pollstart, double interval each iteration until poll is reached
+	initwait=<number> -- wait N ms before first poll. If this is long enough for call to finish, saves round trip
 }
 status: table with msg and run set to last status, and timeout set if timeout expired, or false,errormessage on error
 TODO for gui, this should yield in lua, resume from timer or something
@@ -599,7 +612,7 @@ TODO for gui, this should yield in lua, resume from timer or something
 function con_methods:wait_status(opts)
 	opts = util.extend_table({
 		poll=250,
-		pollstart=5,
+		pollstart=4,
 		timeout=86400000 -- 1 day
 	},opts)
 	local timeleft = opts.timeout
@@ -611,6 +624,10 @@ function con_methods:wait_status(opts)
 		sleeptime = opts.pollstart
 	else
 		sleeptime = opts.poll
+	end
+	if opts.initwait then
+		sys.sleep(opts.initwait)
+		timeleft = timeleft - opts.initwait
 	end
 	while true do
 		local status,msg = self:script_status()
