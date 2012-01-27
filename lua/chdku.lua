@@ -587,18 +587,26 @@ opts:
 	run=bool
 	timeout=<number> -- timeout in ms
 	poll=<number> -- polling interval in ms
+	pollstart=<number> -- if set (not false), start polling at pollstart, double interval each iteration until poll is reached
 }
 status: table with msg and run set to last status, and timeout set if timeout expired, or false,errormessage on error
 TODO for gui, this should yield in lua, resume from timer or something
 ]]
 function con_methods:wait_status(opts)
+	opts = util.extend_table({
+		poll=250,
+		pollstart=5,
+		timeout=86400000 -- 1 day
+	},opts)
 	local timeleft = opts.timeout
-	local sleeptime = opts.poll
-	if not timeleft then
-		timeleft=86400000 -- 1 day 
+	local sleeptime
+	if opts.poll < 50 then
+		opts.poll = 50
 	end
-	if not sleeptime or sleeptime < 50 then
-		sleeptime=250
+	if opts.pollstart then
+		sleeptime = opts.pollstart
+	else
+		sleeptime = opts.poll
 	end
 	while true do
 		local status,msg = self:script_status()
@@ -609,6 +617,12 @@ function con_methods:wait_status(opts)
 			return status
 		end
 		if timeleft > 0 then
+			if opts.pollstart and sleeptime < opts.poll then
+				sleeptime = sleeptime * 2
+				if sleeptime > opts.poll then
+					sleeptime = opts.poll
+				end
+			end
 			if timeleft < sleeptime then
 				sleeptime = timeleft
 			end
