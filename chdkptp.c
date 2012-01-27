@@ -31,6 +31,7 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <utime.h>
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #ifndef WIN32
@@ -1471,9 +1472,19 @@ static int syslib_ostype(lua_State *L) {
 	return 1;
 }
 
+static int syslib_gettimeofday(lua_State *L) {
+	struct timeval tv;
+	gettimeofday(&tv,NULL);
+	lua_pushnumber(L,tv.tv_sec);
+	lua_pushnumber(L,tv.tv_usec);
+	return 2;
+}
+
+
 static const luaL_Reg lua_syslib[] = {
   {"sleep", syslib_sleep},
   {"ostype", syslib_ostype},
+  {"gettimeofday", syslib_gettimeofday},
   {NULL, NULL}
 };
 

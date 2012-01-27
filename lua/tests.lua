@@ -127,6 +127,13 @@ t.fsmisc = function()
 	assert(fsutil.joinpath(unpack(fsutil.splitpath('foo/bar/mod'))) == './foo/bar/mod')
 end
 
+t.ustime = function()
+	local t=os.time()
+	local t0=ustime.new(t,600000)
+	local t1=ustime.new(t+1,500000)
+	assert(ustime.diff(t1,t0)==900000)
+end
+
 function m:run(name)
 	-- TODO side affects galore
 	printf('%s:start\n',name)

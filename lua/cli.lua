@@ -227,7 +227,11 @@ function cli:execute(line)
 			if not args then
 				return false,msg
 			end
+			local t0=ustime.new()
 			status,msg = self.names[cmd](args)
+			if cli.showtime then
+				printf("time %.4f\n",ustime.diff(t0)/1000000)
+			end
 			if not status and not msg then
 				msg=cmd .. " failed"
 			end
