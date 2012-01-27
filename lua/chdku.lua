@@ -216,25 +216,29 @@ local function mupload_fn(self,opts)
 				return false,err
 			end
 		end
+		opts.lastdir = dst
 	else
-		-- TODO this means we stat a directory once per file uploaded to it
-		-- could cache, or do all the dirs first
 		local dst_dir=fsutil.dirname_cam(dst)
-		local st,err=con:stat(dst_dir)
-		if st then
-			if not st.is_dir then
-				return false, 'not a directory: '..dst_dir
-			end
-		else
-			if opts.pretend then
-				printf('remote mkdir_m(%s)\n',dst_dir)
+		-- cache target directory so we don't have an extra stat call for every file in that dir
+		if opts.lastdir ~= dst_dir then
+			local st,err=con:stat(dst_dir)
+			if st then
+				if not st.is_dir then
+					return false, 'not a directory: '..dst_dir
+				end
 			else
-				local status,err=con:mkdir_m(dst_dir)
-				if not status then
-					return false,err
+				if opts.pretend then
+					printf('remote mkdir_m(%s)\n',dst_dir)
+				else
+					local status,err=con:mkdir_m(dst_dir)
+					if not status then
+						return false,err
+					end
 				end
 			end
+			opts.lastdir = dst_dir
 		end
+		-- TODO stat'ing in batches would be faster
 		st,err=con:stat(dst)
 		if st and not st.is_file then
 			return false, 'not a file: '..dst
