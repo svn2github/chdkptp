@@ -616,7 +616,7 @@ process directory tree with matching
 status,err = find_files(paths,opts,func)
 paths=<array of paths to process>
 opts={
-	fmatch='<pattern>', -- match on names of files, default any
+	fmatch='<pattern>', -- match on full path of files, default any (NOTE can match on filename with /<match>$)
 	dmatch='<pattern>', -- match on names of directories, default any 
 	rmatch='<pattern>', -- recurse into directories matching, default any 
 	dirs=true, -- pass directories to func. otherwise only files sent to func, but dirs are still recursed
@@ -657,10 +657,10 @@ function find_files(paths,opts,func)
 	return fs_iter.run(paths,{
 		ff_check_match=function(self,opts)
 			if self.cur.st.is_file then
-				return not opts.fmatch or string.match(self.cur.name,opts.fmatch)
+				return not opts.fmatch or string.match(self.cur.full,opts.fmatch)
 			end
 			if self.cur.st.is_dir then
-				return not opts.dmatch or string.match(self.cur.name,opts.dmatch)
+				return not opts.dmatch or string.match(self.cur.full,opts.dmatch)
 			end
 			if opts.martians then
 				return true

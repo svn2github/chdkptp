@@ -381,10 +381,10 @@ function fsutil.find_files(paths,opts,func)
 	return fs_iter.run(paths,{
 		ff_check_match=function(self,opts)
 			if self.cur.st.mode == 'file' then
-				return not opts.fmatch or string.match(self.cur.name,opts.fmatch)
+				return not opts.fmatch or string.match(self.cur.full,opts.fmatch)
 			end
 			if self.cur.st.mode == 'directory' then
-				return not opts.dmatch or string.match(self.cur.name,opts.dmatch)
+				return not opts.dmatch or string.match(self.cur.full,opts.dmatch)
 			end
 			if opts.martians then
 				return true
@@ -415,7 +415,7 @@ function fsutil.find_files(paths,opts,func)
 					end
 				end
 				if self:depth() < opts.maxdepth and self:can_recurse() then
-					if not opts.rmatch or string.match(self.cur.name,opts.rmatch) then
+					if not opts.rmatch or string.match(self.cur.full,opts.rmatch) then
 						local status,err = self:recurse()
 						if not status then
 							return false,err
