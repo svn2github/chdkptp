@@ -260,6 +260,24 @@ function camfiletree:get_data(id)
 	return iup.TreeGetUserId(self,id)
 end
 
+-- TODO we could keep a map somewhere
+function camfiletree:get_id_from_path(fullpath)
+	local id = 0
+	while true do
+		local data = self:get_data(id)
+		if data then
+			if not data.dummy then
+				if data:fullpath() == fullpath then
+					return id
+				end
+			end
+		else
+			return
+		end
+		id = id + 1
+	end
+end
+
 -- TODO
 filetreedata_getfullpath = function(self)
 	-- root is special special, we don't want to add slashes
@@ -312,20 +330,39 @@ function do_dir_download_dialog(data)
 		title = "Download contents of "..remotepath, 
 	} 
 
--- Shows file dialog in the center of the screen
-	statusprint('download dialog ' .. remotepath)
+-- Shows dialog in the center of the screen
+	statusprint('dir download dialog ' .. remotepath)
 	filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
 
--- Gets file dialog status
+-- Gets dialog status
 	local status = filedlg.status
 
--- new or overwrite (windows native dialog already prompts for overwrite)
 	if status == "0" then 
 		statusprint("d "..remotepath.."->"..filedlg.value)
-		-- can't use mdownload here because local name might be different than remote basename
 		add_status(con:mdownload({remotepath},filedlg.value))
 	end
 end
+
+function do_dir_upload_dialog(data)
+	local remotepath = data:fullpath()
+	local filedlg = iup.filedlg{
+		dialogtype = "DIR",
+		title = "Upload contents to "..remotepath, 
+	} 
+-- Shows dialog in the center of the screen
+	statusprint('dir upload dialog ' .. remotepath)
+	filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
+
+-- Gets dialog status
+	local status = filedlg.status
+
+	if status == "0" then 
+		statusprint("d "..remotepath.."->"..filedlg.value)
+		add_status(con:mupload({filedlg.value},remotepath))
+		camfiletree:refresh_tree_by_path(remotepath)
+	end
+end
+
 
 function do_upload_dialog(remotepath)
 	local filedlg = iup.filedlg{
@@ -347,25 +384,43 @@ function do_upload_dialog(remotepath)
 		return
 	end
 	statusprint('upload value ' .. tostring(value))
-	local multi = {}
+	local paths = {}
 	local e=1
+	local dir
 	while true do
-		local s
+		local s,sub
 		s,e,sub=string.find(value,'([^|]+)|',e)
 		if s then
-			table.insert(multi,sub)
+			if not dir then
+				dir = sub
+			else
+				table.insert(paths,fsutil.joinpath(dir,sub))
+			end
 		else
 			break
 		end
 	end
-	if #multi == 0 then
-		statusprint("u "..value.."->"..fsutil.joinpath(remotepath,fsutil.basename(value)))
-		add_status(con:upload(value,fsutil.joinpath(remotepath,fsutil.basename(value))))
+	-- single select
+	if #paths == 0 then
+		table.insert(paths,value)
+	end
+	-- note native windows dialog does not allow multi-select to include directories.
+	-- If it did, each to-level directory contents would get dumped into the target dir
+	-- should add an option to mupload to include create top level dirs
+	-- TODO test gtk/linux
+	add_status(con:mupload(paths,remotepath))
+	camfiletree:refresh_tree_by_path(remotepath)
+end
+
+function do_mkdir_dialog(data)
+	local remotepath = data:fullpath()
+	local dirname = iup.Scanf("Create directory\n"..remotepath.."%64.11%s\n",'');
+	if dirname then
+		printf('mkdir: %s',dirname)
+		add_status(con:mkdir_m(fsutil.joinpath_cam(remotepath,dirname)))
+		camfiletree:refresh_tree_by_path(remotepath)
 	else
-		for i = 2, #multi do
-			statusprint("u "..multi[1] .. '/' .. multi[i].."->"..fsutil.joinpath(remotepath,multi[i]))
-			add_status(con:upload(multi[1] .. '/' .. multi[i],fsutil.joinpath(remotepath,multi[i])))
-		end
+		printf('mkdir canceled')
 	end
 end
 
@@ -379,9 +434,41 @@ function do_delete_dialog(data)
 	end
 	if iup.Alarm('Confirm delete',msg,'OK','Cancel') == 1 then
 		add_status(con:mdelete({fullpath}))
-		-- TODO should refresh
+		camfiletree:refresh_tree_by_path(fsutil.dirname_cam(fullpath))
 	end
 end
+
+function camfiletree:refresh_tree_by_id(id)
+	if not id then
+		printf('refresh_tree_by_id: nil id')
+		return
+	end
+	local oldstate=self['state'..id]
+	local data=self:get_data(id)
+	statusprint('old state', oldstate)
+	self:populate_branch(id,data:fullpath())
+	if oldstate and oldstate ~= self['state'..id] then
+		self['state'..id]=oldstate
+	end
+end
+
+function camfiletree:refresh_tree_by_path(path)
+	printf('refresh_tree_by_path: %s',tostring(path))
+	local id = self:get_id_from_path(path)
+	if id then
+		printf('refresh_tree_by_path: found %s',tostring(id))
+		self:refresh_tree_by_id(id)
+	else
+		printf('refresh_tree_by_path: failed to find %s',tostring(path))
+	end
+end
+--[[
+function camfiletree:dropfiles_cb(filename,num,x,y)
+	-- note id -1 > not on any specific item
+	local id = iup.ConvertXYToPos(self,x,y)
+	printf('dropfiles_cb: %s %d %d %d %d\n',filename,num,x,y,id)
+end
+]]
 
 function camfiletree:rightclick_cb(id)
 	local data=self:get_data(id)
@@ -396,24 +483,32 @@ function camfiletree:rightclick_cb(id)
 			iup.item{
 				title='Refresh',
 				action=function()
-					local oldstate=camfiletree['state'..id]
-					statusprint('old state', oldstate)
-					self:populate_branch(id,data:fullpath())
-					if oldstate and oldstate ~= camfiletree['state'..id] then
-						camfiletree['state'..id]=oldstate
-					end
+					self:refresh_tree_by_id(id)
+				end,
+			},
+			-- the default file selector doesn't let you multi-select with directories
+			iup.item{
+				title='Upload files...',
+				action=function()
+					do_upload_dialog(data:fullpath())
 				end,
 			},
 			iup.item{
-				title='Upload...',
+				title='Upload directory contents...',
 				action=function()
-					do_upload_dialog(data:fullpath())
+					do_dir_upload_dialog(data)
 				end,
 			},
 			iup.item{
 				title='Download contents...',
 				action=function()
 					do_dir_download_dialog(data)
+				end,
+			},
+			iup.item{
+				title='Create directory...',
+				action=function()
+					do_mkdir_dialog(data)
 				end,
 			},
 			iup.item{
@@ -458,6 +553,7 @@ function camfiletree:populate_branch(id,path)
 				-- dummy, otherwise tree nodes not expandable
 				-- TODO would be better to only add if dir is not empty
 				self['addleaf'..self.lastaddnode] = 'dummy'
+				self:set_data(self.lastaddnode,{dummy=true})
 			else
 				self['addleaf'..id]=st.name
 				self:set_data(self.lastaddnode,{name=st.name,stat=st,path=path})
@@ -467,9 +563,9 @@ function camfiletree:populate_branch(id,path)
 end
 
 function camfiletree:branchopen_cb(id)
-	statusprint('branchopn_cb ' .. id)
+	statusprint('branchopen_cb ' .. id)
 	if not con:is_connected() then
-		statusprint('branchopn_cb not connected')
+		statusprint('branchopen_cb not connected')
 		return iup.IGNORE
 	end
 	local path
