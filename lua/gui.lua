@@ -277,7 +277,8 @@ function camfiletree:set_data(id,data)
 	iup.TreeSetUserId(self,id,data)
 end
 
-function do_download_dialog(remotepath)
+function do_download_dialog(data)
+	local remotepath = data:fullpath()
 	local filedlg = iup.filedlg{
 		dialogtype = "SAVE",
 		title = "Download "..remotepath, 
@@ -296,9 +297,33 @@ function do_download_dialog(remotepath)
 -- new or overwrite (windows native dialog already prompts for overwrite)
 	if status == "1" or status == "0" then 
 		statusprint("d "..remotepath.."->"..filedlg.value)
+		-- can't use mdownload here because local name might be different than remote basename
 		add_status(con:download(remotepath,filedlg.value))
+		add_status(lfs.touch(filedlg.value,chdku.ts_cam2pc(data.stat.mtime)))
 -- canceled
 --	elseif status == "-1" then 
+	end
+end
+
+function do_dir_download_dialog(data)
+	local remotepath = data:fullpath()
+	local filedlg = iup.filedlg{
+		dialogtype = "DIR",
+		title = "Download contents of "..remotepath, 
+	} 
+
+-- Shows file dialog in the center of the screen
+	statusprint('download dialog ' .. remotepath)
+	filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
+
+-- Gets file dialog status
+	local status = filedlg.status
+
+-- new or overwrite (windows native dialog already prompts for overwrite)
+	if status == "0" then 
+		statusprint("d "..remotepath.."->"..filedlg.value)
+		-- can't use mdownload here because local name might be different than remote basename
+		add_status(con:mdownload({remotepath},filedlg.value))
 	end
 end
 
@@ -386,6 +411,12 @@ function camfiletree:rightclick_cb(id)
 				end,
 			},
 			iup.item{
+				title='Download contents...',
+				action=function()
+					do_dir_download_dialog(data)
+				end,
+			},
+			iup.item{
 				title='Delete...',
 				action=function()
 					do_delete_dialog(data)
@@ -397,7 +428,7 @@ function camfiletree:rightclick_cb(id)
 			iup.item{
 				title='Download...',
 				action=function()
-					do_download_dialog(data:fullpath())
+					do_download_dialog(data)
 				end,
 			},
 			iup.item{
