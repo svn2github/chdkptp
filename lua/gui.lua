@@ -344,9 +344,17 @@ function do_upload_dialog(remotepath)
 	end
 end
 
-function do_delete_dialog(fullpath)
-	if iup.Alarm('Confirm delete','delete ' .. fullpath .. ' ?','OK','Cancel') == 1 then
-		add_status(con:execlua('os.remove("'..fullpath..'")'))
+function do_delete_dialog(data)
+	local msg
+	local fullpath = data:fullpath()
+	if data.stat.is_dir then
+		msg = 'delete directory ' .. fullpath .. ' and all contents ?'
+	else
+		msg = 'delete ' .. fullpath .. ' ?'
+	end
+	if iup.Alarm('Confirm delete',msg,'OK','Cancel') == 1 then
+		add_status(con:mdelete({fullpath}))
+		-- TODO should refresh
 	end
 end
 
@@ -377,6 +385,12 @@ function camfiletree:rightclick_cb(id)
 					do_upload_dialog(data:fullpath())
 				end,
 			},
+			iup.item{
+				title='Delete...',
+				action=function()
+					do_delete_dialog(data)
+				end,
+			},
 		}:popup(iup.MOUSEPOS,iup.MOUSEPOS)
 	else
 		iup.menu{
@@ -389,7 +403,7 @@ function camfiletree:rightclick_cb(id)
 			iup.item{
 				title='Delete...',
 				action=function()
-					do_delete_dialog(data:fullpath())
+					do_delete_dialog(data)
 				end,
 			},
 		}:popup(iup.MOUSEPOS,iup.MOUSEPOS)
