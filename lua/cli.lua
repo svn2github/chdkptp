@@ -904,11 +904,14 @@ cli:add_commands{
 					-- alphabetic sort TODO sorting/grouping options
 					chdku.sortdir_stat(list)
 					for i,st in ipairs(list) do
+						local name = st.name
+						local size = st.size
 						if st.is_dir then
-							r = r .. string.format("%s/\n",st.name)
+							name = name..'/'
+							size = '<dir>'
 						else
-							r = r .. string.format("%-13s %10d\n",st.name,st.size)
 						end
+						r = r .. string.format("%s %10s %s\n",os.date('%c',chdku.ts_cam2pc(st.mtime)),tostring(size),name)
 					end
 				else
 					table.sort(list)
