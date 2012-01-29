@@ -42,6 +42,36 @@ function chdku.format_script_msg(msg)
 	return r
 end
 
+--[[
+Camera timestamps are in seconds since Jan 1, 1970 in current camera time
+PC timestamps (linux, windows) are since Jan 1, 1970 UTC
+return offset of current PC time from UTC time, in seconds
+]]
+function chdku.ts_get_offset()
+	-- local timestamp, assumed to be seconds since unix epoch
+	local tslocal=os.time()
+	-- !*t returns a table of hours, minutes etc in UTC (without a timezone spec)
+	-- os.time turns this into a timestamp, treating as local time
+	return tslocal - os.time(os.date('!*t',tslocal))
+end
+
+--[[
+covert a timestamp from the camera to the equivalent local time on the pc
+]]
+function chdku.ts_cam2pc(tscam)
+	return tscam - chdku.ts_get_offset()
+end
+
+--[[
+covert a timestamp from the pc to the equivalent on the camera
+]]
+function chdku.ts_pc2cam(tspc)
+	if not tspc then
+		tspc = os.time()
+	end
+	return tspc + chdku.ts_get_offset()
+end
+
 --[[ 
 connection methods, added to the connection object
 ]]
