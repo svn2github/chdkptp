@@ -59,17 +59,32 @@ end
 covert a timestamp from the camera to the equivalent local time on the pc
 ]]
 function chdku.ts_cam2pc(tscam)
-	return tscam - chdku.ts_get_offset()
+	local tspc = tscam - chdku.ts_get_offset()
+	-- TODO
+	-- on windows, a time < 0 causes os.date to return nil 
+	-- these can appear from the cam if you set 0 with utime and have a negative utc offset
+	-- since this is a bogus date anyway, just force it to zero to avoid runtime errors
+	if tspc > 0 then
+		return tspc
+	end
+	return 0
 end
 
 --[[
 covert a timestamp from the pc to the equivalent on the camera
+default to current time if none given
 ]]
 function chdku.ts_pc2cam(tspc)
 	if not tspc then
 		tspc = os.time()
 	end
-	return tspc + chdku.ts_get_offset()
+	local tscam = tspc + chdku.ts_get_offset()
+	-- TODO
+	-- cameras handle < 0 times inconsistently (vxworks > 2100, dryos < 1970)
+	if tscam > 0 then
+		return tscam
+	end
+	return 0
 end
 
 --[[ 
@@ -129,20 +144,24 @@ end
 --[[
 download files and directories
 status[,err]=con:mdownload(srcpaths,dstpath,opts)
-opts are passed to find_files
+opts:
+	mtime=bool -- keep (default) or discard remote mtime NOTE files only for now
+other opts are passed to find_files
 ]]
 function con_methods:mdownload(srcpaths,dstpath,opts)
 	if not dstpath then
 		dstpath = '.'
 	end
-	opts=extend_table({},opts)
-	opts.dirsfirst=true
+	local lopts=extend_table({mtime=true},opts)
+	local ropts=extend_table({},opts)
+	ropts.dirsfirst=true
+	ropts.mtime=nil
 	local dstmode = lfs.attributes(dstpath,'mode')
 	if dstmode and dstmode ~= 'directory' then
 		return false,'mdownload: dest must be a directory'
 	end
 	local files={}
-	local status,rstatus,rerr = self:execwait('return ff_mdownload('..serialize(srcpaths)..','..serialize(opts)..')',
+	local status,rstatus,rerr = self:execwait('return ff_mdownload('..serialize(srcpaths)..','..serialize(ropts)..')',
 										{libs={'ff_mdownload'},msgs=chdku.msg_unbatcher(files)})
 
 	if not status then
@@ -205,7 +224,12 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 				local f,err=io.open(dst,"wb")
 				f:close()
 			end
-			-- TODO optionally set timestamps (need to translate)
+			if lopts.mtime then
+				status,err = lfs.touch(dst,chdku.ts_cam2pc(finfo.st.mtime));
+				if not status then
+					return status,err
+				end
+			end
 		end
 	end
 	return true
@@ -216,6 +240,7 @@ upload files and directories
 status[,err]=con:mupload(srcpaths,dstpath,opts)
 opts are as for find_files, plus
 	pretend: just print what would be done
+	mtime: preserve mtime of local files
 ]]
 local function mupload_fn(self,opts)
 	local con=opts.con
@@ -280,13 +305,20 @@ local function mupload_fn(self,opts)
 			if not status then
 				return false,err
 			end
+			if opts.mtime then
+				-- TODO updating times in batches would be faster
+				local status,err = con:utime(dst,chdku.ts_pc2cam(self.cur.st.modification))
+				if not status then
+					return false,err
+				end
+			end
 		end
 	end
 	return true
 end
 
 function con_methods:mupload(srcpaths,dstpath,opts)
-	opts = util.extend_table({},opts)
+	opts = util.extend_table({mtime=true},opts)
 	opts.dirsfirst=true
 	opts.mu_dst=dstpath
 	opts.con=self
@@ -351,6 +383,10 @@ end
 
 function con_methods:stat(path)
 	return self:call_remote('os.stat',nil,path)
+end
+
+function con_methods:utime(path,mtime,atime)
+	return self:call_remote('os.utime',nil,path,mtime,atime)
 end
 
 function con_methods:mdkir(path)

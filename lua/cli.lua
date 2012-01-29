@@ -606,16 +606,18 @@ cli:add_commands{
 			rmatch=false,
 			nodirs=false,
 			maxdepth=100,
+			nomtime=false,
 		},
 		help_detail=[[
  <remote...> files/directories to download
  <target dir> directory to download into
  options:
-   -fmatch=<pattern> download only file with names matching <pattern>
-   -dmatch=<pattern> only create directories with names matching <pattern>
-   -rmatch=<pattern> only recurse into directories with names matching <pattern>
-   -nodirs           only create directories  
+   -fmatch=<pattern> download only file with path/name matching <pattern>
+   -dmatch=<pattern> only create directories with path/name matching <pattern>
+   -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
+   -nodirs           only create directories needed to download file  
    -maxdepth=n       only recurse into N levels of directory
+   -nomtime			 don't preserve modification time of remote files
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 ]],
 
@@ -635,6 +637,7 @@ cli:add_commands{
 				rmatch=args.rmatch,
 				dirs=not args.nodirs,
 				maxdepth=tonumber(args.maxdepth),
+				mtime=not args.nomtime
 			}
 			return con:mdownload(srcs,dst,opts)
 		end,
@@ -650,17 +653,19 @@ cli:add_commands{
 			nodirs=false,
 			maxdepth=100,
 			pretend=false,
+			nomtime=false,
 		},
 		help_detail=[[
  <local...> files/directories to upload
  <target dir> directory to upload into
  options:
-   -fmatch=<pattern> upload only file with names matching <pattern>
-   -dmatch=<pattern> only create directories with names matching <pattern>
-   -rmatch=<pattern> only recurse into directories with names matching <pattern>
-   -nodirs           only create directories  
+   -fmatch=<pattern> upload only file with path/name matching <pattern>
+   -dmatch=<pattern> only create directories with path/name matching <pattern>
+   -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
+   -nodirs           only create directories needed to upload file 
    -maxdepth=n       only recurse into N levels of directory
    -pretend          print actions instead of doing them
+   -nomtime          don't preserve local modification time
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 ]],
 
@@ -680,6 +685,7 @@ cli:add_commands{
 				dirs=not args.nodirs,
 				maxdepth=tonumber(args.maxdepth),
 				pretend=args.pretend,
+				mtime=not args.nomtime,
 			}
 			return con:mupload(srcs,dst,opts)
 		end,
@@ -911,6 +917,7 @@ cli:add_commands{
 							size = '<dir>'
 						else
 						end
+						-- print(i,name,chdku.ts_cam2pc(st.mtime))
 						r = r .. string.format("%s %10s %s\n",os.date('%c',chdku.ts_cam2pc(st.mtime)),tostring(size),name)
 					end
 				else
