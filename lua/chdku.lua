@@ -659,6 +659,57 @@ function con_methods:exec(code,opts_in)
 end
 
 --[[
+convenience method, get a message of a specific type
+mtype=<string> - expected message type
+msubtype=<string|nil> - expected subtype, or nil for any
+munserialize=<bool> - unserialize and return the message value, only valid for user/return
+
+returns
+status,message|msg value
+status first since message value could decode to false/nil
+]]
+function con_methods:read_msg_strict(opts)
+	opts=extend_table({},opts)
+	local msg,err=self:read_msg()
+	if not msg or msg.type == 'none' then
+		return false, err
+	end
+	if msg.script_id ~= self:get_script_id() then
+		return false,'msg from unexpected script id'
+	end
+	if msg.type ~= opts.mtype then
+		return false,'unexpected msg type'
+	end
+	if opts.msubtype and msg.subtype ~= opts.msubtype then
+		return false,'wrong message subtype'
+	end
+	if opts.munserialize then
+		local v = util.unserialize(msg.value)
+		return true,v
+	end
+	return true,msg
+end
+--[[
+convenience method, wait for a single message and return it
+opts passed wait_status, and read_msg_strict
+]]
+function con_methods:wait_msg(opts)
+	opts=extend_table({},opts)
+	opts.msg=true
+	opts.run=nil
+	local status,err=self:wait_status(opts)
+	if not status then
+		return false,err
+	end
+	if status.timeout then
+		return false,'timeout'
+	end
+	if not status.msg then
+		return false,'no msg'
+	end
+	return self:read_msg_strict(opts)
+end
+--[[
 sleep until specified status is met
 status,errmsg=con:wait_status(opts)
 opts:
