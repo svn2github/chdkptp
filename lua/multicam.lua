@@ -89,6 +89,59 @@ function mc:check_errors()
 	end
 end
 
+function mc:init_sync_single(lcon,lt0,tsend,rt0)
+	local offset = tsend
+	for i=1,10 do
+		local diff = ustime.diffms(lt0) + offset
+		local status,err=lcon:write_msg('tick')
+		if status then
+			local expect = rt0 + diff
+			local status,msg=lcon:wait_msg({
+					mtype='user',
+					msubtype='table',
+					munserialize=true,
+			})
+			if status then
+				printf('expect %d got %d delta %d\n',expect,msg.status,expect-msg.status)
+			else
+				warnf('sync_single wait_msg failed: %s\n',err)
+			end
+		else
+			warnf('sync_single write_msg failed: %s\n',err)
+		end
+	end
+	lcon.mc_sync = {
+		rt0=rt0,
+		lt0=lt0,
+		tsend=tsend,
+		offset=offset,
+	}
+end
+--[[
+initialize values to allow all cameras to execute a given command as close as possible to the same real time
+]]
+function mc:init_sync()
+	for i,lcon in ipairs(self.cams) do
+		local t0=ustime.new()
+		local status,err=lcon:write_msg('tick')
+		local tsend=ustime.diffms(t0)
+		if status then
+			local status,msg=lcon:wait_msg({
+				mtype='user',
+				msubtype='table',
+				munserialize=true,
+			})
+			if status then
+				self:init_sync_single(lcon,t0,tsend,msg.status)
+			else
+				warnf('%d:wait_msg failed: %s\n',err)
+			end
+		else
+			warnf('%d:write_msg failed: %s\n',err)
+		end
+	end
+end
+
 function mc:get_single_status(lcon,cmd,r)
 	local status,err = lcon:script_status()
 	if not status then
