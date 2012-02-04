@@ -55,6 +55,13 @@ function ustime.diff(t1,t0)
 	return (t1.sec - t0.sec)*1000000 + t1.usec - t0.usec
 end
 
+--[[
+difference in ms
+]]
+function ustime.diffms(t1,t0)
+	return ustime.diff(t1,t0)/1000
+end
+
 function proto:get()
 	self.sec,self.usec = sys.gettimeofday()
 end
