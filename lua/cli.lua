@@ -444,20 +444,15 @@ cli:add_commands{
 			local devs = chdk.list_usb_devices()
 			for i,desc in ipairs(devs) do
 				local lcon = chdku.connection(desc)
-				local usb_info = lcon:get_usb_devinfo()
 				local tempcon = false
 				local status = "+"
 				if not lcon:is_connected() then
 					tempcon = true
 					status = "-"
 					lcon:connect()
-				end
-				local ptp_info = lcon:get_ptp_devinfo()
-				if not ptp_info then
-					ptp_info = { model = "<unknown>" }
-				end
-				if not ptp_info.serial_number then
-					ptp_info.serial_number ='(none)'
+				else
+					-- existing con wrapped in new object won't have info set
+					lcon:update_connection_info()
 				end
 
 				if lcon._con == con._con then
@@ -466,10 +461,11 @@ cli:add_commands{
 
 				msg = msg .. string.format("%s%d:%s b=%s d=%s v=0x%x p=0x%x s=%s\n",
 											status, i,
-											ptp_info.model,
-											usb_info.bus, usb_info.dev,
-											usb_info.vendor_id, usb_info.product_id,
-											ptp_info.serial_number)
+											tostring(lcon.ptpdev.model),
+											lcon.usbdev.bus, lcon.usbdev.dev,
+											tostring(lcon.usbdev.vendor_id),
+											tostring(lcon.usbdev.product_id),
+											tostring(lcon.ptpdev.serial_number))
 				if tempcon then
 					lcon:disconnect()
 				end
@@ -845,6 +841,8 @@ cli:add_commands{
 						if not lcon:is_connected() then
 							lcon:connect()
 							tempcon = true
+						else
+							lcon:update_connection_info()
 						end
 						if not lcon:match_ptp_info(match) then
 							if tempcon then
@@ -871,15 +869,10 @@ cli:add_commands{
 	{
 		names={'reconnect','r'},
 		help='reconnect to current device',
-		-- TODO depends on camera coming back on current dev/bus, not guaranteed
-		-- caching model/serial could help
+		-- NOTE camera may connect to a different device,
+		-- will detect and fail if serial, model or pid don't match
 		func=function(self,args) 
-			if con:is_connected() then
-				con:disconnect()
-			end
-			-- appears to be needed to avoid device numbers changing (reset too soon ?)
-			sys.sleep(2000)
-			return con:connect()
+			return con:reconnect()
 		end,
 	},
 	{
@@ -935,16 +928,20 @@ cli:add_commands{
 	{
 		names={'reboot'},
 		help='reboot the camera',
-		arghelp="[file]",
-		args=argparser.create(),
+		arghelp="[options] [file]",
+		args=argparser.create({
+			wait=3500,
+			norecon=false,
+		}),
 		help_detail=[[
- [file] is an optional file to boot.
-  If not given, the normal boot process is used.
-  The file may be an unencoded binary or on DryOS only, an encoded .FI2
- chdkptp attempts to reconnect to the camera after it boots.
+ file: Optional file to boot.
+  Must be an unencoded binary or for DryOS only, an encoded .FI2
+  Format is assumed based on extension
+  If not set, firmware boots normally, loading diskboot.bin if configured
+ options:
+   -norecon  don't try to reconnect
+   -wait=<N> wait N ms before attempting to reconnect, default 3500
 ]],
-		-- TODO reconnect depends on camera coming back on current dev/bus, not guaranteed
-		-- caching model/serial could help
 		func=function(self,args) 
 			local bootfile=args[1]
 			if bootfile then
@@ -959,11 +956,10 @@ cli:add_commands{
 			if not status then
 				return false,err
 			end
-			con:disconnect()
-			-- sleep locally to avoid clobbering the reboot, and allow time for the camera to come up before trying to connect
-			sys.sleep(3000)
-
-			return con:connect()
+			if args.norecon then
+				return true
+			end
+			return con:reconnect({wait=args.wait})
 		end,
 	},
 };

@@ -134,11 +134,14 @@ connect (c)  [-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] : - connect 
 reconnect (r)             : - reconnect to current device
 disconnect (dis)             : - disconnect from device
 ls           [-l] [path] : - list files/directories on camera
-reboot       [file]      : - reboot the camera
- [file] is an optional file to boot.
-  If not given, the normal boot process is used.
-  The file may be an unencoded binary or on DryOS only, an encoded .FI2
- chdkptp attempts to reconnect to the camera after it boots.
+reboot       [options] [file]: - reboot the camera
+ file: Optional file to boot.
+  Must be an unencoded binary or for DryOS only, an encoded .FI2
+  Format is assumed based on extension
+  If not set, firmware boots normally, loading diskboot.bin if configured
+ options:
+   -norecon  don't try to reconnect
+   -wait=<N> wait N ms before attempting to reconnect, default 3500
 
 =Examples=
 start chdkptp in interactive mode and connect to the camera
@@ -182,11 +185,11 @@ note the mdownload cli command above is probably more convenient
 list devices and connect to a specific camera
 ___> list
  1:Canon PowerShot D10 b=bus-0 d=\\.\libusb0-0001--0x04a9-0x31bc v=0x4a9 p=0x31bc s=12345678123456781234567812345678
- 2:Canon PowerShot A540 b=bus-0 d=\\.\libusb0-0002--0x04a9-0x311b v=0x4a9 p=0x311b s=(none)
+ 2:Canon PowerShot A540 b=bus-0 d=\\.\libusb0-0002--0x04a9-0x311b v=0x4a9 p=0x311b s=nil
 ___> c 540
 con> list
  1:Canon PowerShot D10 b=bus-0 d=\\.\libusb0-0001--0x04a9-0x31bc v=0x4a9 p=0x31bc s=12345678123456781234567812345678
-*2:Canon PowerShot A540 b=bus-0 d=\\.\libusb0-0002--0x04a9-0x311b v=0x4a9 p=0x311b s=(none)
+*2:Canon PowerShot A540 b=bus-0 d=\\.\libusb0-0002--0x04a9-0x311b v=0x4a9 p=0x311b s=nil
 
 =Running under linux=
 Under linux, the .lua files will not automatically found relative to the executable directory

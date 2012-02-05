@@ -93,20 +93,18 @@ connection methods, added to the connection object
 local con_methods = {}
 --[[
 check whether this cameras model and serial number match those given
+assumes self.ptpdev is up to date
 TODO - ugly
 ]]
 function con_methods:match_ptp_info(match) 
 	match = util.extend_table({model='.*',serial_number='.*'},match)
-	local ptp_info = self:get_ptp_devinfo()
-	if not ptp_info then
-		return false
-	end
 	-- older cams don't have serial
-	if not ptp_info.serial_number then
-		ptp_info.serial_number = ''
+	local serial = ''
+	if self.ptpdev.serial_number then
+		serial = self.ptpdev.serial_number
 	end
 --	printf('model %s (%s) serial_number %s (%s)\n',ptp_info.model,match.model,ptp_info.serial_number, match.serial_number)
-	return (string.find(ptp_info.model,match.model) and string.find(ptp_info.serial_number,match.serial_number))
+	return (string.find(self.ptpdev.model,match.model) and string.find(serial,match.serial_number))
 end
 
 --[[
@@ -774,6 +772,71 @@ function con_methods:wait_status(opts)
 end
 
 --[[
+set usbdev, ptpdev apiver for current connection
+TODO handle not connected/errors
+]]
+function con_methods:update_connection_info()
+	self.usbdev=self:get_usb_devinfo()
+	self.ptpdev=self:get_ptp_devinfo()	
+	local major,minor=self:camera_api_version()
+	self.apiver={major=major,minor=minor}
+end
+--[[
+override low level connect to gather some useful information that shouldn't change over life of connection
+opts{
+	raw:bool -- just call the low level connect (saves ~40ms)
+}
+]]
+function con_methods:connect(opts)
+	opts = util.extend_table({},opts)
+	local status,err=chdk_connection.connect(self._con)
+	if not status then
+		return false,err
+	end
+	if opts.raw then
+		return true
+	end
+	self:update_connection_info()
+	return true
+end
+
+--[[
+attempt to reconnect to the device
+opts{
+	wait=<ms> -- amount of time to wait, default 2 sec to avoid probs with dev numbers changing
+	strict=bool -- fail if model, pid or serial number changes
+}
+if strict is not set, reconnect to different device returns true, <message>
+]]
+function con_methods:reconnect(opts)
+	opts=util.extend_table({
+		wait=2000,
+		strict=true,
+	},opts)
+	if self:is_connected() then
+		self:disconnect()
+	end
+	local ptpdev = self.ptpdev
+	local usbdev = self.usbdev
+	-- appears to be needed to avoid device numbers changing (reset too soon ?)
+	sys.sleep(opts.wait)
+	local status,err = self:connect()
+	if not status then
+		return status,err
+	end
+	if ptpdev.model ~= self.ptpdev.model
+			or ptpdev.serial_number ~= self.ptpdev.serial_number
+			or usbdev.product_id ~= self.usbdev.product_id then
+		if opts.strict then
+			self:disconnect()
+			return false,'reconnected to a different device'
+		else
+			return true,'reconnected to a different device'
+		end
+	end
+	return true
+end
+--[[
 meta table for wrapped connection object
 ]]
 local con_meta = {
@@ -823,6 +886,10 @@ return a connection object wrapped with chdku methods
 devspec is a table specifying the bus and device name to connect to
 no checking is done on the existence of the device
 if devspec is null, a dummy connection is returned
+
+TODO this returns a *new* wrapper object, even
+if one already exist for the underlying object
+not clear if this is desirable, could cache a table of them
 ]]
 function chdku.connection(devspec)
 	local con = {}
