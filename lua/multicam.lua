@@ -128,16 +128,46 @@ function mc:init_sync_single(lcon,lt0,rt0)
 		end
 		sys.sleep(50) -- don't want messages to get queued
 	end
+-- average difference between predicted and returned time in test
+-- large |value| implies initial from init_sync was an exteme
 	local tickoff = util.table_amean(ticks)
-	local msend = util.table_amean(sends) -- original in us
+-- msend average time to complete a send, accounts for a portion of latency
+-- not clear what this includes, or how much is spent in each direction
+	local msend = util.table_amean(sends)
 	printf('%s: mean offset %f (%d)\n',lcon.ptpdev.model,tickoff,#ticks)
 	printf('%s: mean send %f (%d)\n',lcon.ptpdev.model,msend,#sends)
 	lcon.mc_sync = {
-		rt0=rt0,
-		lt0=lt0,
+		lt0=lt0, -- base local time
+		rt0=rt0, -- base remote time obtained at lt0 + latency
 		tickoff=tickoff,
 		msend=msend,
+		-- adjusted base remote time 
+		rtadj = rt0 - tickoff - msend/2,
 	}
+	--local t0=ustime.new()
+	for i=1,10 do
+		local status,err=lcon:write_msg('tick')
+		if status then
+			local expect = self:get_sync_tick(lcon,ustime.new(),1000)
+			local status,msg=lcon:wait_msg({
+					mtype='user',
+					msubtype='table',
+					munserialize=true,
+			})
+			if status then
+				printf('%s: expect=%d r=%d d=%d\n',
+					lcon.ptpdev.model,
+					expect,
+					msg.status,
+					expect-msg.status)
+			else
+				warnf('sync_single wait_msg failed: %s\n',err)
+			end
+		else
+			warnf('sync_single write_msg failed: %s\n',err)
+		end
+		sys.sleep(50) -- don't want messages to get queued
+	end
 end
 --[[
 initialize values to allow all cameras to execute a given command as close as possible to the same real time
@@ -171,46 +201,19 @@ function mc:get_single_status(lcon,cmd,r)
 		return
 	end
 	if status.msg then
-		local msg,err=lcon:read_msg()
+		local msg,err=lcon:read_msg_strict({
+			mtype='user',
+			msubtype='table',
+			munserialize=true
+		})
 		if not msg then
 			r.failed = true
-			r.err = 'msg status with no message ?!?'
+			r.err = err
 			return 
 		end
-		if msg.script_id ~= lcon:get_script_id() then
-			-- TODO warn - not sure what to do with soft fails, keep trying ?
-			warnf('msg from unexpected script_id %d\n',msg.script_id)
-			return
-		elseif msg.type == 'user' then
-			if msg.subtype ~= 'table' then
-				warnf('unexpected message type %s\n',msg.type)
-				return
-			end
-			local v = util.unserialize(msg.value)
-			if type(v) ~= 'table' then
-				warnf('failed to unserialize msg\n')
-				return
-			end
-			if v.cmd ~= cmd then
-				warnf('message from unexpected cmd %s',tostring(msg.cmd))
-				return
-			end
-			r.done = true
-			r.status = v.status
-			return
-		elseif msg.type == 'return' then
-			r.failed = true
-			r.err = 'unexpected return'
-			return
-		elseif msg.type == 'error' then
-			r.failed = true
-			r.err = msg.value
-			return
-		else
-			r.failed = true
-			r.err = 'unkown message type ?!?'
-			return
-		end
+		r.done = true
+		r.status = msg
+		return
 	elseif status.run == false then
 		-- not running, no messages waiting
 		r.failed = true
@@ -263,19 +266,37 @@ function mc:wait_status_msg(cmd,opts)
 	end
 end
 --[[
+get camera tick matching tstart + syncat
+<camera base time> + <tstart - local base time> + syncat
+]]
+function mc:get_sync_tick(lcon,tstart,syncat)
+	return lcon.mc_sync.rtadj + ustime.diffms(tstart,lcon.mc_sync.lt0) + syncat
+end
+--[[
 send command
 opts {
 	wait=bool - expect / wait for status message
 	arg=string
+	syncat=<ms> -- number of ms after now command should execute (TODO accept a ustime)
 	--
 }
+if syncat is set, sends a synchronized command
+to execute at approximately local issue time + syncat
+command must accept a camera tick time as it's argument (e.g. shoot)
 ]]
 function mc:cmd(cmd,opts)
 	opts=util.extend_table({},opts)
+	local tstart = ustime.new()
+	local sendcmd = cmd
 	for i,lcon in ipairs(self.cams) do
-		local status,err = lcon:write_msg(cmd)
+		local status,err
+		if opts.syncat then
+			sendcmd = string.format('%s %d',cmd,self:get_synced_tick(lcon,tstart,syncat))
+		end
+		local status,err = lcon:write_msg(sendcmd)
+		printf('%s:%s\n',lcon.ptpdev.model,sendcmd)
 		if not status then
-			warnf('%d: send %s cmd failed: %s\n',i,tostring(cmd),tostring(err))
+			warnf('%d: send %s cmd failed: %s\n',i,tostring(sendcmd),tostring(err))
 		end
 	end
 	if not opts.wait then
