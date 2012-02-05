@@ -227,10 +227,18 @@ function cli:execute(line)
 			if not args then
 				return false,msg
 			end
+			local cstatus
 			local t0=ustime.new()
-			status,msg = self.names[cmd](args)
+			cstatus,status,msg = xpcall(
+				function()
+					return self.names[cmd](args)
+				end,
+				util.err_traceback)
 			if cli.showtime then
 				printf("time %.4f\n",ustime.diff(t0)/1000000)
+			end
+			if not cstatus then
+				return false,status
 			end
 			if not status and not msg then
 				msg=cmd .. " failed"
@@ -315,7 +323,7 @@ cli:add_commands{
 		func=function(self,args) 
 			local f,r = loadstring(args)
 			if f then
-				r={pcall(f)};
+				r={xpcall(f,util.err_traceback)}
 				if not r[1] then 
 					return false, string.format("call failed:%s\n",r[2])
 				end

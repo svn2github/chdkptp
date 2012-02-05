@@ -46,6 +46,10 @@ function util.errf(format,...)
 	fprintf(util.util_stderr,"ERROR: " .. format,...)
 end
 
+function util.err_traceback(err)
+	return debug.traceback(err,2)
+end
+
 util.extend_table_max_depth = 10
 local extend_table_r
 extend_table_r = function(target,source,seen,depth) 
@@ -119,6 +123,17 @@ function util.in_table(table,value)
 			return true
 		end
 	end
+end
+
+function util.table_amean(table)
+	if #table == 0 then
+		return nil
+	end
+	local sum = 0
+	for i=1,#table do
+		sum = sum + table[i]
+	end
+	return sum/#table
 end
 
 --[[
