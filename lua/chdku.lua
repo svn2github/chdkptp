@@ -683,6 +683,9 @@ function con_methods:read_msg_strict(opts)
 	end
 	if opts.munserialize then
 		local v = util.unserialize(msg.value)
+		if opts.msubtype and type(v) ~= opts.msubtype then
+			return false,'unserialize failed'
+		end
 		return true,v
 	end
 	return true,msg
