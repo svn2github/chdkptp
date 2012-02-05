@@ -39,7 +39,9 @@ function mc:connect()
 	for i, devinfo in ipairs(devices) do
 		local lcon,msg = chdku.connection(devinfo)
 		-- if not already connected, try to connect
-		if not lcon:is_connected() then
+		if lcon:is_connected() then
+			lcon:update_connection_info()
+		else
 			local status,err = lcon:connect()
 			if not status then
 				warnf('%d: connect failed bus:%s dev:%s err:%s\n',i,devinfo.dev,devinfo.bus,tostring(err))
@@ -47,8 +49,12 @@ function mc:connect()
 		end
 		-- if connection didn't fail
 		if lcon:is_connected() then
-			local ptpinfo = lcon:get_ptp_devinfo()
-			printf('%d: %s bus:%s dev:%s sn:%s\n',i,ptpinfo.model,devinfo.dev,devinfo.bus,tostring(ptpinfo.serial_number))
+			printf('%d:%s bus=%s dev=%s sn=%s\n',
+				i,
+				lcon.ptpdev.model,
+				lcon.usbdev.dev,
+				lcon.usbdev.bus,
+				tostring(lcon.ptpdev.serial_number))
 			table.insert(self.cams,lcon)
 		end
 	end
@@ -89,11 +95,15 @@ function mc:check_errors()
 	end
 end
 
-function mc:init_sync_single(lcon,lt0,tsend,rt0)
-	local offset = tsend
+function mc:init_sync_single(lcon,lt0,rt0)
+	local ticks={}
+	local sends={}
+	--printf('lt0 %d rt0 %d\n',lt0,rt0)
 	for i=1,10 do
-		local diff = ustime.diffms(lt0) + offset
+		local tsend = ustime.new()
+		local diff = ustime.diffms(lt0)
 		local status,err=lcon:write_msg('tick')
+		sends[i] = ustime.diffms(tsend)
 		if status then
 			local expect = rt0 + diff
 			local status,msg=lcon:wait_msg({
@@ -102,19 +112,31 @@ function mc:init_sync_single(lcon,lt0,tsend,rt0)
 					munserialize=true,
 			})
 			if status then
-				printf('expect %d got %d delta %d\n',expect,msg.status,expect-msg.status)
+				printf('%s: send %d diff %d pred=%d r=%d delta=%d\n',
+					lcon.ptpdev.model,
+					sends[i],
+					diff,
+					expect,
+					msg.status,
+					expect-msg.status)
+				table.insert(ticks,expect-msg.status)
 			else
 				warnf('sync_single wait_msg failed: %s\n',err)
 			end
 		else
 			warnf('sync_single write_msg failed: %s\n',err)
 		end
+		sys.sleep(50) -- don't want messages to get queued
 	end
+	local tickoff = util.table_amean(ticks)
+	local msend = util.table_amean(sends) -- original in us
+	printf('%s: mean offset %f (%d)\n',lcon.ptpdev.model,tickoff,#ticks)
+	printf('%s: mean send %f (%d)\n',lcon.ptpdev.model,msend,#sends)
 	lcon.mc_sync = {
 		rt0=rt0,
 		lt0=lt0,
-		tsend=tsend,
-		offset=offset,
+		tickoff=tickoff,
+		msend=msend,
 	}
 end
 --[[
@@ -124,7 +146,6 @@ function mc:init_sync()
 	for i,lcon in ipairs(self.cams) do
 		local t0=ustime.new()
 		local status,err=lcon:write_msg('tick')
-		local tsend=ustime.diffms(t0)
 		if status then
 			local status,msg=lcon:wait_msg({
 				mtype='user',
@@ -132,12 +153,12 @@ function mc:init_sync()
 				munserialize=true,
 			})
 			if status then
-				self:init_sync_single(lcon,t0,tsend,msg.status)
+				self:init_sync_single(lcon,t0,msg.status)
 			else
-				warnf('%d:wait_msg failed: %s\n',err)
+				warnf('%d:wait_msg failed: %s\n',i,tostring(msg))
 			end
 		else
-			warnf('%d:write_msg failed: %s\n',err)
+			warnf('%d:write_msg failed: %s\n',i,tostring(err))
 		end
 	end
 end
@@ -343,9 +364,12 @@ function cmds.preshoot()
 end
 
 function cmds.shoot()
-	local ms=tonumber(mc.args)
-	if ms then
-		sleep(ms)
+	local shottick=tonumber(mc.args)
+	if shottick then
+		local s=shottick - get_tick_count()
+		if s >= 10 then
+			sleep(s)
+		end
 	end
 	press('shoot_full')
 	sleep(mc.shoot_hold)
