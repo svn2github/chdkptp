@@ -202,15 +202,20 @@ function mc:get_single_status(lcon,cmd,r)
 		return
 	end
 	if status.msg then
-		local msg,err=lcon:read_msg_strict({
+		local status,msg=lcon:read_msg_strict({
 			mtype='user',
 			msubtype='table',
 			munserialize=true
 		})
-		if not msg then
+		if not status then
 			r.failed = true
-			r.err = err
+			r.err = msg
 			return 
+		end
+		-- TODO it would be good to skip over any stale status messages
+		if msg.cmd ~= cmd then
+			r.failed = true
+			r.err = 'status from unexpected cmd:'..tostring(msg.cmd)
 		end
 		r.done = true
 		r.status = msg
@@ -273,11 +278,17 @@ get camera tick matching tstart + syncat
 function mc:get_sync_tick(lcon,tstart,syncat)
 	return lcon.mc_sync.rtadj + ustime.diffms(tstart,lcon.mc_sync.lt0) + syncat
 end
+function mc:flushmsgs()
+	for i,lcon in ipairs(self.cams) do
+		lcon:flushmsgs()
+	end
+end
 --[[
 send command
 opts {
 	wait=bool - expect / wait for status message
 	arg=string
+	flushmsgs=bool - flush any pending messages
 	syncat=<ms> -- number of ms after now command should execute (TODO accept a ustime)
 	--
 }
@@ -286,13 +297,16 @@ to execute at approximately local issue time + syncat
 command must accept a camera tick time as it's argument (e.g. shoot)
 ]]
 function mc:cmd(cmd,opts)
-	opts=util.extend_table({},opts)
 	local tstart = ustime.new()
+	opts=util.extend_table({},opts)
+	if opts.flushmsgs then
+		self:flushmsgs()
+	end
 	local sendcmd = cmd
 	for i,lcon in ipairs(self.cams) do
 		local status,err
 		if opts.syncat then
-			sendcmd = string.format('%s %d',cmd,self:get_synced_tick(lcon,tstart,syncat))
+			sendcmd = string.format('%s %d',cmd,self:get_sync_tick(lcon,tstart,opts.syncat))
 		end
 		local status,err = lcon:write_msg(sendcmd)
 		printf('%s:%s\n',lcon.ptpdev.model,sendcmd)
@@ -303,12 +317,50 @@ function mc:cmd(cmd,opts)
 	if not opts.wait then
 		return true
 	end
-	return self:wait_status_msg(cmd,opts)
+
+	-- to match remote command name
+	local cmdname=string.match(cmd,'^(%w+)')
+
+	return self:wait_status_msg(cmdname,opts)
 end
 
 function mc:cmdwait(cmd,opts)
 	opts = util.extend_table({wait=true},opts)
 	return self:cmd(cmd,opts)
+end
+
+function mc:print_cmd_status(status,results)
+	if status then
+		printf("ok\n")
+	else
+		printf("errors\n")
+	end
+	if results then
+		for i,v in ipairs(results) do
+			printf('%d: %s\n',i,tostring(util.serialize(v,{pretty=true})))
+		end
+	end
+end
+function mc:testshots(nshots) 
+	if not nshots then
+		nshots = 1
+	end
+	self:flushmsgs()
+	for i=1,nshots do
+		self:print_cmd_status(self:cmdwait('call return get_exp_count()'))
+		self:print_cmd_status(self:cmdwait('call set_tv96_direct(768);set_sv96(672)'))
+		self:print_cmd_status(self:cmdwait('preshoot'))
+		local t=ustime.new()
+		self:cmd('shoot',{syncat=300})
+		sys.sleep(240)
+		for j=1,25 do
+			printf('%d %d\n',i,ustime.diffms(t)-300)
+			sys.sleep(20)
+		end
+		self:print_cmd_status(self:wait_status_msg('shoot'))
+		self:print_cmd_status(self:cmdwait('call return get_exp_count()'))
+		sys.sleep(500)
+	end
 end
 
 --[[
