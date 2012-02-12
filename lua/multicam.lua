@@ -146,22 +146,23 @@ function mc:init_sync_single(lcon,lt0,rt0)
 	}
 	--local t0=ustime.new()
 	for i=1,10 do
-		local status,err=lcon:write_msg('tick')
+		local expect = self:get_sync_tick(lcon,ustime.new(),100)
+		local status,err=lcon:write_msg(string.format('synctick %d',expect))
 		if status then
-			local expect = self:get_sync_tick(lcon,ustime.new(),1000)
 			local status,msg=lcon:wait_msg({
 					mtype='user',
 					msubtype='table',
 					munserialize=true,
 			})
 			if status then
-				printf('%s: expect=%d r=%d d=%d\n',
+				printf('%s: expect=%d r=%d d=%d %s\n',
 					lcon.ptpdev.model,
 					expect,
 					msg.status,
-					expect-msg.status)
+					expect-msg.status,
+					msg.msg)
 			else
-				warnf('sync_single wait_msg failed: %s\n',err)
+				warnf('sync_single wait_msg failed: %s\n',msg)
 			end
 		else
 			warnf('sync_single write_msg failed: %s\n',err)
@@ -367,6 +368,16 @@ function write_status(status,msg)
 	},mc.status_msg_timeout)
 end
 
+function wait_tick(synctick)
+	if synctick then
+		-- current chdk builds sleep an extra 20ms on top of requested amount
+		local s=synctick - get_tick_count() - 20
+		if s >= 10 then
+			sleep(s)
+		end
+	end
+end
+
 function cmds.rec()
 	switch_mode_usb(1)
 	return wait_timeout(get_mode,true,100,mc.mode_sw_timeout)
@@ -385,13 +396,7 @@ function cmds.preshoot()
 end
 
 function cmds.shoot()
-	local shottick=tonumber(mc.args)
-	if shottick then
-		local s=shottick - get_tick_count()
-		if s >= 10 then
-			sleep(s)
-		end
-	end
+	wait_tick(tonumber(mc.args))
 	press('shoot_full')
 	sleep(mc.shoot_hold)
 	release('shoot_full')
@@ -402,12 +407,42 @@ function cmds.tick()
 	write_status(get_tick_count())
 end
 
+function cmds.synctick()
+	t=get_tick_count()
+	wait_tick(tonumber(mc.args))
+	write_status(get_tick_count(),string.format('start %d',t))
+end
+
 function cmds.exit()
 	mc.done = true
 end
 
+function cmds.call()
+	local f,err=loadstring(mc.args)
+	if f then 
+		write_status({f()})
+	else
+		write_status(false,err)
+	end
+end
+
+function cmds.pcall()
+	local f,err=loadstring(mc.args)
+	if f then 
+		local r={pcall(f)}
+		if not r[1] then
+			write_status(false,r)
+		else
+			write_status(r)
+		end
+	else
+		write_status(false,err)
+	end
+end
+
 function mc.run(opts)
 	extend_table(mc,opts)
+	set_yield(-1,-1)
 	repeat 
 		local msg=read_usb_msg(mc.msg_timeout)
 		if msg then
