@@ -36,7 +36,25 @@ INC_PATHS+=-I$(IUP_INCLUDE_DIR)
 endif
 CFLAGS+=-DCHDKPTP_IUP=1
 SYS_LIBS+=$(IUP_SYS_LIBS)
+
+# CD only usable with IUP
+ifeq ("$(CD_SUPPORT)","1")
+ifdef CD_LIB_DIR
+LIB_PATHS+=-L$(CD_LIB_DIR)
+endif
+ifdef CD_INCLUDE_DIR
+INC_PATHS+=-I$(CD_INCLUDE_DIR)
+endif
+CFLAGS+=-DCHDKPTP_CD=1
+SYS_LIBS+=$(IUP_SYS_LIBS)
+LINK_LIBS=-l$(IUP_LUA_LIB) -l$(IUP_CD_LUA_LIB) -l$(CD_LUA_LIB) -l$(LUA_LIB) -l$(IUP_CD_LIB) -l$(CD_LIB) -l$(IUP_LIB) -l$(LIBUSB_LIB) -l$(CD_FREETYPE_LIB)
+ifeq ($(OSTYPE),Windows)
+SYS_LIBS+=-lwinspool
+endif
+else
 LINK_LIBS=-l$(IUP_LUA_LIB) -l$(LUA_LIB) -l$(IUP_LIB) -l$(LIBUSB_LIB)
+endif
+# iup
 endif
 
 INC_PATHS+=-I$(CHDK_SRC_DIR)

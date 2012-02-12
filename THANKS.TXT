@@ -10,10 +10,13 @@ Copyright (c) 1994-2011 Lua.org, PUC-Rio.
 IUP http://www.tecgraf.puc-rio.br/iup/
 Copyright (c) 1994-2011 Tecgraf, PUC-Rio.
 
+CD http://www.tecgraf.puc-rio.br/cd/
+Copyright (c) 1994-2012 Tecgraf, PUC-Rio.
+
 LuaFileSystem http://keplerproject.github.com/luafilesystem/
 Copyright (c) 2003 Kepler Project.
 
-Lua, IUP and LuaFileSystem are distributed under the following license:
+Lua, IUP, CD and LuaFileSystem are distributed under the following license:
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

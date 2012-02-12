@@ -150,7 +150,8 @@ end
 con=chdku.connection()
 
 if options.g then
-	if init_iup() then
+	printf('starting gui...\n')
+	if init_gui_libs() then
 		gui=require('gui')
 		return gui:run()
 	else

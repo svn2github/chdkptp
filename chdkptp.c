@@ -71,6 +71,12 @@
 #ifdef CHDKPTP_IUP
 #include <iup.h>
 #include <iuplua.h>
+#ifdef CHDKPTP_CD
+#include <cd.h>
+#include <cdlua.h>
+#include <cdiup.h>
+#include <cdluaiup.h>
+#endif
 #endif
 #include "lfs/lfs.h"
 
@@ -1531,25 +1537,33 @@ static int exec_lua_string(lua_State *L, const char *luacode) {
 	return r==0;
 }
 
-static int iup_inited;
+static int gui_inited;
 
-// TODO we should allow loading IUP with require
-static int init_iup(lua_State *L) {
+// TODO we should allow loading IUP and CD with require
+static int init_gui_libs(lua_State *L) {
 #ifdef CHDKPTP_IUP
-	if(!iup_inited) {
-		iup_inited = 1;
+	if(!gui_inited) {
+		gui_inited = 1;
 		iuplua_open(L); 
-		lua_pushboolean(L,1);
-		return 1;
-	}
+#ifdef CHDKPTP_CD
+		cdlua_open(L); 
+		cdluaiup_open(L); 
 #endif
+	}
+	lua_pushboolean(L,1);
+	return 1;
+#else
 	lua_pushboolean(L,0);
 	return 1;
+#endif
 }
 
-static int uninit_iup(lua_State *L) {
+static int uninit_gui_libs(lua_State *L) {
 #ifdef CHDKPTP_IUP
-	if(iup_inited) {
+	if(gui_inited) {
+#ifdef CHDKPTP_CD
+		cdlua_close(L);
+#endif
 		iuplua_close(L); 
 //		IupClose(); // ???
 		return 1;
@@ -1568,8 +1582,8 @@ static int init_lua_globals (lua_State *L, int argc, char **argv) {
 	}
 	lua_setglobal(L,"args");
 	// TODO hacky
-	lua_pushcfunction(L,init_iup);
-	lua_setglobal(L,"init_iup");
+	lua_pushcfunction(L,init_gui_libs);
+	lua_setglobal(L,"init_gui_libs");
 }
 
 /* main program  */
@@ -1585,7 +1599,7 @@ int main(int argc, char ** argv)
 	init_lua_globals(L,argc,argv);
 	chdkptp_registerlibs(L);
 	exec_lua_string(L,"require('main')");
-	uninit_iup(L);
+	uninit_gui_libs(L);
 	lua_close(L);
 	// gc takes care of any open connections
 

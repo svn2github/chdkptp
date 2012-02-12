@@ -26,6 +26,8 @@ chdkptp includes software from several other projects, see THANKS.TXT for detail
 =Dependencies=
 - IUP version 3.4 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work)
   Optional, edit makefile to build without iup gui support
+- CD Version 5.5 http://www.tecgraf.puc-rio.br/cd/
+  Optional, will be used for live display
 - Lua version 5.1 http://www.lua.org/
 - LibUSB (libusb-win32 on windows)
 - CHDK source for PTP protocol header http://tools.assembla.com/chdk/browser/trunk
@@ -48,6 +50,9 @@ file iup-3.3_Win32_mingw4_lib.zip
 Note, this package has the libraries in the root, with etc/ and include/ subdirectories.
 You may want to put the libraries in /lib to match the IUP recommended filesystem layout
 The examples and win32 binaries are not required, but may be helpful
+
+==Installing CD libraries==
+Similar to IUP, from http://sourceforge.net/projects/canvasdraw/files/
 
 ==Installing and building Lua==
 Get the lua 5.1.4 source from http://www.lua.org/download.html

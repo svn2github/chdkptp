@@ -20,6 +20,12 @@ IUP_LIB=iup
 IUP_LUA_LIB=iuplua51
 LIBUSB_LIB=usb
 
+CD_LIB=cd
+CD_LUA_LIB=cdlua51
+CD_FREETYPE_LIB=freetype6
+IUP_CD_LIB=iupcd
+IUP_CD_LUA_LIB=iupluacd51
+
 ifdef DEBUG
 CFLAGS+=-g
 LDFLAGS+=-g

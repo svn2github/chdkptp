@@ -71,6 +71,8 @@ img_inactive = iup.image {
       colors = { "215 215 215", "40 40 40", "100 100 100", "200 200 200" }
 }
 
+gui.has_cd = (cd and type(cd.CreateCanvas) == 'function')
+
 connect_icon = iup.label{
 	image = img_release,
 	iminactive = img_inactive,
@@ -589,6 +591,33 @@ function camfiletree:branchclose_cb(id)
 end
 ]]
 
+if gui.has_cd then
+	livecnv = iup.canvas{rastersize="320x240",expand="NO"}
+	function livecnv:map_cb()
+		print('map!')
+		self.canvas = cd.CreateCanvas(cd.IUP,self)
+	end
+
+	function livecnv:action()
+		print('action!')
+		---[[
+		canvas = self.canvas     -- retrieve the CD canvas from the IUP attribute
+		canvas:Activate()
+		canvas:Clear()
+		canvas:Foreground (cd.RED)
+		canvas:Box (10, 55, 10, 55)
+--		canvas:Foreground(cd.EncodeColor(255, 32, 140))
+--		canvas:Line(0, 0, 300, 100)
+		--]]
+	end
+
+	function livecnv:resize_cb(w,h)
+		--self.canvas:Activate()
+		print("Resize: Width="..w.."   Height="..h)
+	end
+	livecnvtitle='Live'
+end
+--]]
 -- creates a dialog
 dlg = iup.dialog{
 	iup.vbox{ 
@@ -607,9 +636,11 @@ dlg = iup.dialog{
 						btn_exec,
 					},
 				},
-				camfiletree;
+				camfiletree,
+				livecnv;
 				tabtitle0='console',
 				tabtitle1='files',
+				tabtitle2=livecnvtitle,
 			},
 			iup.vbox{
 				cam_btn_frame,
