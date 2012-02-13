@@ -79,6 +79,7 @@
 #endif
 #endif
 #include "lfs/lfs.h"
+#include "yuvutil.h"
 
 /* some defines comes here */
 
@@ -1406,6 +1407,42 @@ static int chdk_reset_device(lua_State *L) {
 		reset_device(dev);
 	}
 }
+
+/*
+TODO temp test
+put_live_image_to_canvas(canvas,data)
+*/
+static int chdk_put_live_image_to_canvas(lua_State *L) {
+#ifdef CHDKPTP_CD
+	cdCanvas *cnv = cdlua_checkcanvas(L,1);
+	// TODO accept user data
+
+	size_t len;
+	const char *data = luaL_checklstring(L,2,&len);
+	// TODO
+	if(len != ((720*240)*12)/8) {
+		lua_pushboolean(L,0);
+		return 1;
+	}
+	char *r=malloc(360*240);
+	char *g=malloc(360*240);
+	char *b=malloc(360*240);
+	yuv_live_to_cd_rgb(data,720,240,r,g,b);
+
+	cdCanvasPutImageRectRGB(cnv,
+							360,240, // image size
+							r,g,b, // data
+							0,0, // x,y,
+							0,0, // widht, height (default)
+							0,0,0,0); // xmin, xmax, ymin, ymax
+	free(r);
+	free(g);
+	free(b);
+#endif
+	lua_pushboolean(L,1);
+	return 1;
+}
+
 /*
 most functions return result[,errormessage]
 result is false or nil on error
@@ -1419,6 +1456,7 @@ static const luaL_Reg chdklib[] = {
   {"list_usb_devices", chdk_list_usb_devices},
   {"get_conlist", chdk_get_conlist}, // TEMP TESTING
   {"reset_device", chdk_reset_device}, // TEMP TESTING
+  {"put_live_image_to_canvas", chdk_put_live_image_to_canvas}, // TEMP TESTING
   {NULL, NULL}
 };
 

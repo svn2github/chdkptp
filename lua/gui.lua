@@ -592,7 +592,8 @@ end
 ]]
 
 if gui.has_cd then
-	livecnv = iup.canvas{rastersize="320x240",expand="NO"}
+	-- TODO +2 because it seems to have a border
+	livecnv = iup.canvas{rastersize="362x242",expand="NO"}
 	function livecnv:map_cb()
 		print('map!')
 		self.canvas = cd.CreateCanvas(cd.IUP,self)
@@ -600,10 +601,37 @@ if gui.has_cd then
 
 	function livecnv:action()
 		print('action!')
-		---[[
-		canvas = self.canvas     -- retrieve the CD canvas from the IUP attribute
+		local canvas = self.canvas     -- retrieve the CD canvas from the IUP attribute
 		canvas:Activate()
+		--[[
 		canvas:Clear()
+		canvas:Foreground (cd.RED)
+		canvas:Box (10, 55, 10, 55)
+		--]]
+		--[[
+		local w=360
+		local h=240
+		local image_rgb = cd.CreateImageRGB(w, h)	
+		for y=0,h-1 do
+			for x=0,w-1 do
+				image_rgb.r[y*w + x] = y
+				image_rgb.g[y*w + x] = 255-y
+				image_rgb.b[y*w + x] = 0
+			end
+		end
+		canvas:PutImageRectRGB(image_rgb, 0, 0, w, h, 0, 0, 0, 0)
+		--]]
+
+		---[[
+		local f=io.open('LIVE-D10.BIN','rb')
+		local data=f:read('*a')
+		f:close()
+		if not chdk.put_live_image_to_canvas(canvas,data) then
+			print('put fail')
+		end
+		--]]
+		--canvas:Flush();
+--[[
 		canvas:Foreground (cd.RED)
 		canvas:Box (10, 55, 10, 55)
 --		canvas:Foreground(cd.EncodeColor(255, 32, 140))
