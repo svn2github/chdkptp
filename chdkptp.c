@@ -1152,6 +1152,57 @@ static int chdk_script_status(lua_State *L) {
 	lua_setfield(L, -2, "msg");
 	return 1;
 }
+#ifdef CHDKPTP_LIVEVIEW
+/*
+TODO why not just use the handler_id to identify the handler ?
+handler[,errmsg]=con:get_handler(handler_id)
+handler - handler handle
+*/
+static int chdk_get_handler(lua_State *L) {
+  	CHDK_CONNECTION_METHOD;
+	int handler_id=lua_tonumber(L,2);
+	int handler;
+	if ( !ptp_usb->connected ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"not connected");
+		return 2;
+	}
+	if ( !ptp_chdk_get_handler(params,&params->deviceinfo,handler_id,&handler) ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"ptp error");
+		return 2;
+	}
+	lua_pushnumber(L,handler);
+	return 1;
+}
+/*
+TODO allow returning data as a userdata rather than lua string
+data[,errmsg]=con:get_handler(handler[,arg1[,arg2]])
+handler - handler handle
+*/
+static int chdk_call_handler(lua_State *L) {
+  	CHDK_CONNECTION_METHOD;
+	int handler=lua_tonumber(L,2);
+	int harg1=luaL_optnumber(L,3,0);
+	int harg2=luaL_optnumber(L,4,0);
+	char *data=NULL;
+	unsigned data_size = 0;
+	if ( !ptp_usb->connected ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"not connected");
+		return 2;
+	}
+	if ( !ptp_chdk_call_handler(params,&params->deviceinfo,handler,harg1,harg2,&data,&data_size) ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"ptp error");
+		return 2;
+	}
+	lua_pushlstring(L,data,data_size);
+	free(data);
+	return 1;
+
+}
+#endif
 
 // TODO these assume numbers are 0 based and contiguous 
 static const char* script_msg_type_to_name(unsigned type_id) {
@@ -1493,6 +1544,10 @@ static const luaL_Reg chdkconnection[] = {
   {"dev_status", chdk_dev_status},
   {"get_ptp_devinfo", chdk_get_ptp_devinfo},
   {"get_usb_devinfo", chdk_get_usb_devinfo}, // does not need to be connected, returns bus and dev at minimum
+#ifdef CHDKPTP_LIVEVIEW
+  {"get_handler",chdk_get_handler},
+  {"call_handler",chdk_call_handler},
+#endif
   {NULL, NULL}
 };
 

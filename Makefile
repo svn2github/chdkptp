@@ -56,6 +56,9 @@ LINK_LIBS=-l$(IUP_LUA_LIB) -l$(LUA_LIB) -l$(IUP_LIB) -l$(LIBUSB_LIB)
 endif
 # iup
 endif
+ifeq ("$(LIVEVIEW_SUPPORT)","1")
+CFLAGS+=-DCHDKPTP_LIVEVIEW=1
+endif
 
 INC_PATHS+=-I$(CHDK_SRC_DIR)
 CFLAGS+=$(INC_PATHS)

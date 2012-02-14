@@ -604,11 +604,6 @@ if gui.has_cd then
 		local canvas = self.canvas     -- retrieve the CD canvas from the IUP attribute
 		canvas:Activate()
 		--[[
-		canvas:Clear()
-		canvas:Foreground (cd.RED)
-		canvas:Box (10, 55, 10, 55)
-		--]]
-		--[[
 		local w=360
 		local h=240
 		local image_rgb = cd.CreateImageRGB(w, h)	
@@ -622,12 +617,17 @@ if gui.has_cd then
 		canvas:PutImageRectRGB(image_rgb, 0, 0, w, h, 0, 0, 0, 0)
 		--]]
 
-		---[[
+		--[[
 		local f=io.open('LIVE-D10.BIN','rb')
 		local data=f:read('*a')
 		f:close()
-		if not chdk.put_live_image_to_canvas(canvas,data) then
-			print('put fail')
+		--]]
+		if livedata then
+			if not chdk.put_live_image_to_canvas(canvas,livedata) then
+				print('put fail')
+			end
+		else
+			canvas:Clear()
 		end
 		--]]
 		--canvas:Flush();
@@ -644,6 +644,20 @@ if gui.has_cd then
 		print("Resize: Width="..w.."   Height="..h)
 	end
 	livecnvtitle='Live'
+	live_timer = iup.timer{ 
+		time = "100",
+	}
+	function live_timer:action_cb()
+		if not con.live_handler then
+			print('getting handler')
+			con.live_handler = con:get_handler(1)
+		end
+		if con:is_connected() then
+			livedata = string.sub(con:call_handler(con.live_handler,1),-(720*240*12)/8)
+			livecnv:action()
+		end
+	end
+
 end
 --]]
 -- creates a dialog
