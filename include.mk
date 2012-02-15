@@ -26,13 +26,14 @@ CD_FREETYPE_LIB=freetype6
 IUP_CD_LIB=iupcd
 IUP_CD_LUA_LIB=iupluacd51
 
+#see config-sample-*.mk
+-include $(TOPDIR)/config.mk
+
 ifdef DEBUG
 CFLAGS+=-g
 LDFLAGS+=-g
 endif
 
-#see config-sample-*.mk
--include $(TOPDIR)/config.mk
 
 DEP_DIR=.dep
 
