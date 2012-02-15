@@ -335,45 +335,6 @@ get_busses()
 	return (usb_get_busses());
 }
 
-/*
-   find_device() returns the pointer to a usb_device structure matching
-   given busn, devicen numbers. If any or both of arguments are 0 then the
-   first matching PTP device structure is returned. 
-*/
-struct usb_device*
-find_device (int busn, int devicen, short force);
-struct usb_device*
-find_device (int busn, int devn, short force)
-{
-	struct usb_bus *bus;
-	struct usb_device *dev;
-
-	bus=get_busses();
-	for (; bus; bus = bus->next) {
-		for (dev = bus->devices; dev; dev = dev->next) {
-			if (dev->config) {
-				if ((dev->config->interface->altsetting->bInterfaceClass==USB_CLASS_PTP)||force) {
-					if (dev->descriptor.bDeviceClass!=USB_CLASS_HUB) {
-						int curbusn, curdevn;
-
-						curbusn=strtol(bus->dirname,NULL,10);
-						curdevn=strtol(dev->filename,NULL,10);
-
-						if (devn==0) {
-							if (busn==0) return dev;
-							if (curbusn==busn) return dev;
-						} else {
-							if ((busn==0)&&(curdevn==devn)) return dev;
-							if ((curbusn==busn)&&(curdevn==devn)) return dev;
-						}
-					}
-				}
-			}
-		}
-	}
-	return NULL;
-}
-
 void
 find_endpoints(struct usb_device *dev, int* inep, int* outep, int* intep);
 void
@@ -410,64 +371,11 @@ find_endpoints(struct usb_device *dev, int* inep, int* outep, int* intep)
 	}
 }
 
-#if 0
-// TODO retry logic should be in lua
-int
-open_camera (int busn, int devn, short force, PTP_USB *ptp_usb, PTPParams *params, struct usb_device **dev)
-{
-	int retrycnt=0;
-	uint16_t ret=0;
-
-#ifdef DEBUG
-	printf("dev %i\tbus %i\n",devn,busn);
-#endif
-	
-  // retry device find for a while (in case the user just powered it on or called restart)
-	while ((retrycnt++ < MAXCONNRETRIES) && !ret) {
-		*dev=find_device(busn,devn,force);
-		if (*dev!=NULL) 
-			ret=1;
-		else {
-			fprintf(stderr,"Could not find any device matching given bus/dev numbers, retrying in 1 s...\n");
-			sleep(1);
-		}
-	}
-
-	if (*dev==NULL) {
-		fprintf(stderr,"could not find any device matching given "
-		"bus/dev numbers\n");
-		return -1;
-	}
-	find_endpoints(*dev,&ptp_usb->inep,&ptp_usb->outep,&ptp_usb->intep);
-    init_ptp_usb(params, ptp_usb, *dev);   
-
-  // first connection attempt often fails if some other app or driver has accessed the camera, retry for a while
-	retrycnt=0;
-	while ((retrycnt++ < MAXCONNRETRIES) && ((ret=ptp_opensession(params,1))!=PTP_RC_OK)) {
-		printf("Failed to connect (attempt %d), retrying in 1 s...\n", retrycnt);
-		close_usb(ptp_usb, *dev);
-		sleep(1);
-		find_endpoints(*dev,&ptp_usb->inep,&ptp_usb->outep,&ptp_usb->intep);
-		init_ptp_usb(params, ptp_usb, *dev);   
-	}  
-	if (ret != PTP_RC_OK) {
-		fprintf(stderr,"ERROR: Could not open session!\n");
-		close_usb(ptp_usb, *dev);
-		return -1;
-	}
-
-	if (ptp_getdeviceinfo(params,&params->deviceinfo)!=PTP_RC_OK) {
-		fprintf(stderr,"ERROR: Could not get device info!\n");
-		close_usb(ptp_usb, *dev);
-		return -1;
-	}
-	return 0;
-}
-#endif
 void
 close_camera(PTP_USB *ptp_usb, PTPParams *params)
 {
 	// usb_device(handle) appears to give bogus results when the device has gone away
+	// TODO possible a different device could come back on this bus/dev ?
 	struct usb_device *dev=find_device_by_path(ptp_usb->bus,ptp_usb->dev);
 	if(!dev) {
 		fprintf(stderr,"attempted to close non-present device %s:%s\n",ptp_usb->bus,ptp_usb->dev);
@@ -478,35 +386,6 @@ close_camera(PTP_USB *ptp_usb, PTPParams *params)
 		fprintf(stderr,"ERROR: Could not close session!\n");
 	close_usb(ptp_usb, dev);
 }
-
-
-// TODO equivalent in lua, maybe just in list_devices
-#if 0
-void
-show_info (int busn, int devn, short force)
-{
-	PTPParams params;
-	PTP_USB ptp_usb;
-	struct usb_device *dev;
-
-	printf("\nCamera information\n");
-	printf("==================\n");
-	if (open_camera(busn, devn, force, &ptp_usb, &params, &dev)<0)
-		return;
-	printf("Model: %s\n",params.deviceinfo.Model);
-	printf("  manufacturer: %s\n",params.deviceinfo.Manufacturer);
-	printf("  serial number: '%s'\n",params.deviceinfo.SerialNumber);
-	printf("  device version: %s\n",params.deviceinfo.DeviceVersion);
-	printf("  extension ID: 0x%08lx\n",(long unsigned)
-					params.deviceinfo.VendorExtensionID);
-	printf("  extension description: %s\n",
-					params.deviceinfo.VendorExtensionDesc);
-	printf("  extension version: 0x%04x\n",
-				params.deviceinfo.VendorExtensionVersion);
-	printf("\n");
-	close_camera(&ptp_usb, &params, dev);
-}
-#endif
 
 int
 usb_get_endpoint_status(PTP_USB* ptp_usb, int ep, uint16_t* status)
@@ -721,7 +600,7 @@ int get_connection_udata_by_path(lua_State *L, const char *bus, const char *dev)
 	lua_getfield(L,-1,dev_path);
 	//  TODO could check meta table
 	if(lua_isuserdata(L,-1)) {
-		lua_replace(L, -2); // move udate up to connection list
+		lua_replace(L, -2); // move udata up to connection list
 		return 1;
 	} else {
 		lua_pop(L, 2); // nil, connection list
