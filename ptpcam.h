@@ -42,7 +42,7 @@ int myusb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int length,
 			if((result)!=PTP_RC_OK) {			\
 				ptp_perror(&params,result);		\
 				fprintf(stderr,"ERROR: "error);		\
-				close_camera(&ptp_usb, &params, dev);   \
+				close_camera(&ptp_usb, &params);   \
 				return;					\
 			}						\
 }
@@ -157,6 +157,6 @@ void clear_stall(PTP_USB* ptp_usb);
 int usb_get_endpoint_status(PTP_USB* ptp_usb, int ep, uint16_t* status);
 int usb_clear_stall_feature(PTP_USB* ptp_usb, int ep);
 int open_camera (int busn, int devn, short force, PTP_USB *ptp_usb, PTPParams *params, struct usb_device **dev);
-void close_camera (PTP_USB *ptp_usb, PTPParams *params, struct usb_device *dev);
-
+void close_camera (PTP_USB *ptp_usb, PTPParams *params);
+struct usb_device *find_device_by_path(const char *find_bus, const char *find_dev);
 #endif /* __PTPCAM_H__ */

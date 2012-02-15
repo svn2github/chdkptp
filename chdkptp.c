@@ -465,8 +465,15 @@ open_camera (int busn, int devn, short force, PTP_USB *ptp_usb, PTPParams *param
 }
 #endif
 void
-close_camera(PTP_USB *ptp_usb, PTPParams *params, struct usb_device *dev)
+close_camera(PTP_USB *ptp_usb, PTPParams *params)
 {
+	// usb_device(handle) appears to give bogus results when the device has gone away
+	struct usb_device *dev=find_device_by_path(ptp_usb->bus,ptp_usb->dev);
+	if(!dev) {
+		fprintf(stderr,"attempted to close non-present device %s:%s\n",ptp_usb->bus,ptp_usb->dev);
+		return;
+	}
+
 	if (ptp_closesession(params)!=PTP_RC_OK)
 		fprintf(stderr,"ERROR: Could not close session!\n");
 	close_usb(ptp_usb, dev);
@@ -626,7 +633,7 @@ static void get_connection_data(lua_State *L,int narg, PTPParams **params,PTP_US
 static void close_connection(PTPParams *params,PTP_USB *ptp_usb)
 {
 	if(ptp_usb->connected) {
-		close_camera(ptp_usb,params,usb_device(ptp_usb->handle));
+		close_camera(ptp_usb,params);
 	}
 	ptp_usb->connected = 0;
 }
@@ -803,7 +810,7 @@ int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
 	if (ptp_getdeviceinfo(params,&params->deviceinfo)!=PTP_RC_OK) {
 		// TODO do we want to close here ?
 		printf("Could not get device info!\n");
-		close_camera(ptp_usb, params, dev);
+		close_camera(ptp_usb, params);
 		return 0;
 	}
 	// TODO we could check camera CHDK, API version, etc here
@@ -1514,10 +1521,12 @@ static const luaL_Reg chdklib[] = {
 static int chdk_connection_gc(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 
-//	printf("collecting connection %s:%s\n",ptp_usb->bus,ptp_usb->dev);
+	printf("collecting connection %s:%s\n",ptp_usb->bus,ptp_usb->dev);
+
 	if(ptp_usb->connected) {
-//		printf("was connected\n");
-		close_camera(ptp_usb,params,usb_device(ptp_usb->handle));
+		printf("disconnecting...");
+		close_camera(ptp_usb,params);
+		printf("done\n");
 	}
 	free(ptp_usb);
 	return 0;
