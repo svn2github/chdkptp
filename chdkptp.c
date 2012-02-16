@@ -1400,12 +1400,12 @@ static const luaL_Reg chdklib[] = {
 static int chdk_connection_gc(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 
-	printf("collecting connection %s:%s\n",ptp_usb->bus,ptp_usb->dev);
+	//printf("collecting connection %s:%s\n",ptp_usb->bus,ptp_usb->dev);
 
 	if(ptp_usb->connected) {
-		printf("disconnecting...");
+		//printf("disconnecting...");
 		close_camera(ptp_usb,params);
-		printf("done\n");
+		//printf("done\n");
 	}
 	free(ptp_usb);
 	return 0;
