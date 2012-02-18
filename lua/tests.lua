@@ -134,10 +134,38 @@ t.ustime = function()
 	assert(ustime.diff(t1,t0)==900000)
 end
 
+t.lbuf = function()
+	local s="hello world"
+	local l=lbuf.new(s)
+	assert(s:len() == l:len())
+	assert(s == l:string())
+	assert(s:sub(0,100) == l:string(0,100))
+	assert(l:string(-5)=='world')
+	assert(l:string(1,5)=='hello')
+	assert(l:string(nil,5)=='hello')
+	assert(l:string(100,200)==s:sub(100,200))
+	assert(l:byte(0)==s:byte(0))
+	assert(l:byte(5)==s:byte(5))
+	local t1 = {l:byte(-5,100)}
+	local t2 = {s:byte(-5,100)}
+	assert(#t1 == #t2)
+	for i,v in ipairs(t2) do
+		assert(t1[i]==t2[i])
+	end
+	l=lbuf.new(100)
+	assert(l:len()==100)
+	assert(l:byte()==0)
+	s=""
+	l=lbuf.new(s)
+	assert(l:len()==0)
+	assert(l:byte()==nil)
+	assert(l:string()=="")
+end
+
 function m:run(name)
 	-- TODO side affects galore
 	printf('%s:start\n',name)
-	status,msg = pcall(t[name])
+	status,msg = xpcall(t[name],util.err_traceback)
 	printf('%s:',name)
 	if status then
 		printf('ok\n')

@@ -80,6 +80,7 @@
 #endif
 #include "lfs/lfs.h"
 #include "yuvutil.h"
+#include "lbuf.h"
 
 /* some defines comes here */
 
@@ -1577,6 +1578,7 @@ int main(int argc, char ** argv)
 	lua_State *L = lua_open();
 	luaL_openlibs(L);
 	luaopen_lfs(L);
+	lbuf_open(L);
 	init_lua_globals(L,argc,argv);
 	chdkptp_registerlibs(L);
 	exec_lua_string(L,"require('main')");
