@@ -48,7 +48,7 @@ static int lbuf_len(lua_State *L) {
 	return 1;
 }
 
-int get_index_arg(lua_State *L,lBuf_t *buf,int i,int def) {
+static int get_index_arg(lua_State *L,lBuf_t *buf,int i,int def) {
 	int val=luaL_optint(L,i,def);
 	if(val < 0) {
 		val = buf->len + val + 1;
@@ -106,19 +106,72 @@ static int lbuf_byte(lua_State *L) {
 	}
 	int i;
 	for(i=start;i<end;i++) {
-		lua_pushnumber(L,*(uint8_t *)(buf->bytes+i));
+		lua_pushnumber(L,*(char *)(buf->bytes+i));
 	}
 	return count;
+}
+
+typedef void (*get_vals_fn)(lua_State *L,void *p);
+
+void get_vals_int32(lua_State *L,void *p) {
+	int32_t v;
+	memcpy(&v,p,4); // p might not be aligned
+	lua_pushnumber(L,v);
+}
+
+void get_vals_uint32(lua_State *L,void *p) {
+	uint32_t v;
+	memcpy(&v,p,4); // p might not be aligned
+	lua_pushnumber(L,v);
+}
+
+/*
+v,...=buf:<get_vals_func>([offset[,count]])
+return elements of buff in starting at offset in chunks, exact format depending on functions
+not symmetric with byte(), due to complexity of dealing with > 1 size, alignment etc
+
+offset is offset in bytes, default 0, negative not currently allowed
+if offset is larger than buffer size, nothing is returned
+count defaults to 1, is rounded down to the largest valid value
+*/
+static int get_vals(lua_State *L,unsigned size,get_vals_fn f) {
+	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
+	int off=luaL_optint(L,2,0);
+	int count=luaL_optint(L,3,1);
+	// may give these special meaning later
+	if(off < 0 || count < 0) {
+		return luaL_error(L,"negative values not allowed");
+	}
+	if(off > buf->len - size) {
+		return 0;
+	}
+	if((off + count*size) > buf->len) {
+		count = (buf->len - off)/size;
+	}
+	if(!lua_checkstack(L,count)) {
+		return luaL_error(L,"insufficient stack space");
+	}
+	char *p;
+	int i;
+	for(i=0, p=buf->bytes + off;i<count;i++, p+=size) {
+		f(L,p);
+	}
+
+	return count;
+}
+static int lbuf_int32(lua_State *L) {
+	return get_vals(L,4,get_vals_int32);
+}
+static int lbuf_uint32(lua_State *L) {
+	return get_vals(L,4,get_vals_uint32);
 }
 
 static const luaL_Reg lbuf_methods[] = {
   {"len", lbuf_len},
   {"string", lbuf_string},
   {"byte", lbuf_byte},
-  /*
   {"int32", lbuf_int32},
   {"uint32", lbuf_uint32},
-  */
   {NULL, NULL}
 };
 
