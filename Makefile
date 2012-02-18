@@ -2,8 +2,8 @@ TOPDIR=.
 include include.mk
 
 ifeq ($(OSTYPE),Windows)
-SYS_LIBS=-lws2_32 -lkernel32
-IUP_SYS_LIBS=-lcomctl32 -lole32 -lgdi32 -lcomdlg32
+SYS_LIBS=ws2_32 kernel32
+IUP_SYS_LIBS=comctl32 ole32 gdi32 comdlg32
 endif
 
 ifeq ($(OSTYPE),Linux)
@@ -11,7 +11,7 @@ ifeq ($(OSTYPE),Linux)
 #TARGET_ARCH=-m32
 endif
 
-LINK_LIBS=-l$(LUA_LIB) -l$(LIBUSB_LIB)
+LINK_LIBS=$(LUA_LIB) $(LIBUSB_LIB)
 
 ifdef LUA_LIB_DIR
 LIB_PATHS+=-L$(LUA_LIB_DIR)
@@ -47,12 +47,12 @@ INC_PATHS+=-I$(CD_INCLUDE_DIR)
 endif
 CFLAGS+=-DCHDKPTP_CD=1
 SYS_LIBS+=$(IUP_SYS_LIBS)
-LINK_LIBS=-l$(IUP_LUA_LIB) -l$(IUP_CD_LUA_LIB) -l$(CD_LUA_LIB) -l$(LUA_LIB) -l$(IUP_CD_LIB) -l$(CD_LIB) -l$(IUP_LIB) -l$(LIBUSB_LIB) -l$(CD_FREETYPE_LIB)
+LINK_LIBS=$(IUP_LUA_LIB) $(IUP_CD_LUA_LIB) $(CD_LUA_LIB) $(LUA_LIB) $(IUP_CD_LIB) $(CD_LIB) $(IUP_LIB) $(LIBUSB_LIB) $(CD_FREETYPE_LIB)
 ifeq ($(OSTYPE),Windows)
-SYS_LIBS+=-lwinspool
+SYS_LIBS+=winspool
 endif
 else
-LINK_LIBS=-l$(IUP_LUA_LIB) -l$(LUA_LIB) -l$(IUP_LIB) -l$(LIBUSB_LIB)
+LINK_LIBS=$(IUP_LUA_LIB) $(LUA_LIB) $(IUP_LIB) $(LIBUSB_LIB)
 endif
 # iup
 endif
@@ -63,7 +63,7 @@ endif
 INC_PATHS+=-I$(CHDK_SRC_DIR)
 CFLAGS+=$(INC_PATHS)
 
-LDFLAGS+=$(LIB_PATHS) $(LINK_LIBS) $(SYS_LIBS)
+LDFLAGS+=$(LIB_PATHS) $(patsubst %,-l%,$(LINK_LIBS) $(SYS_LIBS)) 
 
 SUBDIRS=lfs
 

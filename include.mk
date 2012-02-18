@@ -2,10 +2,12 @@ HOSTPLATFORM:=$(patsubst MINGW%,MINGW,$(shell uname -s))
 ifeq ($(HOSTPLATFORM),MINGW)
 OSTYPE=Windows
 EXE=.exe
+CD_FREETYPE_LIB=freetype6
 else
 ifeq ($(HOSTPLATFORM),Linux)
 OSTYPE=Linux
 EXE= 
+CD_FREETYPE_LIB=freetype z
 endif
 endif
 
@@ -22,7 +24,6 @@ LIBUSB_LIB=usb
 
 CD_LIB=cd
 CD_LUA_LIB=cdlua51
-CD_FREETYPE_LIB=freetype6
 IUP_CD_LIB=iupcd
 IUP_CD_LUA_LIB=iupluacd51
 
