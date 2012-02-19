@@ -133,19 +133,20 @@ not symmetric with byte(), due to complexity of dealing with > 1 size, alignment
 offset is offset in bytes, default 0, negative not currently allowed
 if offset is larger than buffer size, nothing is returned
 count defaults to 1, is rounded down to the largest valid value
+negative count means all
 */
 static int get_vals(lua_State *L,unsigned size,get_vals_fn f) {
 	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
 	int off=luaL_optint(L,2,0);
 	int count=luaL_optint(L,3,1);
 	// may give these special meaning later
-	if(off < 0 || count < 0) {
-		return luaL_error(L,"negative values not allowed");
+	if(off < 0) {
+		return luaL_error(L,"negative offset not allowed");
 	}
 	if(off > buf->len - size) {
 		return 0;
 	}
-	if((off + count*size) > buf->len) {
+	if(count < 0 || (off + count*size) > buf->len) {
 		count = (buf->len - off)/size;
 	}
 	if(!lua_checkstack(L,count)) {
@@ -159,10 +160,10 @@ static int get_vals(lua_State *L,unsigned size,get_vals_fn f) {
 
 	return count;
 }
-static int lbuf_int32(lua_State *L) {
+static int lbuf_get_i32(lua_State *L) {
 	return get_vals(L,4,get_vals_int32);
 }
-static int lbuf_uint32(lua_State *L) {
+static int lbuf_get_u32(lua_State *L) {
 	return get_vals(L,4,get_vals_uint32);
 }
 
@@ -170,8 +171,8 @@ static const luaL_Reg lbuf_methods[] = {
   {"len", lbuf_len},
   {"string", lbuf_string},
   {"byte", lbuf_byte},
-  {"int32", lbuf_int32},
-  {"uint32", lbuf_uint32},
+  {"get_i32", lbuf_get_i32},
+  {"get_u32", lbuf_get_u32},
   {NULL, NULL}
 };
 

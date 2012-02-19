@@ -165,24 +165,27 @@ end
 t.lbufi = function()
 	-- TODO not endian aware
 	local l=lbuf.new('\001\000\000\000\255\255\255\255')
-	assert(l:int32()==1)
-	assert(l:int32(10)==nil)
-	assert(l:int32(5)==nil)
-	assert(l:int32(4,10)==-1)
-	assert(l:uint32()==1)
-	assert(l:int32(4)==-1)
-	assert(l:uint32(4)==0xFFFFFFFF)
-	assert(l:uint32(1)==0xFF000000)
-	local t={l:int32(0,100)}
+	assert(l:get_i32()==1)
+	assert(l:get_i32(10)==nil)
+	assert(l:get_i32(5)==nil)
+	assert(l:get_i32(4,10)==-1)
+	assert(l:get_u32()==1)
+	assert(l:get_i32(4)==-1)
+	assert(l:get_u32(4)==0xFFFFFFFF)
+	assert(l:get_u32(1)==0xFF000000)
+	local t={l:get_i32(0,100)}
 	assert(#t == 2)
 	assert(t[1] == 1)
 	assert(t[2] == -1)
 	local l=lbuf.new('\001\000\000\000\000\255\255\255\255')
-	assert(l:int32(1)==0x000000)
-	local t={l:uint32(0,3)}
+	assert(l:get_i32(1)==0x000000)
+	local t={l:get_u32(0,3)}
 	assert(#t == 2)
 	assert(t[1] == 1)
 	assert(t[2] == 0xFFFFFF00)
+	local l=lbuf.new(string.rep('\001',256))
+	local t={l:get_u32(4,-1)}
+	assert(#t == 63)
 end
 
 function m:run(name)
