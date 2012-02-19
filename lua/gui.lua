@@ -757,10 +757,12 @@ function maintabs:tabchange_cb(new,old)
 		iup.Refresh(dlg)
 		statusupdatepos()
 	end
-	if new == livebox then
-		live_timer.run = "YES"
-	else
-		live_timer.run = "NO"
+	if live_timer then
+		if new == livebox then
+			live_timer.run = "YES"
+		else
+			live_timer.run = "NO"
+		end
 	end
 end
 -- creates a dialog
