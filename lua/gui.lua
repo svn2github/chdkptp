@@ -4,7 +4,7 @@ based on the button example from the IUP distribution
 this file is licensed under the same terms as the IUP examples
 ]]
 local gui = {}
-
+local live = require('gui_live')
 -- defines released button image
 img_release = iup.image {
       {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
@@ -101,6 +101,7 @@ function update_connection_status()
 		btn_connect.title = "Connect"
 		connect_label.title = string.format("host:%d.%d cam:-.-",host_major,host_minor)
 	end
+	live.on_connect_change(con)
 end
 
 function btn_connect:action()
@@ -635,94 +636,18 @@ function camfiletree:branchclose_cb(id)
 end
 ]]
 
-if gui.has_cd then
-	-- TODO +2 because border is on
-	-- TODO should come from camera info
-	livecnv = iup.canvas{rastersize="362x242",expand="NO"}
-	livetoggle = iup.toggle{title="Viewfinder"}
-	bmptoggle = iup.toggle{title="UI Overlay"}
-	function livetoggle:action(state)
-		live_viewport = (state == 1)
-	end
-	function bmptoggle:action(state)
-		live_bitmap = (state == 1)
-	end
-	livebox = iup.hbox{
-		livecnv,
-		iup.frame{
-			iup.vbox{
-				livetoggle,
-				bmptoggle,
-			},
-			title="Stream"
-		},
-		margin="4x4",
-		ngap="4"
-	}
+live.init()
 
-	function livecnv:map_cb()
-		self.canvas = cd.CreateCanvas(cd.IUP,self)
-	end
-
-	function livecnv:action()
-		if maintabs.value ~= livebox then
-			return;
-		end
-		local canvas = self.canvas     -- retrieve the CD canvas from the IUP attribute
-		canvas:Activate()
-		if livedata then
-			if not chdk.put_live_image_to_canvas(canvas,livedata) then
-				print('put fail')
-			end
-		else
-			canvas:Clear()
-		end
-	end
-
-	--[[
-	function livecnv:resize_cb(w,h)
-		print("Resize: Width="..w.."   Height="..h)
-	end
-	]]
-
-	livecnvtitle='Live'
-	live_timer = iup.timer{ 
-		time = "100",
-	}
-	function live_timer:action_cb()
-		if con:is_connected() and maintabs.value == livebox then
-			local what=0
-			if live_viewport then
-				what = 1
-			end
-			if live_bitmap then
-				what = what + 4
-			end
-			if what == 0 then
-				return
-			end
-			-- TODO this needs to get reset on disconnect
-			if not con.live_handler then
-				--print('getting handler')
-				con.live_handler = con:get_handler(1)
-			end
-			livedata = con:call_handler(con.live_handler,what)
-			livecnv:action()
-		end
-	end
-
-end
---]]
 contab = iup.vbox{
 	statustext,
 }
 maintabs = iup.tabs{
 	contab,
 	camfiletree,
-	livebox,
+	live.get_container(),
 	tabtitle0='Console',
 	tabtitle1='Files',
-	tabtitle2=livecnvtitle,
+	tabtitle2=live.get_container_title(),
 }
 
 inputbox = iup.hbox{
@@ -757,13 +682,7 @@ function maintabs:tabchange_cb(new,old)
 		iup.Refresh(dlg)
 		statusupdatepos()
 	end
-	if live_timer then
-		if new == livebox then
-			live_timer.run = "YES"
-		else
-			live_timer.run = "NO"
-		end
-	end
+	live.update_run_state()
 end
 -- creates a dialog
 dlg = iup.dialog{
@@ -888,6 +807,7 @@ function gui:run()
 	do_connect_option()
 	update_connection_status()
 	do_execute_option()
+	live.update_run_state()
 
 	if (iup.MainLoopLevel()==0) then
 	  iup.MainLoop()
