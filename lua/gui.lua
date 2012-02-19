@@ -600,7 +600,7 @@ if gui.has_cd then
 	end
 
 	function livecnv:action()
-		print('action!')
+		--print('action!')
 		local canvas = self.canvas     -- retrieve the CD canvas from the IUP attribute
 		canvas:Activate()
 		--[[
@@ -653,7 +653,7 @@ if gui.has_cd then
 			con.live_handler = con:get_handler(1)
 		end
 		if con:is_connected() then
-			livedata = string.sub(con:call_handler(con.live_handler,1),-(720*240*12)/8)
+			livedata = con:call_handler(con.live_handler,1)
 			livecnv:action()
 		end
 	end

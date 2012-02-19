@@ -1063,8 +1063,7 @@ static int chdk_get_handler(lua_State *L) {
 	return 1;
 }
 /*
-TODO allow returning data as a userdata rather than lua string
-data[,errmsg]=con:get_handler(handler[,arg1[,arg2]])
+lbuf[,errmsg]=con:get_handler(handler[,arg1[,arg2]])
 handler - handler handle
 */
 static int chdk_call_handler(lua_State *L) {
@@ -1084,10 +1083,8 @@ static int chdk_call_handler(lua_State *L) {
 		lua_pushstring(L,"ptp error");
 		return 2;
 	}
-	lua_pushlstring(L,data,data_size);
-	free(data);
+	lbuf_create(L,data,data_size,LBUF_FL_FREE);
 	return 1;
-
 }
 #endif
 
@@ -1352,26 +1349,22 @@ put_live_image_to_canvas(canvas,data)
 */
 static int chdk_put_live_image_to_canvas(lua_State *L) {
 #ifdef CHDKPTP_CD
+	lv_vid_info *vi;
 	cdCanvas *cnv = cdlua_checkcanvas(L,1);
-	// TODO accept user data
-
-	size_t len;
-	const char *data = luaL_checklstring(L,2,&len);
-	// TODO
-	if(len != ((720*240)*12)/8) {
-		lua_pushboolean(L,0);
-		return 1;
-	}
-	char *r=malloc(360*240);
-	char *g=malloc(360*240);
-	char *b=malloc(360*240);
-	yuv_live_to_cd_rgb(data,720,240,r,g,b);
+	lBuf_t *buf = luaL_checkudata(L,2,LBUF_META);
+	vi = (lv_vid_info *)buf->bytes;
+	// TODO offsets
+	unsigned size = vi->vp_width*vi->vp_height;
+	char *r=malloc(size/2);
+	char *g=malloc(size/2);
+	char *b=malloc(size/2);
+	yuv_live_to_cd_rgb(buf->bytes+vi->vp_buffer_start,vi->vp_width,vi->vp_height,r,g,b);
 
 	cdCanvasPutImageRectRGB(cnv,
-							360,240, // image size
+							vi->vp_width/2,vi->vp_height, // image size
 							r,g,b, // data
 							0,0, // x,y,
-							0,0, // widht, height (default)
+							0,0, // width, height (default)
 							0,0,0,0); // xmin, xmax, ymin, ymax
 	free(r);
 	free(g);
