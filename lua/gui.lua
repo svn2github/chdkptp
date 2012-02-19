@@ -120,14 +120,13 @@ function btn_connect:action()
 	update_connection_status()
 end
 
--- creates a text box
+-- console input
 inputtext = iup.text{ 
---	size = "700x",
 	expand = "HORIZONTAL",
 }
 
+-- console output
 statustext = iup.text{ 
---	size = "700x256",
 	multiline = "YES",
 	readonly = "YES",
 	expand = "YES",
@@ -141,22 +140,6 @@ function statusprint(...)
 	end
 	statustext.append = s
 end
---[[
-device_menu = iup.menu
-{
-  {"Refresh devices"},
-  {"Disconnect"},
-  {},
-} 
-menu = iup.menu
-{
-  {
-    "Device",
-	device_menu
-  },
-}
---]]
-
 
 --[[
 status_timer = iup.timer{ 
@@ -177,11 +160,7 @@ end
 -- creates a button
 btn_exec = iup.button{ 
 	title = "Execute",
---	size = "EIGHTHxEIGHTH"
 }
-
--- creates a button entitled Exit
-btn_exit = iup.button{ title = "Exit" }
 
 cam_btns={}
 function cam_btn(name,title)
@@ -593,35 +572,19 @@ end
 
 if gui.has_cd then
 	-- TODO +2 because it seems to have a border
+	-- TODO should come from camera info
 	livecnv = iup.canvas{rastersize="362x242",expand="NO"}
+
 	function livecnv:map_cb()
-		print('map!')
 		self.canvas = cd.CreateCanvas(cd.IUP,self)
 	end
 
 	function livecnv:action()
-		--print('action!')
+		if maintabs.value ~= self then
+			return;
+		end
 		local canvas = self.canvas     -- retrieve the CD canvas from the IUP attribute
 		canvas:Activate()
-		--[[
-		local w=360
-		local h=240
-		local image_rgb = cd.CreateImageRGB(w, h)	
-		for y=0,h-1 do
-			for x=0,w-1 do
-				image_rgb.r[y*w + x] = y
-				image_rgb.g[y*w + x] = 255-y
-				image_rgb.b[y*w + x] = 0
-			end
-		end
-		canvas:PutImageRectRGB(image_rgb, 0, 0, w, h, 0, 0, 0, 0)
-		--]]
-
-		--[[
-		local f=io.open('LIVE-D10.BIN','rb')
-		local data=f:read('*a')
-		f:close()
-		--]]
 		if livedata then
 			if not chdk.put_live_image_to_canvas(canvas,livedata) then
 				print('put fail')
@@ -629,20 +592,12 @@ if gui.has_cd then
 		else
 			canvas:Clear()
 		end
-		--]]
-		--canvas:Flush();
---[[
-		canvas:Foreground (cd.RED)
-		canvas:Box (10, 55, 10, 55)
---		canvas:Foreground(cd.EncodeColor(255, 32, 140))
---		canvas:Line(0, 0, 300, 100)
-		--]]
 	end
 
 	function livecnv:resize_cb(w,h)
-		--self.canvas:Activate()
 		print("Resize: Width="..w.."   Height="..h)
 	end
+
 	livecnvtitle='Live'
 	live_timer = iup.timer{ 
 		time = "100",
@@ -652,7 +607,7 @@ if gui.has_cd then
 			print('getting handler')
 			con.live_handler = con:get_handler(1)
 		end
-		if con:is_connected() then
+		if con:is_connected() and maintabs.value == livecnv then
 			livedata = con:call_handler(con.live_handler,1)
 			livecnv:action()
 		end
@@ -660,6 +615,20 @@ if gui.has_cd then
 
 end
 --]]
+maintabs = iup.tabs{
+	iup.vbox{
+		statustext,
+		iup.hbox{
+			inputtext, 
+			btn_exec,
+		},
+	},
+	camfiletree,
+	livecnv;
+	tabtitle0='console',
+	tabtitle1='files',
+	tabtitle2=livecnvtitle,
+}
 -- creates a dialog
 dlg = iup.dialog{
 	iup.vbox{ 
@@ -670,20 +639,7 @@ dlg = iup.dialog{
 			btn_connect;
 		},
 		iup.hbox{
-			iup.tabs{
-				iup.vbox{
-					statustext,
-					iup.hbox{
-						inputtext, 
-						btn_exec,
-					},
-				},
-				camfiletree,
-				livecnv;
-				tabtitle0='console',
-				tabtitle1='files',
-				tabtitle2=livecnvtitle,
-			},
+			maintabs,
 			iup.vbox{
 				cam_btn_frame,
 				iup.hbox{
@@ -723,11 +679,6 @@ dlg = iup.dialog{
 				},
 			}
 		},
-		--[[
-		iup.hbox{
-			iup.fill{},
-		};
-		]]
 		padding = '2x2'
 	};
 	title = "CHDK PTP", 
@@ -736,9 +687,13 @@ dlg = iup.dialog{
 	maxbox = "YES",
 	minbox = "YES",
 	menu = menu,
-	size = "700x300",
+	rastersize = "700x400",
 	padding = '2x2'
 }
+function dlg:resize_cb(w,h)
+	print("dlg Resize: Width="..w.."   Height="..h)
+	self.clientsize=w.."x"..h
+end
 --n1.normalize="BOTH"
 cmd_history = {
 	pos = 1,
@@ -800,18 +755,12 @@ end
 function btn_exec:action()
 	statustext.append = '> ' .. inputtext.value
 	cmd_history:add(inputtext.value)
---	local status,err = chdk.execlua(inputtext.value)
 	add_status(cli:execute(inputtext.value))
 	inputtext.value=''
 	-- handle cli exit
 	if cli.finished then
 		dlg:hide()
 	end
-end
-
--- callback called when the exit button is activated
-function btn_exit:action()
-  dlg:hide()
 end
 
 function gui:run()
