@@ -701,6 +701,7 @@ if gui.has_cd then
 			if what == 0 then
 				return
 			end
+			-- TODO this needs to get reset on disconnect
 			if not con.live_handler then
 				--print('getting handler')
 				con.live_handler = con:get_handler(1)

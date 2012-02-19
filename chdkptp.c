@@ -1355,10 +1355,17 @@ static int chdk_put_live_image_to_canvas(lua_State *L) {
 	vi = (lv_vid_info *)buf->bytes;
 	// TODO offsets
 	unsigned size = vi->vp_width*vi->vp_height;
-	char *r=malloc(size/2);
-	char *g=malloc(size/2);
-	char *b=malloc(size/2);
-	yuv_live_to_cd_rgb(buf->bytes+vi->vp_buffer_start,vi->vp_width,vi->vp_height,r,g,b);
+	unsigned dispsize = size/2;
+	char *r=malloc(dispsize);
+	char *g=malloc(dispsize);
+	char *b=malloc(dispsize);
+	if(vi->vp_buffer_start) {
+		yuv_live_to_cd_rgb(buf->bytes+vi->vp_buffer_start,vi->vp_width,vi->vp_height,r,g,b);
+	} else {
+		memset(r,32,dispsize);
+		memset(g,32,dispsize);
+		memset(b,32,dispsize);
+	}
 
 	cdCanvasPutImageRectRGB(cnv,
 							vi->vp_width/2,vi->vp_height, // image size
