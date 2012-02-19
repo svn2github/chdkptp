@@ -639,13 +639,33 @@ if gui.has_cd then
 	-- TODO +2 because border is on
 	-- TODO should come from camera info
 	livecnv = iup.canvas{rastersize="362x242",expand="NO"}
+	livetoggle = iup.toggle{title="Viewfinder"}
+	bmptoggle = iup.toggle{title="UI Overlay"}
+	function livetoggle:action(state)
+		live_viewport = (state == 1)
+	end
+	function bmptoggle:action(state)
+		live_bitmap = (state == 1)
+	end
+	livebox = iup.hbox{
+		livecnv,
+		iup.frame{
+			iup.vbox{
+				livetoggle,
+				bmptoggle,
+			},
+			title="Stream"
+		},
+		margin="4x4",
+		ngap="4"
+	}
 
 	function livecnv:map_cb()
 		self.canvas = cd.CreateCanvas(cd.IUP,self)
 	end
 
 	function livecnv:action()
-		if maintabs.value ~= self then
+		if maintabs.value ~= livebox then
 			return;
 		end
 		local canvas = self.canvas     -- retrieve the CD canvas from the IUP attribute
@@ -670,12 +690,22 @@ if gui.has_cd then
 		time = "100",
 	}
 	function live_timer:action_cb()
-		if not con.live_handler then
-			print('getting handler')
-			con.live_handler = con:get_handler(1)
-		end
-		if con:is_connected() and maintabs.value == livecnv then
-			livedata = con:call_handler(con.live_handler,1)
+		if con:is_connected() and maintabs.value == livebox then
+			local what=0
+			if live_viewport then
+				what = 1
+			end
+			if live_bitmap then
+				what = what + 4
+			end
+			if what == 0 then
+				return
+			end
+			if not con.live_handler then
+				--print('getting handler')
+				con.live_handler = con:get_handler(1)
+			end
+			livedata = con:call_handler(con.live_handler,what)
 			livecnv:action()
 		end
 	end
@@ -688,7 +718,7 @@ contab = iup.vbox{
 maintabs = iup.tabs{
 	contab,
 	camfiletree,
-	livecnv,
+	livebox,
 	tabtitle0='Console',
 	tabtitle1='Files',
 	tabtitle2=livecnvtitle,
@@ -725,6 +755,11 @@ function maintabs:tabchange_cb(new,old)
 		iup.Map(statustext)
 		iup.Refresh(dlg)
 		statusupdatepos()
+	end
+	if new == livebox then
+		live_timer.run = "YES"
+	else
+		live_timer.run = "NO"
 	end
 end
 -- creates a dialog
