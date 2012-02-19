@@ -130,7 +130,13 @@ statustext = iup.text{
 	multiline = "YES",
 	readonly = "YES",
 	expand = "YES",
+	formatting = "YES",
+	scrollbar = "VERTICAL",
+	autohide = "YES",
+	visiblelines="2",
+	appendnewline="NO",
 }
+
 
 function statusprint(...)
 	local args={...}
@@ -139,6 +145,24 @@ function statusprint(...)
 		s=s .. ' ' .. tostring(args[i])
 	end
 	statustext.append = s
+	statusupdatepos()
+end
+
+-- TODO it would be better to only auto update if not manually scrolled up
+-- doesn't work all the time
+function statusupdatepos()
+	local pos = statustext.count -- iup 3.5 only
+	if not pos then
+		pos = string.len(statustext.value)
+	end
+	local l = iup.TextConvertPosToLinCol(statustext,pos)
+	local h = math.floor(tonumber(string.match(statustext.size,'%d+x(%d+)'))/8)
+	--print(l,h)
+	if l > h then
+		l=l-h + 1
+		--print('scrollto',l)
+		statustext.scrollto = string.format('%d:1',l)
+	end
 end
 
 --[[
@@ -185,50 +209,91 @@ cam_btn("display","disp")
 cam_btn("down")
 cam_btn("menu")
 
-cam_btn_frame = iup.frame{
-	iup.vbox{
-		iup.hbox{ 
-			cam_btns.erase,
-			cam_btns.up,
-			cam_btns.print,
+cam_btn_frame = iup.vbox{
+	iup.hbox{ 
+		cam_btns.erase,
+		cam_btns.up,
+		cam_btns.print,
+	},
+	iup.hbox{ 
+		cam_btns.left,
+		cam_btns.set,
+		cam_btns.right,
+	},
+	iup.hbox{ 
+		cam_btns.display,
+		cam_btns.down,
+		cam_btns.menu,
+	},
+	iup.label{separator="HORIZONTAL"},
+	iup.hbox{ 
+		iup.button{
+			title='zoom+',
+			size='45x15',
+			action=function(self)
+				add_status(con:execlua('click("zoom_in")'))
+			end,
 		},
-		iup.hbox{ 
-			cam_btns.left,
-			cam_btns.set,
-			cam_btns.right,
-		},
-		iup.hbox{ 
-			cam_btns.display,
-			cam_btns.down,
-			cam_btns.menu,
-		},
-		iup.hbox{ 
-			iup.button{
-				title='zoom+',
-				size='45x15',
-				action=function(self)
-					add_status(con:execlua('click("zoom_in")'))
-				end,
-			},
-			iup.fill{
-			},
-			iup.button{
-				title='zoom-',
-				size='45x15',
-				action=function(self)
-					add_status(con:execlua('click("zoom_out")'))
-				end,
-			},
+		iup.fill{
 		},
 		iup.button{
-			title='shoot',
-			size='94x15',
+			title='zoom-',
+			size='45x15',
 			action=function(self)
-				add_status(con:execlua('shoot()'))
+				add_status(con:execlua('click("zoom_out")'))
 			end,
-		}
-	} ;
-	title = "Camera Controls",
+		},
+		expand="HORIZONTAL",
+	},
+	iup.label{separator="HORIZONTAL"},
+	iup.button{
+		title='shoot',
+		size='94x15',
+		action=function(self)
+			add_status(con:execlua('shoot()'))
+		end,
+	},
+	iup.label{separator="HORIZONTAL"},
+	iup.hbox{
+		iup.button{
+			title='rec',
+			size='45x15',
+			action=function(self)
+				add_status(con:execlua('switch_mode_usb(1)'))
+			end,
+		},
+		iup.fill{},
+		iup.button{
+			title='play',
+			size='45x15',
+			action=function(self)
+				add_status(con:execlua('switch_mode_usb(0)'))
+			end,
+		},
+		expand="HORIZONTAL",
+	},
+	iup.fill{},
+	iup.hbox{
+		iup.button{
+			title='shutdown',
+			size='45x15',
+			action=function(self)
+				add_status(con:execlua('shut_down()'))
+			end,
+		},
+		iup.fill{},
+		iup.button{
+			title='reboot',
+			size='45x15',
+			action=function(self)
+				add_status(con:execlua('reboot()'))
+			end,
+		},
+		expand="HORIZONTAL",
+	},
+	expand="VERTICAL",
+	nmargin="4x4",
+	ngap="2"
 }
 
 camfiletree=iup.tree{}
@@ -571,7 +636,7 @@ end
 ]]
 
 if gui.has_cd then
-	-- TODO +2 because it seems to have a border
+	-- TODO +2 because border is on
 	-- TODO should come from camera info
 	livecnv = iup.canvas{rastersize="362x242",expand="NO"}
 
@@ -594,9 +659,11 @@ if gui.has_cd then
 		end
 	end
 
+	--[[
 	function livecnv:resize_cb(w,h)
 		print("Resize: Width="..w.."   Height="..h)
 	end
+	]]
 
 	livecnvtitle='Live'
 	live_timer = iup.timer{ 
@@ -615,20 +682,51 @@ if gui.has_cd then
 
 end
 --]]
+contab = iup.vbox{
+	statustext,
+}
 maintabs = iup.tabs{
-	iup.vbox{
-		statustext,
-		iup.hbox{
-			inputtext, 
-			btn_exec,
-		},
-	},
+	contab,
 	camfiletree,
-	livecnv;
-	tabtitle0='console',
-	tabtitle1='files',
+	livecnv,
+	tabtitle0='Console',
+	tabtitle1='Files',
 	tabtitle2=livecnvtitle,
 }
+
+inputbox = iup.hbox{
+	inputtext, 
+	btn_exec,
+}
+leftbox = iup.vbox{
+	maintabs,
+--				statustext,
+	inputbox,
+	nmargin="4x4",
+	ngap="2"
+}
+
+--[[
+TODO this is lame, move console output for min-console or full tab
+]]
+function maintabs:tabchange_cb(new,old)
+	--print('tab change')
+	if new == contab then
+		iup.SaveClassAttributes(statustext)
+		iup.Detach(statustext)
+		iup.Insert(contab,nil,statustext)
+		iup.Map(statustext)
+		iup.Refresh(dlg)
+		statusupdatepos()
+	elseif old == contab then
+		iup.SaveClassAttributes(statustext)
+		iup.Detach(statustext)
+		iup.Insert(leftbox,inputbox,statustext)
+		iup.Map(statustext)
+		iup.Refresh(dlg)
+		statusupdatepos()
+	end
+end
 -- creates a dialog
 dlg = iup.dialog{
 	iup.vbox{ 
@@ -637,49 +735,15 @@ dlg = iup.dialog{
 			connect_label,
 			iup.fill{},
 			btn_connect;
+			nmargin="4x2",
 		},
+		iup.label{separator="HORIZONTAL"},
 		iup.hbox{
-			maintabs,
+			leftbox,
 			iup.vbox{
-				cam_btn_frame,
-				iup.hbox{
-					iup.button{
-						title='rec',
-						size='45x15',
-						action=function(self)
-							add_status(con:execlua('switch_mode_usb(1)'))
-						end,
-					},
-					iup.fill{},
-					iup.button{
-						title='play',
-						size='45x15',
-						action=function(self)
-							add_status(con:execlua('switch_mode_usb(0)'))
-						end,
-					},
-				},
-				iup.fill{},
-				iup.hbox{
-					iup.button{
-						title='shutdown',
-						size='45x15',
-						action=function(self)
-							add_status(con:execlua('shut_down()'))
-						end,
-					},
-					iup.fill{},
-					iup.button{
-						title='reboot',
-						size='45x15',
-						action=function(self)
-							add_status(con:execlua('reboot()'))
-						end,
-					},
-				},
-			}
+			},
+			cam_btn_frame,
 		},
-		padding = '2x2'
 	};
 	title = "CHDK PTP", 
 	resize = "YES", 
@@ -687,14 +751,14 @@ dlg = iup.dialog{
 	maxbox = "YES",
 	minbox = "YES",
 	menu = menu,
-	rastersize = "700x400",
+	rastersize = "700x460",
 	padding = '2x2'
 }
 function dlg:resize_cb(w,h)
-	print("dlg Resize: Width="..w.."   Height="..h)
+	--print("dlg Resize: Width="..w.."   Height="..h)
 	self.clientsize=w.."x"..h
 end
---n1.normalize="BOTH"
+
 cmd_history = {
 	pos = 1,
 	prev = function(self) 
@@ -745,15 +809,15 @@ status_out = {
 function add_status(status,msg)
 	if status then
 		if msg then
-			statustext.append = msg
+			printf(msg)
 		end
 	else 
-		statustext.append = "error: " .. msg
+		printf("error: %s",tostring(msg))
 	end
 end
 
 function btn_exec:action()
-	statustext.append = '> ' .. inputtext.value
+	printf('> %s\n',inputtext.value)
 	cmd_history:add(inputtext.value)
 	add_status(cli:execute(inputtext.value))
 	inputtext.value=''
