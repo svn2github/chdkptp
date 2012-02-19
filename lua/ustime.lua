@@ -66,4 +66,7 @@ function proto:get()
 	self.sec,self.usec = sys.gettimeofday()
 end
 
+proto.diff = ustime.diff
+proto.diffms = ustime.diffms
+
 return ustime
