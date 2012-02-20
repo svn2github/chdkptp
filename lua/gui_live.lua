@@ -295,7 +295,7 @@ function m.init()
 		stats:start_frame()
 		ccnv:Activate()
 		if m.livedata then
-			if not chdk.put_live_image_to_canvas(ccnv,m.livedata) then
+			if not chdk.put_live_image_to_canvas(ccnv,m.livedata,m.livebasedata) then
 				print('put fail')
 			end
 		else

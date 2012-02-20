@@ -1357,14 +1357,55 @@ static int chdk_reset_device(lua_State *L) {
 
 /*
 TODO temp test
-put_live_image_to_canvas(canvas,data)
+would be more flexible to render bmp to it's own alpha'd image and scale to fit
+*/
+#ifdef CHDKPTP_CD
+static void merge_bitmap(lv_vid_info *vi,lv_base_info *bi,char *r,char *g,char *b) {
+	char *bmp = ((char *)vi + vi->bm_buffer_start);
+	int vwidth = vi->vp_width/2;
+	int height = bi->bm_max_height;
+	int width = bi->bm_max_width;
+	if(height > vi->vp_height) {
+		height = vi->vp_height;
+	}
+	// bmp with 1:2 pixels
+	int x_inc = 1;
+	if(width == vi->vp_width) {
+		x_inc = 2;
+	} else if (width > vwidth) {
+		width = vwidth;
+	}
+	int y_inc = bi->bm_buffer_width;
+	//printf("width:%d height %d x_inc:%d y_inc:%d\n",width,height,x_inc,y_inc);
+	int x,y;
+	char *p=bmp + (height-1)*y_inc;
+	for(y=0;y<height;y++,p-=y_inc) {
+		int d_off = y * vwidth;
+		for(x=0;x<width;x+=x_inc,d_off++) {
+			// 0 is trans
+			if(p[x]) {
+				*(r + d_off) = 255;
+				*(g + d_off) = 255;
+				*(b + d_off) = 255;
+			}
+		}
+	}
+}
+#endif
+
+/*
+TODO temp test
+put_live_image_to_canvas(canvas,livedata,basedata)
 */
 static int chdk_put_live_image_to_canvas(lua_State *L) {
 #ifdef CHDKPTP_CD
 	lv_vid_info *vi;
+	lv_base_info *bi;
 	cdCanvas *cnv = cdlua_checkcanvas(L,1);
 	lBuf_t *buf = luaL_checkudata(L,2,LBUF_META);
+	lBuf_t *base_buf = luaL_checkudata(L,3,LBUF_META);
 	vi = (lv_vid_info *)buf->bytes;
+	bi = (lv_base_info *)base_buf->bytes;
 	// TODO offsets
 	unsigned size = vi->vp_width*vi->vp_height;
 	unsigned dispsize = size/2;
@@ -1377,6 +1418,9 @@ static int chdk_put_live_image_to_canvas(lua_State *L) {
 		memset(r,32,dispsize);
 		memset(g,32,dispsize);
 		memset(b,32,dispsize);
+	}
+	if(vi->bm_buffer_start) {
+		merge_bitmap(vi,bi,r,g,b);
 	}
 
 	cdCanvasPutImageRectRGB(cnv,
