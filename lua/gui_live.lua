@@ -260,4 +260,9 @@ function m.update_run_state()
 	end
 end
 
+-- for anything that needs to be intialized when everything is started
+function m.on_dlg_run()
+	m.update_run_state()
+end
+
 return m
