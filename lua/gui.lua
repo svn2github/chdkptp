@@ -392,10 +392,10 @@ function gui.resize_for_content(refresh)
 	print("resize_for_content dlg:"..w.."x"..h)
 	print("resize_for_content content:"..cw.."x"..ch)
 	--]]
-	local update
 	if not (w and cw and h and ch) then
 		return
 	end
+	local update
 	if w < cw then
 		w = cw
 		update = true

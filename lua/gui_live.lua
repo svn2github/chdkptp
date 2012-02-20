@@ -229,12 +229,38 @@ local function update_vidinfo(livedata)
 	end
 end
 
+--[[
+update canvas size from lbasedata and lvidinfo
+]]
+local function update_canvas_size()
+	-- TODO for now we just do the whole buffer
+	local w,h = gui.parsesize(m.icnv.rastersize)
+	local vp_width = m.lbasedata.vp_buffer_width/2
+	local vp_height = m.lbasedata.vp_max_height
+	
+	local update
+	if w ~= vp_width  then
+		w = vp_width
+		update = true
+	end
+	if h ~= vp_height  then
+		h = vp_height
+		update = true
+	end
+	if update then
+		m.icnv.rastersize = w.."x"..h
+		iup.Refresh(m.container)
+		gui.resize_for_content()
+	end
+end
 
 function m.init()
 	if not m.live_support() then
 		return false
 	end
 	local icnv = iup.canvas{rastersize="360x240",border="NO",expand="NO"}
+	-- testing
+	--local icnv = iup.canvas{rastersize="160x100",border="NO",expand="NO"}
 	m.icnv = icnv
 	m.statslabel = iup.label{size="90x80",alignment="ALEFT:ATOP"}
 	m.container = iup.hbox{
@@ -318,6 +344,7 @@ function m.init()
 			if m.livedata then
 				stats:end_xfer(m.livedata:len())
 				update_vidinfo(m.livedata)
+				update_canvas_size()
 			else
 				gui.update_connection_status() -- update connection status on error, to prevent spamming
 				stats:stop()
@@ -329,6 +356,7 @@ function m.init()
 		m.statslabel.title = stats:get()
 	end
 end
+
 function m.get_container()
 	return m.container
 end
