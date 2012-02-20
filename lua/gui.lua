@@ -6,6 +6,9 @@ this file is licensed under the same terms as the IUP examples
 local gui = {}
 local live = require('gui_live')
 local tree = require('gui_tree')
+-- make global for easier testing
+gui.live = live
+gui.tree = tree
 -- defines released button image
 img_release = iup.image {
       {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
@@ -317,6 +320,8 @@ maintabs = iup.tabs{
 	tabtitle2=live.get_container_title(),
 }
 
+live.set_tabs(maintabs)
+
 inputbox = iup.hbox{
 	inputtext, 
 	btn_exec,
@@ -350,7 +355,7 @@ function maintabs:tabchange_cb(new,old)
 		statusupdatepos()
 	end
 	gui.resize_for_content() -- this may trigger a second refresh, but needed
-	live.update_run_state()
+	live.on_tab_change(new,old)
 end
 -- creates a dialog
 dlg = iup.dialog{

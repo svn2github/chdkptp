@@ -149,8 +149,7 @@ local function toggle_bm(ih,state)
 end
 
 local function update_should_run()
-	-- TODO global maintabs
-	if not con:is_connected() or maintabs.value ~= m.container then
+	if not con:is_connected() or m.tabs.value ~= m.container then
 		return false
 	end
 	return (m.vp_active or m.bm_active)
@@ -289,8 +288,7 @@ function m.init()
 	end
 
 	function icnv:action()
-		-- TODO global from gui
-		if maintabs.value ~= m.container then
+		if m.tabs.value ~= m.container then
 			return;
 		end
 		local ccnv = self.ccnv     -- retrieve the CD canvas from the IUP attribute
@@ -357,6 +355,9 @@ function m.init()
 	end
 end
 
+function m.set_tabs(tabs)
+	m.tabs = tabs
+end
 function m.get_container()
 	return m.container
 end
@@ -369,17 +370,26 @@ function m.on_connect_change(lcon)
 	m.livebasedata = nil
 end
 -- check whether we should be running, update timer
-function m.update_run_state()
-	if m.timer then
-		-- TODO check this is updated in the callback for gtk
-		-- better to just check if control is visible
-		if maintabs.value == m.container then
-			m.timer.run = "YES"
-			stats:start()
-		else
-			m.timer.run = "NO"
-			stats:stop()
-		end
+function m.update_run_state(state)
+	if state == nil then
+		state = (m.tabs.active == m.container)
+	end
+	if state then
+		m.timer.run = "YES"
+		stats:start()
+	else
+		m.timer.run = "NO"
+		stats:stop()
+	end
+end
+function m.on_tab_change(new,old)
+	if not m.live_support() then
+		return
+	end
+	if new == m.container then
+		m.update_run_state(true)
+	else
+		m.update_run_state(false)
 	end
 end
 
