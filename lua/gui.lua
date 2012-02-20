@@ -349,6 +349,7 @@ function maintabs:tabchange_cb(new,old)
 		iup.Refresh(dlg)
 		statusupdatepos()
 	end
+	gui.resize_for_content() -- this may trigger a second refresh, but needed
 	live.update_run_state()
 end
 -- creates a dialog
@@ -381,7 +382,10 @@ dlg = iup.dialog{
 function gui.content_size()
 	return gui.parsesize(dlg[1].rastersize)
 end
-function gui.resize_for_content()
+--[[
+size the dialog large enough for the content
+]]
+function gui.resize_for_content(refresh)
 	local cw,ch= gui.content_size()
 	local w,h=gui.parsesize(dlg.clientsize)
 	--[[
