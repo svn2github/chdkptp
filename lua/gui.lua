@@ -174,22 +174,6 @@ function statusupdatepos()
 	end
 end
 
---[[
-status_timer = iup.timer{ 
-	time = "500",
-}
-function status_timer:action_cb()
-	if chdk.is_connected() then
-		connect_icon.active = "YES"
-		btn_connect.title = "Disconnect"
-		connect_label.title = "connected"
-	else
-		connect_icon.active = "NO"
-		btn_connect.title = "Connect"
-		connect_label.title = "not connected"
-	end
-end
---]]
 -- creates a button
 btn_exec = iup.button{ 
 	title = "Execute",
@@ -495,7 +479,6 @@ end
 function gui:run()
 	-- shows dialog
 	dlg:showxy( iup.CENTER, iup.CENTER)
-	--status_timer.run = "YES"
 
 	tree.on_dlg_run()
 	util.util_stdout = status_out
@@ -511,4 +494,4 @@ function gui:run()
 	end
 end
 
-return gui;
+return gui

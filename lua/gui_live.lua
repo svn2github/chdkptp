@@ -304,7 +304,7 @@ function m.init()
 		stats:end_frame()
 	end
 
-	---[[
+	--[[
 	function icnv:resize_cb(w,h)
 		print("Resize: Width="..w.."   Height="..h)
 	end
@@ -372,7 +372,7 @@ end
 -- check whether we should be running, update timer
 function m.update_run_state(state)
 	if state == nil then
-		state = (m.tabs.active == m.container)
+		state = (m.tabs.value == m.container)
 	end
 	if state then
 		m.timer.run = "YES"
