@@ -282,6 +282,7 @@ function m.init()
 			end
 			if m.bm_active then
 				what = what + 4
+				what = what + 8 -- palette TODO shouldn't request if we don't understand type, but palette type is in dynamic data
 			end
 			if what == 0 then
 				return
