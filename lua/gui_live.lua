@@ -211,6 +211,21 @@ local function update_vidinfo(livedata)
 			printf("%s:%s->%s\n",f,tostring(m.lvidinfo[f]),v)
 			m.lvidinfo[f]=v
 		end
+		if m.lvidinfo.palette_buffer_start > 0 and m.lvidinfo.palette_buffer_size > 0 then
+			printf('palette:\n')
+			local c = 0
+			for i=0, m.lvidinfo.palette_buffer_size-1, 4 do
+				local v = livedata:get_i32(m.lvidinfo.palette_buffer_start+i)
+				printf("%08x",v)
+				c = c + 1
+				if c == 4 then
+					c=0
+					printf('\n')
+				else 
+					printf(' ')
+				end
+			end
+		end
 	end
 end
 
@@ -219,11 +234,13 @@ function m.init()
 	if not m.live_support() then
 		return false
 	end
-	local icnv = iup.canvas{rastersize="362x242",expand="NO"}
+	local icnv = iup.canvas{rastersize="360x240",border="NO",expand="NO"}
 	m.icnv = icnv
 	m.statslabel = iup.label{size="90x80",alignment="ALEFT:ATOP"}
 	m.container = iup.hbox{
-		icnv,
+		iup.frame{
+			icnv,
+		},
 		iup.vbox{
 			iup.frame{
 				iup.vbox{
