@@ -88,7 +88,13 @@ btn_connect = iup.button{
 	size = "48x"
 }
 
-function update_connection_status()
+-- parse a NxM attribute and return as numbers
+function gui.parsesize(size)
+	local w,h=string.match(size,'(%d+)x(%d+)')
+	return tonumber(w),tonumber(h)
+end
+
+function gui.update_connection_status()
 	local host_major, host_minor = chdk.host_api_version()
 	if con:is_connected() then
 		connect_icon.active = "YES"
@@ -117,7 +123,7 @@ function btn_connect:action()
 			add_status(false,"no devices available")
 		end
 	end
-	update_connection_status()
+	gui.update_connection_status()
 end
 
 -- console input
@@ -372,8 +378,40 @@ dlg = iup.dialog{
 	rastersize = "700x460",
 	padding = '2x2'
 }
+function gui.content_size()
+	return gui.parsesize(dlg[1].rastersize)
+end
+function gui.resize_for_content()
+	local cw,ch= gui.content_size()
+	local w,h=gui.parsesize(dlg.clientsize)
+	--[[
+	print("resize_for_content dlg:"..w.."x"..h)
+	print("resize_for_content content:"..cw.."x"..ch)
+	--]]
+	local update
+	if not (w and cw and h and ch) then
+		return
+	end
+	if w < cw then
+		w = cw
+		update = true
+	end
+	if h < ch then
+		h = ch
+		update = true
+	end
+	if update then
+		dlg.clientsize = w..'x'..h
+		iup.Refresh(dlg)
+	end
+end
+
 function dlg:resize_cb(w,h)
-	--print("dlg Resize: Width="..w.."   Height="..h)
+	--[[
+	local cw,ch=gui.content_size()
+	print("dlg Resize: Width="..w.."   Height="..h)
+	print("dlg content: Width="..cw.."   Height="..ch)
+	--]]
 	self.clientsize=w.."x"..h
 end
 
@@ -454,9 +492,10 @@ function gui:run()
 	util.util_stdout = status_out
 	util.util_stderr = status_out
 	do_connect_option()
-	update_connection_status()
+	gui.update_connection_status()
 	do_execute_option()
 	live.on_dlg_run()
+	gui.resize_for_content()
 
 	if (iup.MainLoopLevel()==0) then
 	  iup.MainLoop()

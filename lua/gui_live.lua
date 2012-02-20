@@ -280,11 +280,11 @@ function m.init()
 		stats:end_frame()
 	end
 
-	--[[
-	function livecnv:resize_cb(w,h)
+	---[[
+	function icnv:resize_cb(w,h)
 		print("Resize: Width="..w.."   Height="..h)
 	end
-	]]
+	--]]
 
 	m.container_title='Live'
 	m.timer = iup.timer{ 
@@ -307,7 +307,11 @@ function m.init()
 			if not m.livehandler then
 				m.livehandler = con:get_handler(1)
 				m.livebasedata = con:call_handler(m.livebasedata,m.livehandler,0x80)
-				update_basedata(m.livebasedata)
+				if m.livebasedata then
+					update_basedata(m.livebasedata)
+				else
+					gui.update_connection_status() -- update connection status on error, to prevent spamming
+				end
 			end
 			stats:start_xfer()
 			m.livedata = con:call_handler(m.livedata,m.livehandler,what)
@@ -315,6 +319,7 @@ function m.init()
 				stats:end_xfer(m.livedata:len())
 				update_vidinfo(m.livedata)
 			else
+				gui.update_connection_status() -- update connection status on error, to prevent spamming
 				stats:stop()
 			end
 			icnv:action()
