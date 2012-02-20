@@ -92,6 +92,7 @@ end
 function stats:get()
 	local run
 	local t_end
+	-- TODO a rolling average would be more useful
 	local fps_avg = 0
 	local frame_time =0
 	local bps_avg = 0
@@ -120,6 +121,7 @@ function stats:get()
 		-- instananeous
 		bps_last = self.xfer_last/xfer_time*1000
 	end
+	-- TODO this rapidly spams lua with lots of unique strings
 	return string.format(
 [[Running: %s
 FPS avg: %0.2f
@@ -284,15 +286,13 @@ function m.init()
 			if what == 0 then
 				return
 			end
-			-- TODO this needs to get reset on disconnect
 			if not m.livehandler then
-				--print('getting handler')
 				m.livehandler = con:get_handler(1)
-				m.livebasedata = con:call_handler(m.livehandler,0x80)
+				m.livebasedata = con:call_handler(m.livebasedata,m.livehandler,0x80)
 				update_basedata(m.livebasedata)
 			end
 			stats:start_xfer()
-			m.livedata = con:call_handler(m.livehandler,what)
+			m.livedata = con:call_handler(m.livedata,m.livehandler,what)
 			if m.livedata then
 				stats:end_xfer(m.livedata:len())
 				update_vidinfo(m.livedata)

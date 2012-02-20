@@ -1063,14 +1063,16 @@ static int chdk_get_handler(lua_State *L) {
 	return 1;
 }
 /*
-lbuf[,errmsg]=con:get_handler(handler[,arg1[,arg2]])
+lbuf[,errmsg]=con:get_handler(lbuf,handler[,arg1[,arg2]])
 handler - handler handle
+lbuf - lbuf to re-use, will be created if nil
 */
 static int chdk_call_handler(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
-	int handler=lua_tonumber(L,2);
-	int harg1=luaL_optnumber(L,3,0);
-	int harg2=luaL_optnumber(L,4,0);
+	lBuf_t *buf = lbuf_getlbuf(L,2);
+	int handler=lua_tonumber(L,3);
+	int harg1=luaL_optnumber(L,4,0);
+	int harg2=luaL_optnumber(L,5,0);
 	char *data=NULL;
 	unsigned data_size = 0;
 	if ( !ptp_usb->connected ) {
@@ -1083,7 +1085,17 @@ static int chdk_call_handler(lua_State *L) {
 		lua_pushstring(L,"ptp error");
 		return 2;
 	}
-	lbuf_create(L,data,data_size,LBUF_FL_FREE);
+	if(buf) {
+		if(buf->flags & LBUF_FL_FREE) {
+			free(buf->bytes);
+		}
+		buf->bytes = data;
+		buf->len = data_size;
+		buf->flags = LBUF_FL_FREE;
+		lua_pushvalue(L,2); // copy it to stack top for return
+	} else {
+		lbuf_create(L,data,data_size,LBUF_FL_FREE);
+	}
 	return 1;
 }
 #endif

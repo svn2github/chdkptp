@@ -40,6 +40,28 @@ int lbuf_create(lua_State *L,void *data,unsigned len,unsigned flags) {
 }
 
 /*
+check whether given stack index is an lbuf, and if so, return it
+*/
+lBuf_t* lbuf_getlbuf(lua_State *L,int i) {
+	if(!lua_isuserdata(L,i)) {
+		return NULL;
+	}
+	if(lua_islightuserdata(L,i)) {
+		return NULL;
+	}
+	if(!lua_getmetatable(L,i)) {
+		return NULL;
+	}
+	lua_getfield(L,LUA_REGISTRYINDEX,LBUF_META);
+	int r = lua_rawequal(L,-1,-2);
+	lua_pop(L,2);
+	if(r) {
+		return lua_touserdata(L,i);
+	}
+	return NULL;
+}
+
+/*
 nbytes=buf:len()
 */
 static int lbuf_len(lua_State *L) {

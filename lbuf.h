@@ -28,6 +28,7 @@ typedef struct {
 	char *bytes;
 } lBuf_t;
 int lbuf_create(lua_State *L,void *data,unsigned len,unsigned flags);
+lBuf_t* lbuf_getlbuf(lua_State *L,int i);
 void lbuf_open(lua_State *L);
 #endif
 
