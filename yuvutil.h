@@ -20,4 +20,5 @@
 #ifndef YUVUTIL_H
 #define YUVUTIL_H
 void yuv_live_to_cd_rgb(const char *p_yuv,unsigned width,unsigned height,char *r,char *g,char *b);
+void yuv_bmp_type1_blend_pixel_to_cd_rgb(const char *palette, uint8_t pixel,char *r,char *g,char *b);
 #endif

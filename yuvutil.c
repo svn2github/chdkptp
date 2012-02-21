@@ -30,12 +30,70 @@ static uint8_t yuv_to_r(uint8_t y, int8_t v) {
 	return clip_yuv(((y<<12) +          v*5743 + 2048)>>12);
 }
 
-static uint8_t yuv_to_b(uint8_t y, int8_t u, int8_t v) {
+static uint8_t yuv_to_g(uint8_t y, int8_t u, int8_t v) {
 	return clip_yuv(((y<<12) - u*1411 - v*2925 + 2048)>>12);
 }
 
-static uint8_t yuv_to_g(uint8_t y, int8_t u) {
+static uint8_t yuv_to_b(uint8_t y, int8_t u) {
 	return clip_yuv(((y<<12) + u*7258          + 2048)>>12);
+}
+
+static uint8_t blend(unsigned v1, unsigned v2,unsigned a) {
+	return (v1*a + v2*(255 - a))/255;
+}
+/*
+vp_xoffset:0->0
+vp_yoffset:0->0
+vp_width:720->720
+vp_height:240->240
+vp_buffer_start:44->44
+vp_buffer_size:259200->259200
+bm_buffer_start:0->259244
+bm_buffer_size:0->86400
+palette_type:1->1
+palette_buffer_start:0->345644
+palette_buffer_size:0->64
+palette:
+00000000 0000e0ff 62ee60ff 0000b9ff - trans, greyish, red, whitish 
+0000007f b3a17eff 5eb8ccff 00005fff
+5dc594ff b0508aff d43d4bff 0000287f
+e27b007f 000030ff 000069ff 000000ff - x,x,x,solid black
+*/
+struct yuv_palette_entry_type1 {
+	uint8_t a;
+	uint8_t y;
+	int8_t u;
+	int8_t v;
+};
+
+static uint8_t clamp_uint8(unsigned v) {
+	return (v>255)?255:v;
+}
+static int8_t clamp_int8(int v) {
+	if(v>127) {
+		return 127;
+	}
+	if(v<-127) {
+		return -127;
+	}
+	return v;
+}
+/*
+for type 1 palette: 1 = 16 x 4 byte AYUV values
+*/
+void yuv_bmp_type1_blend_pixel_to_cd_rgb(const char *palette, uint8_t pixel,char *r,char *g,char *b) {
+	struct yuv_palette_entry_type1 *pal = (struct yuv_palette_entry_type1 *)palette;
+	unsigned i1 = pixel & 0xF;
+	unsigned i2 = (pixel & 0xF0)>>4;
+	int8_t u,v;
+	uint8_t y,a;
+	a = (pal[i1].a + pal[i2].a)/2;
+	y = clamp_uint8(pal[i1].y + pal[i2].y);
+	u = clamp_int8(pal[i1].u + pal[i2].u);
+	v = clamp_int8(pal[i1].v + pal[i2].v);
+	*r = blend(yuv_to_r(y,v),*r,a);
+	*g = blend(yuv_to_g(y,u,v),*g,a);
+	*b = blend(yuv_to_b(y,u),*b,a);
 }
 
 void yuv_live_to_cd_rgb(const char *p_yuv,unsigned width,unsigned height,char *r,char *g,char *b) {
@@ -47,12 +105,12 @@ void yuv_live_to_cd_rgb(const char *p_yuv,unsigned width,unsigned height,char *r
 		p = p_yuv + y * y_inc;
 		for(x=0;x<width;x+=4,p+=6) {
 			*r++ = yuv_to_r(p[1],p[2]);
-			*b++ = yuv_to_b(p[1],p[0],p[2]);
-			*g++ = yuv_to_g(p[1],p[0]);
+			*g++ = yuv_to_g(p[1],p[0],p[2]);
+			*b++ = yuv_to_b(p[1],p[0]);
 
 			*r++ = yuv_to_r(p[3],p[2]);
-			*b++ = yuv_to_b(p[3],p[0],p[2]);
-			*g++ = yuv_to_g(p[3],p[0]);
+			*g++ = yuv_to_g(p[3],p[0],p[2]);
+			*b++ = yuv_to_b(p[3],p[0]);
 		}
 	}
 }
