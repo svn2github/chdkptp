@@ -213,13 +213,10 @@ local function update_vidinfo(livedata)
 		if m.lvidinfo.palette_buffer_start > 0 and m.lvidinfo.palette_buffer_size > 0 then
 			printf('palette:\n')
 			local c=0
-			--[[
+			---[[
 			local bytes = {livedata:byte(m.lvidinfo.palette_buffer_start+1,
 											m.lvidinfo.palette_buffer_start+m.lvidinfo.palette_buffer_size)}
 			for i,v in ipairs(bytes) do
-				if v < 0 then
-					v = tonumber(string.format('0x%x',v)) - 0xFFFFFF00
-				end
 				printf("0x%02x,",v)
 				c = c + 1
 				if c == 16 then
@@ -230,7 +227,7 @@ local function update_vidinfo(livedata)
 				end
 			end
 			--]]
-			---[[
+			--[[
 			for i=0, m.lvidinfo.palette_buffer_size-1, 4 do
 				local v = livedata:get_i32(m.lvidinfo.palette_buffer_start+i)
 				printf("%08x",v)

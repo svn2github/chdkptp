@@ -109,8 +109,8 @@ static int8_t clamp_int8(int v) {
 /*
 type 1 palette: 16 x 4 byte AYUV values
 */
-void yuv_bmp_type1_blend_rgb(const char *palette, uint8_t pixel,char *r,char *g,char *b) {
-	struct yuv_palette_entry_ayuv *pal = (struct yuv_palette_entry_type1 *)palette;
+void yuv_bmp_type1_blend_rgb(const char *palette, uint8_t pixel,uint8_t *r,uint8_t *g,uint8_t *b) {
+	const struct yuv_palette_entry_ayuv *pal = (const struct yuv_palette_entry_ayuv *)palette;
 	unsigned i1 = pixel & 0xF;
 	unsigned i2 = (pixel & 0xF0)>>4;
 	int8_t u,v;
@@ -124,7 +124,7 @@ void yuv_bmp_type1_blend_rgb(const char *palette, uint8_t pixel,char *r,char *g,
 	*b = blend(yuv_to_b(y,u),*b,a);
 }
 
-void yuv_live_to_cd_rgb(const char *p_yuv,unsigned width,unsigned height,char *r,char *g,char *b) {
+void yuv_live_to_cd_rgb(const char *p_yuv,unsigned width,unsigned height,uint8_t *r,uint8_t *g,uint8_t *b) {
 	unsigned x,y;
 	unsigned y_inc = (width*12)/8;
 	const char *p;
