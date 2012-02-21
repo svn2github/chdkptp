@@ -382,8 +382,8 @@ function m.get_container_title()
 end
 function m.on_connect_change(lcon)
 	-- reset on connect or disconnect, will get updated in timer
+	-- basedata will be reset when the new handler is obtained
 	m.livehandler = nil
-	m.livebasedata = nil
 end
 -- check whether we should be running, update timer
 function m.update_run_state(state)
