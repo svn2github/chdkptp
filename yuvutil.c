@@ -18,7 +18,16 @@
  */
 
 #include <stdint.h>
+#include <stdlib.h>
 #include "yuvutil.h"
+
+// from a540, playback mode
+const char yuv_default_type1_palette[]={
+0x00, 0x00, 0x00, 0x00, 0xff, 0xe0, 0x00, 0x00, 0xff, 0x60, 0xee, 0x62, 0xff, 0xb9, 0x00, 0x00,
+0x7f, 0x00, 0x00, 0x00, 0xff, 0x7e, 0xa1, 0xb3, 0xff, 0xcc, 0xb8, 0x5e, 0xff, 0x5f, 0x00, 0x00,
+0xff, 0x94, 0xc5, 0x5d, 0xff, 0x8a, 0x50, 0xb0, 0xff, 0x4b, 0x3d, 0xd4, 0x7f, 0x28, 0x00, 0x00,
+0x7f, 0x00, 0x7b, 0xe2, 0xff, 0x30, 0x00, 0x00, 0xff, 0x69, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
+};
 
 static uint8_t clip_yuv(int v) {
 	if (v<0) return 0;
@@ -59,16 +68,35 @@ palette:
 5dc594ff b0508aff d43d4bff 0000287f
 e27b007f 000030ff 000069ff 000000ff - x,x,x,solid black
 */
-struct yuv_palette_entry_type1 {
+struct yuv_palette_entry_ayuv {
 	uint8_t a;
 	uint8_t y;
 	int8_t u;
 	int8_t v;
 };
 
+// type implied from index
+struct {
+	yuv_palette_to_rgb_fn to_rgb;
+	yuv_palette_to_rgba_fn to_rgba;
+} yuv_palette_funcs[] = {
+	{NULL,NULL}, 					// type 0 - no palette, we could have a default func here
+	{yuv_bmp_type1_blend_rgb,NULL}, // type 1 - ayuv
+};
+
+#define N_PALETTE_FUNCS (sizeof(yuv_palette_funcs)/sizeof(yuv_palette_funcs[0]))
+
+yuv_palette_to_rgb_fn yuv_get_palette_to_rgb_fn(unsigned type) {
+	if(type<N_PALETTE_FUNCS) {
+		return yuv_palette_funcs[type].to_rgb;
+	}
+	return NULL;
+}
+
 static uint8_t clamp_uint8(unsigned v) {
 	return (v>255)?255:v;
 }
+
 static int8_t clamp_int8(int v) {
 	if(v>127) {
 		return 127;
@@ -79,10 +107,10 @@ static int8_t clamp_int8(int v) {
 	return v;
 }
 /*
-for type 1 palette: 1 = 16 x 4 byte AYUV values
+type 1 palette: 16 x 4 byte AYUV values
 */
-void yuv_bmp_type1_blend_pixel_to_cd_rgb(const char *palette, uint8_t pixel,char *r,char *g,char *b) {
-	struct yuv_palette_entry_type1 *pal = (struct yuv_palette_entry_type1 *)palette;
+void yuv_bmp_type1_blend_rgb(const char *palette, uint8_t pixel,char *r,char *g,char *b) {
+	struct yuv_palette_entry_ayuv *pal = (struct yuv_palette_entry_type1 *)palette;
 	unsigned i1 = pixel & 0xF;
 	unsigned i2 = (pixel & 0xF0)>>4;
 	int8_t u,v;

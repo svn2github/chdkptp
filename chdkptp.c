@@ -1379,14 +1379,19 @@ static void merge_bitmap(lv_vid_info *vi,lv_base_info *bi,char *r,char *g,char *
 	//printf("width:%d height %d x_inc:%d y_inc:%d\n",width,height,x_inc,y_inc);
 	int x,y;
 	char *p=bmp + (height-1)*y_inc;
-	char *pal = ((char *)vi + vi->palette_buffer_start);
 
+	const char *pal=NULL;
+	yuv_palette_to_rgb_fn fn=yuv_get_palette_to_rgb_fn(vi->palette_type);
+	if(fn && vi->palette_buffer_start) {
+		pal = ((char *)vi + vi->palette_buffer_start);
+	} else {
+		pal = yuv_default_type1_palette;
+		fn = yuv_bmp_type1_blend_rgb;
+	}
 	for(y=0;y<height;y++,p-=y_inc) {
 		int d_off = y * vwidth;
 		for(x=0;x<width;x+=x_inc,d_off++) {
-			if(vi->palette_type == 1) {
-				yuv_bmp_type1_blend_pixel_to_cd_rgb(pal,*(p+x),r+d_off,g+d_off,b+d_off);
-			}
+			fn(pal,*(p+x),r+d_off,g+d_off,b+d_off);
 		}
 	}
 }
