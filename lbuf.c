@@ -128,7 +128,7 @@ static int lbuf_byte(lua_State *L) {
 	}
 	int i;
 	for(i=start;i<end;i++) {
-		lua_pushnumber(L,*(char *)(buf->bytes+i));
+		lua_pushnumber(L,*(uint8_t *)(buf->bytes+i));
 	}
 	return count;
 }
