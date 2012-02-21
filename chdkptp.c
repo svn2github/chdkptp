@@ -1410,14 +1410,22 @@ static int chdk_put_live_image_to_canvas(lua_State *L) {
 	lBuf_t *base_buf = luaL_checkudata(L,3,LBUF_META);
 	vi = (lv_vid_info *)buf->bytes;
 	bi = (lv_base_info *)base_buf->bytes;
-	// TODO offsets
+
 	unsigned size = vi->vp_width*vi->vp_height;
 	unsigned dispsize = size/2;
+
 	char *r=malloc(dispsize);
 	char *g=malloc(dispsize);
 	char *b=malloc(dispsize);
 	if(vi->vp_buffer_start) {
-		yuv_live_to_cd_rgb(buf->bytes+vi->vp_buffer_start,vi->vp_width,vi->vp_height,r,g,b);
+		yuv_live_to_cd_rgb(buf->bytes+vi->vp_buffer_start,
+							bi->vp_buffer_width,
+							bi->vp_max_height,
+							vi->vp_xoffset,
+							vi->vp_yoffset,
+							vi->vp_width,
+							vi->vp_height,
+							r,g,b);
 	} else {
 		memset(r,32,dispsize);
 		memset(g,32,dispsize);

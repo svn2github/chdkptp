@@ -29,6 +29,24 @@ const char yuv_default_type1_palette[]={
 0x7f, 0x00, 0x7b, 0xe2, 0xff, 0x30, 0x00, 0x00, 0xff, 0x69, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
 };
 
+// type implied from index
+struct {
+	yuv_palette_to_rgb_fn to_rgb;
+	yuv_palette_to_rgba_fn to_rgba;
+} yuv_palette_funcs[] = {
+	{NULL,NULL}, 					// type 0 - no palette, we could have a default func here
+	{yuv_bmp_type1_blend_rgb,NULL}, // type 1 - ayuv
+};
+
+#define N_PALETTE_FUNCS (sizeof(yuv_palette_funcs)/sizeof(yuv_palette_funcs[0]))
+
+yuv_palette_to_rgb_fn yuv_get_palette_to_rgb_fn(unsigned type) {
+	if(type<N_PALETTE_FUNCS) {
+		return yuv_palette_funcs[type].to_rgb;
+	}
+	return NULL;
+}
+
 static uint8_t clip_yuv(int v) {
 	if (v<0) return 0;
 	if (v>255) return 255;
@@ -50,48 +68,6 @@ static uint8_t yuv_to_b(uint8_t y, int8_t u) {
 static uint8_t blend(unsigned v1, unsigned v2,unsigned a) {
 	return (v1*a + v2*(255 - a))/255;
 }
-/*
-vp_xoffset:0->0
-vp_yoffset:0->0
-vp_width:720->720
-vp_height:240->240
-vp_buffer_start:44->44
-vp_buffer_size:259200->259200
-bm_buffer_start:0->259244
-bm_buffer_size:0->86400
-palette_type:1->1
-palette_buffer_start:0->345644
-palette_buffer_size:0->64
-palette:
-00000000 0000e0ff 62ee60ff 0000b9ff - trans, greyish, red, whitish 
-0000007f b3a17eff 5eb8ccff 00005fff
-5dc594ff b0508aff d43d4bff 0000287f
-e27b007f 000030ff 000069ff 000000ff - x,x,x,solid black
-*/
-struct yuv_palette_entry_ayuv {
-	uint8_t a;
-	uint8_t y;
-	int8_t u;
-	int8_t v;
-};
-
-// type implied from index
-struct {
-	yuv_palette_to_rgb_fn to_rgb;
-	yuv_palette_to_rgba_fn to_rgba;
-} yuv_palette_funcs[] = {
-	{NULL,NULL}, 					// type 0 - no palette, we could have a default func here
-	{yuv_bmp_type1_blend_rgb,NULL}, // type 1 - ayuv
-};
-
-#define N_PALETTE_FUNCS (sizeof(yuv_palette_funcs)/sizeof(yuv_palette_funcs[0]))
-
-yuv_palette_to_rgb_fn yuv_get_palette_to_rgb_fn(unsigned type) {
-	if(type<N_PALETTE_FUNCS) {
-		return yuv_palette_funcs[type].to_rgb;
-	}
-	return NULL;
-}
 
 static uint8_t clamp_uint8(unsigned v) {
 	return (v>255)?255:v;
@@ -101,8 +77,8 @@ static int8_t clamp_int8(int v) {
 	if(v>127) {
 		return 127;
 	}
-	if(v<-127) {
-		return -127;
+	if(v<-128) {
+		return -128;
 	}
 	return v;
 }
@@ -110,7 +86,7 @@ static int8_t clamp_int8(int v) {
 type 1 palette: 16 x 4 byte AYUV values
 */
 void yuv_bmp_type1_blend_rgb(const char *palette, uint8_t pixel,uint8_t *r,uint8_t *g,uint8_t *b) {
-	const struct yuv_palette_entry_ayuv *pal = (const struct yuv_palette_entry_ayuv *)palette;
+	const yuv_palette_entry_ayuv_t *pal = (const yuv_palette_entry_ayuv_t *)palette;
 	unsigned i1 = pixel & 0xF;
 	unsigned i2 = (pixel & 0xF0)>>4;
 	int8_t u,v;
@@ -124,14 +100,18 @@ void yuv_bmp_type1_blend_rgb(const char *palette, uint8_t pixel,uint8_t *r,uint8
 	*b = blend(yuv_to_b(y,u),*b,a);
 }
 
-void yuv_live_to_cd_rgb(const char *p_yuv,unsigned width,unsigned height,uint8_t *r,uint8_t *g,uint8_t *b) {
+void yuv_live_to_cd_rgb(const char *p_yuv,
+						unsigned buf_width, unsigned buf_height,
+						unsigned x_offset, unsigned y_offset,
+						unsigned width,unsigned height,
+						uint8_t *r,uint8_t *g,uint8_t *b) {
 	unsigned x,y;
-	unsigned y_inc = (width*12)/8;
+	unsigned y_inc = (buf_width*12)/8;
 	const char *p;
 	// flip for CD
-	for(y=height-1;y>0;y--) {
-		p = p_yuv + y * y_inc;
-		for(x=0;x<width;x+=4,p+=6) {
+	for(y=y_offset + height-1;y>y_offset;y--) {
+		p = p_yuv + y * y_inc + (x_offset*12)/8;
+		for(x=x_offset;x<width;x+=4,p+=6) {
 			*r++ = yuv_to_r(p[1],p[2]);
 			*g++ = yuv_to_g(p[1],p[0],p[2]);
 			*b++ = yuv_to_b(p[1],p[0]);

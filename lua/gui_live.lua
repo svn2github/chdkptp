@@ -158,15 +158,15 @@ end
 -- TODO temp test, should have a proper binding in C (?)
 m.lbasedata={}
 local base_fields={
-	'version_major',
-	'version_minor',
-	'vp_max_width',
-	'vp_max_height',
-	'vp_buffer_width',
-	'bm_max_width',
-	'bm_max_height',
-	'bm_buffer_width',
-	'lcd_ascpect_ratio',
+	'version_major',		-- Major version number
+	'version_minor',		-- Minor version number
+	'vp_max_width',			-- Maximum viewport width (in pixels)
+	'vp_max_height',		-- Maximum viewport height (in pixels)
+	'vp_buffer_width',		-- Viewport buffer width in case buffer is wider than visible viewport (in pixels)
+	'bm_max_width',			-- Maximum width of bitmap (in pixels)
+	'bm_max_height',		-- Maximum height of bitmap (in pixels)
+	'bm_buffer_width',		-- Bitmap buffer width in case buffer is wider than visible bitmap (in pixels)
+	'lcd_ascpect_ratio',	-- 0 = 4:3, 1 = 16:9
 }
 local function update_basedata(basedata)
 	local t={basedata:get_i32(0,-1)}
@@ -248,10 +248,10 @@ end
 update canvas size from lbasedata and lvidinfo
 ]]
 local function update_canvas_size()
-	-- TODO for now we just do the whole buffer
+	-- TODO would be good to have a whole buffer mode for debugging
 	local w,h = gui.parsesize(m.icnv.rastersize)
-	local vp_width = m.lbasedata.vp_buffer_width/2
-	local vp_height = m.lbasedata.vp_max_height
+	local vp_width = m.lvidinfo.vp_width/2
+	local vp_height = m.lvidinfo.vp_height
 	
 	local update
 	if w ~= vp_width  then
