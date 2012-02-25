@@ -244,6 +244,92 @@ local function update_vidinfo(livedata)
 	end
 end
 
+-- TODO this is just to allow us to read/write a binary integer record size
+local dump_recsize = lbuf.new(4)
+
+--[[
+lbuf - optional lbuf to re-use, if possible
+fh - file handle
+returns (possibly new) lbuf
+]]
+local function read_dump_rec(lb,fh)
+	if not dump_recsize:fread(fh) then
+		return
+	end
+	local len = dump_recsize:get_u32()
+	if not lb or lb:len() ~= len then
+		lb = lbuf.new(len)
+	end
+	if lb:fread(fh) then -- on EOF, return nil
+		return lb
+	end
+end
+
+local function init_dump_replay()
+	m.dump_replay_file = io.open("livedata.dmp","rb")
+	m.livebasedata = read_dump_rec(m.livebasedata,m.dump_replay_file)
+	update_basedata(m.livebasedata)
+end
+
+local function end_dump_replay()
+	m.dump_replay_file:close()
+	m.dump_replay_file=nil
+	stats:stop()
+end
+
+local function read_dump_frame()
+	stats:start()
+	stats:start_xfer()
+
+	local data = read_dump_rec(m.livebasedata,m.dump_replay_file)
+	-- EOF, loop
+	if not data then
+		end_dump_replay()
+		init_dump_replay()
+		data = read_dump_rec(m.livedata,m.dump_replay_file)
+	end
+	m.livedata = data
+	update_vidinfo(m.livedata)
+	stats:end_xfer(m.livedata:len())
+end
+
+
+local function record_dump(basedata,livedata)
+	if not m.dump_active then
+		return
+	end
+	if not m.dumpfile then
+		-- TODO increment or selector
+		m.dumpfile = io.open("livedata.dmp","wb")
+		dump_recsize:set_u32(0,basedata:len())
+		dump_recsize:fwrite(m.dumpfile)
+		basedata:fwrite(m.dumpfile)
+	end
+	dump_recsize:set_u32(0,livedata:len())
+	dump_recsize:fwrite(m.dumpfile)
+	livedata:fwrite(m.dumpfile)
+end
+
+local function toggle_dump(ih,state)
+	m.dump_active = (state == 1)
+	-- TODO this should be called on disconnect etc
+	if not m.dumpactive then
+		if m.dumpfile then
+			m.dumpfile:close()
+			m.dumpfile=nil
+		end
+	end
+end
+
+local function toggle_play_dump(ih,state)
+	m.dump_replay = (state == 1)
+	if m.dump_replay then
+		init_dump_replay()
+	else
+		end_dump_replay()
+	end
+end
+
 --[[
 update canvas size from lbasedata and lvidinfo
 ]]
@@ -290,9 +376,16 @@ function m.init()
 				},
 				title="Stream"
 			},
-			iup.frame{
-				m.statslabel,
-				title="Statistics",
+			iup.tabs{
+				iup.vbox{
+					m.statslabel,
+					tabtitle="Statistics",
+				},
+				iup.vbox{
+					tabtitle="Debug",
+					iup.toggle{title="Dump To file",action=toggle_dump},
+					iup.toggle{title="Play from file",action=toggle_play_dump},
+				},
 			},
 		},
 		margin="4x4",
@@ -358,11 +451,15 @@ function m.init()
 			if m.livedata then
 				stats:end_xfer(m.livedata:len())
 				update_vidinfo(m.livedata)
+				record_dump(m.livebasedata,m.livedata)
 				update_canvas_size()
 			else
 				gui.update_connection_status() -- update connection status on error, to prevent spamming
 				stats:stop()
 			end
+			icnv:action()
+		elseif m.dump_replay then
+			read_dump_frame()
 			icnv:action()
 		else
 			stats:stop()
