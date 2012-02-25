@@ -254,6 +254,11 @@ static int lbuf_fread(lua_State *L) {
 	}
 	size_t r = fread(buf->bytes,buf->len,1,*pf);
 	if(r != 1) {
+		// TODO might want to check if would run off the end
+		if(feof(*pf)) {
+			lua_pushboolean(L,0);
+			return 1;
+		}
 		return luaL_error(L,"read failed");
 	}
 	lua_pushboolean(L,1);
