@@ -188,6 +188,19 @@ t.lbufi = function()
 	assert(#t == 63)
 end
 
+t.lbuff = function()
+	local l=lbuf.new('hello world')
+	local f=io.open('lbuftest.dat','wb')
+	l:fwrite(f)
+	f:close()
+	l2=lbuf.new(l:len())
+	f=io.open('lbuftest.dat','rb')
+	l2:fread(f)
+	f:close()
+	os.remove('lbuftest.dat')
+	assert(l:string()==l2:string())
+end
+
 function m:run(name)
 	-- TODO side affects galore
 	printf('%s:start\n',name)

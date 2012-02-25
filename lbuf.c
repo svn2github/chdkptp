@@ -189,12 +189,52 @@ static int lbuf_get_u32(lua_State *L) {
 	return get_vals(L,4,get_vals_uint32);
 }
 
+/*
+bool=lbuf:fread(file)
+read lbuf from file (using existing size)
+TODO may added partial read with size+offset later
+*/
+static int lbuf_fread(lua_State *L) {
+	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
+	FILE **pf = ((FILE **)luaL_checkudata(L, 2, LUA_FILEHANDLE));
+	if(!*pf) {
+		return luaL_error(L,"attempt to access closed file");
+	}
+	size_t r = fread(buf->bytes,buf->len,1,*pf);
+	if(r != 1) {
+		return luaL_error(L,"read failed");
+	}
+	lua_pushboolean(L,1);
+	return 1;
+}
+
+/*
+bool=lbuf:fwrite(file)
+write lbuf to file
+TODO may added partial write with size+offset later
+*/
+static int lbuf_fwrite(lua_State *L) {
+	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
+	FILE **pf = ((FILE **)luaL_checkudata(L, 2, LUA_FILEHANDLE));
+	if(!*pf) {
+		return luaL_error(L,"attempt to access closed file");
+	}
+	size_t r = fwrite(buf->bytes,buf->len,1,*pf);
+	if(r != 1) {
+		return luaL_error(L,"write failed");
+	}
+	lua_pushboolean(L,1);
+	return 1;
+}
+
 static const luaL_Reg lbuf_methods[] = {
   {"len", lbuf_len},
   {"string", lbuf_string},
   {"byte", lbuf_byte},
   {"get_i32", lbuf_get_i32},
   {"get_u32", lbuf_get_u32},
+  {"fread",lbuf_fread},
+  {"fwrite",lbuf_fwrite},
   {NULL, NULL}
 };
 
