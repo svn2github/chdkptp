@@ -186,6 +186,17 @@ t.lbufi = function()
 	local l=lbuf.new(string.rep('\001',256))
 	local t={l:get_u32(4,-1)}
 	assert(#t == 63)
+	local l=lbuf.new(8)
+	l:set_u32(0,0xFEEDBABE,0xDEADBEEF)
+	local t={l:get_u32(0,2)}
+	assert(#t == 2)
+	assert(t[1] == 0xFEEDBABE)
+	assert(t[2] == 0xDEADBEEF)
+	local l=lbuf.new(5)
+	l:set_i32(0,-1,42)
+	local t={l:get_i32(0,2)}
+	assert(#t == 1)
+	assert(t[1] == -1)
 end
 
 t.lbuff = function()

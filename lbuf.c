@@ -161,7 +161,7 @@ static int get_vals(lua_State *L,unsigned size,get_vals_fn f) {
 	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
 	int off=luaL_optint(L,2,0);
 	int count=luaL_optint(L,3,1);
-	// may give these special meaning later
+	// may give this special meaning later
 	if(off < 0) {
 		return luaL_error(L,"negative offset not allowed");
 	}
@@ -187,6 +187,58 @@ static int lbuf_get_i32(lua_State *L) {
 }
 static int lbuf_get_u32(lua_State *L) {
 	return get_vals(L,4,get_vals_uint32);
+}
+
+typedef void (*set_vals_fn)(lua_State *L,void *p,int i);
+
+void set_vals_int32(lua_State *L,void *p,int i) {
+	int32_t v=lua_tonumber(L,i);
+	memcpy(p,&v,4); // p might not be aligned
+}
+
+void set_vals_uint32(lua_State *L,void *p,int i) {
+	uint32_t v=lua_tonumber(L,i);
+	memcpy(p,&v,4); // p might not be aligned
+}
+
+/*
+buf:<set_vals_func>(offset,val[,...])
+set elements of buff in starting at offset in chunks, exact format depending on functions
+
+offset is offset in bytes, default 0, negative not currently allowed
+if offset is larger than buffer size, nothing is changed
+vals that would extend past the end of buf are discarded
+*/
+static int set_vals(lua_State *L,unsigned size,set_vals_fn f) {
+	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
+	if(buf->flags & LBUF_FL_READONLY) {
+		return luaL_error(L,"attempt to set readonly lbuf");
+	}
+	int off=luaL_optint(L,2,0);
+	int count=lua_gettop(L) - 2;
+	// may give this special meaning later
+	if(off < 0) {
+		return luaL_error(L,"negative offset not allowed");
+	}
+	if(off > buf->len - size) {
+		return 0;
+	}
+	if(count * size > buf->len - off) {
+		count = (buf->len - off)/size;
+	}
+	char *p;
+	int i;
+	for(i=0, p=buf->bytes + off;i<count;i++, p+=size) {
+		f(L,p,i+3);
+	}
+	return count;
+}
+
+static int lbuf_set_i32(lua_State *L) {
+	return set_vals(L,4,set_vals_int32);
+}
+static int lbuf_set_u32(lua_State *L) {
+	return set_vals(L,4,set_vals_uint32);
 }
 
 /*
@@ -233,6 +285,8 @@ static const luaL_Reg lbuf_methods[] = {
   {"byte", lbuf_byte},
   {"get_i32", lbuf_get_i32},
   {"get_u32", lbuf_get_u32},
+  {"set_i32", lbuf_set_i32},
+  {"set_u32", lbuf_set_u32},
   {"fread",lbuf_fread},
   {"fwrite",lbuf_fwrite},
   {NULL, NULL}

@@ -22,6 +22,7 @@
 #define LBUF_META "lbuf.lbuf_meta"
 #define LBUF_METHODS "lbuf.lbuf_methods"
 #define LBUF_FL_FREE 0x1
+#define LBUF_FL_READONLY 0x2
 typedef struct {
 	unsigned len;
 	unsigned flags;
