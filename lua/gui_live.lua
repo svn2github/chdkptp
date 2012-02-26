@@ -148,8 +148,17 @@ local function toggle_bm(ih,state)
 	m.bm_active = (state == 1)
 end
 
+local function check_api_ver()
+	-- normally larger minor would be ok, but want to only work with dev version for now
+	if con.apiver.major == 2 and con.apiver.minor == 2 then
+		return true
+	end
+end
 local function update_should_run()
 	if not con:is_connected() or m.tabs.value ~= m.container then
+		return false
+	end
+	if not check_api_ver() then
 		return false
 	end
 	return (m.vp_active or m.bm_active)
@@ -530,6 +539,12 @@ function m.on_connect_change(lcon)
 	-- reset on connect or disconnect, will get updated in timer
 	-- basedata will be reset when the new handler is obtained
 	m.livehandler = nil
+	if con:is_connected() then
+		-- TODO could disable live options
+		if not check_api_ver() then
+			printf('camera does not support live view api\n')
+		end
+	end
 end
 -- check whether we should be running, update timer
 function m.update_run_state(state)
