@@ -278,7 +278,12 @@ local function read_dump_rec(lb,fh)
 end
 
 local function init_dump_replay()
-	m.dump_replay_file = io.open("livedata.dmp","rb")
+	m.dump_replay_file = io.open(m.dump_replay_filename,"rb")
+	if not m.dump_replay_file then
+		printf("failed to open dumpfile\n")
+		m.dump_replay = false
+		return
+	end
 	m.livebasedata = read_dump_rec(m.livebasedata,m.dump_replay_file)
 	update_basedata(m.livebasedata)
 end
@@ -286,6 +291,7 @@ end
 local function end_dump_replay()
 	m.dump_replay_file:close()
 	m.dump_replay_file=nil
+	m.dump_replay_filename=nil
 	stats:stop()
 end
 
@@ -311,8 +317,14 @@ local function record_dump(basedata,livedata)
 		return
 	end
 	if not m.dumpfile then
-		-- TODO increment or selector
-		m.dumpfile = io.open("livedata.dmp","wb")
+		local dumpname = string.format('chdk_%x_%s.lvdump',con.usbdev.product_id,os.date('%Y%m%d_%H%M%S'))
+		printf('recording to %s\n',dumpname)
+		m.dumpfile = io.open(dumpname,"wb")
+		if not m.dumpfile then
+			printf("failed to open dumpfile\n")
+			m.dump_active = false
+			return
+		end
 		dump_recsize:set_u32(0,basedata:len())
 		dump_recsize:fwrite(m.dumpfile)
 		basedata:fwrite(m.dumpfile)
@@ -333,12 +345,31 @@ local function toggle_dump(ih,state)
 	end
 end
 
-local function toggle_play_dump(ih,state)
-	m.dump_replay = (state == 1)
-	if m.dump_replay then
+local function toggle_play_dump(self,state)
+	if state == 1 then
+		local filedlg = iup.filedlg{
+			dialogtype = "OPEN",
+			title = "File to play", 
+			filter = "*.lvdump", 
+		} 
+		filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
+
+	-- Gets file dialog status
+		local status = filedlg.status
+		local value = filedlg.value
+	-- new or overwrite (windows native dialog already prompts for overwrite
+		if status ~= "0" then
+			printf('play dump canceled\n')
+			self.value = "OFF"
+			return
+		end
+		printf('playing %s\n',tostring(value))
+		m.dump_replay_filename = value
 		init_dump_replay()
+		m.dump_replay = true
 	else
 		end_dump_replay()
+		m.dump_replay = false
 	end
 end
 
@@ -481,7 +512,7 @@ function m.init()
 				},
 				iup.vbox{
 					tabtitle="Debug",
-					iup.toggle{title="Dump To file",action=toggle_dump},
+					iup.toggle{title="Dump to file",action=toggle_dump},
 					iup.toggle{title="Play from file",action=toggle_play_dump},
 				},
 			},
