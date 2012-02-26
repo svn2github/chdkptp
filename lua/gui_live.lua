@@ -250,7 +250,7 @@ local dump_recsize = lbuf.new(4)
 --[[
 lbuf - optional lbuf to re-use, if possible
 fh - file handle
-returns (possibly new) lbuf
+returns (possibly new) lbuf or nil on eof
 ]]
 local function read_dump_rec(lb,fh)
 	if not dump_recsize:fread(fh) then
@@ -355,6 +355,77 @@ local function update_canvas_size()
 	end
 end
 
+local function timer_action(self)
+	if update_should_run() then
+		stats:start()
+		local what=0
+		if m.vp_active then
+			what = 1
+		end
+		if m.bm_active then
+			what = what + 4
+			what = what + 8 -- palette TODO shouldn't request if we don't understand type, but palette type is in dynamic data
+		end
+		if what == 0 then
+			return
+		end
+		if not m.livehandler then
+			m.livehandler = con:get_handler(1)
+			m.livebasedata = con:call_handler(m.livebasedata,m.livehandler,0x80)
+			if m.livebasedata then
+				update_basedata(m.livebasedata)
+			else
+				gui.update_connection_status() -- update connection status on error, to prevent spamming
+			end
+		end
+		stats:start_xfer()
+		m.livedata = con:call_handler(m.livedata,m.livehandler,what)
+		if m.livedata then
+			stats:end_xfer(m.livedata:len())
+			update_vidinfo(m.livedata)
+			record_dump(m.livebasedata,m.livedata)
+			update_canvas_size()
+		else
+			gui.update_connection_status() -- update connection status on error, to prevent spamming
+			stats:stop()
+		end
+		m.icnv:action()
+	elseif m.dump_replay then
+		read_dump_frame()
+		m.icnv:action()
+	else
+		stats:stop()
+	end
+	m.statslabel.title = stats:get()
+end
+
+local function init_timer(time)
+	if not time then
+		time = "100"
+	end 
+	if m.timer then
+		iup.Destroy(m.timer)
+	end
+	m.timer = iup.timer{ 
+		time = time,
+		action_cb = timer_action,
+	}
+	m.update_run_state()
+end
+
+local function update_fps(val)
+	val = tonumber(val)
+	if val == 0 then
+		return
+	end
+	val = math.floor(1000/val)
+	if val ~= tonumber(m.timer.time) then
+		-- reset stats
+		stats:stop()
+		init_timer(val)
+	end
+end
+
 function m.init()
 	if not m.live_support() then
 		return false
@@ -373,6 +444,30 @@ function m.init()
 				iup.vbox{
 					iup.toggle{title="Viewfinder",action=toggle_vp},
 					iup.toggle{title="UI Overlay",action=toggle_bm},
+					iup.hbox{
+						iup.label{title="Target FPS"},
+						iup.text{
+							spin="YES",
+							spinmax="30",
+							spinmin="1",
+							spininc="1",
+							value="10",
+							action=function(self,c,newval)
+								local v = tonumber(newval)
+								local min = tonumber(self.spinmin)
+								local max = tonumber(self.spinmax)
+								if v and v >= min and v <= max then
+									self.value = tostring(v)
+									self.caretpos = string.len(tostring(v))
+									update_fps(self.value)
+								end
+								return iup.IGNORE
+							end,
+							spin_cb=function(self,newval)
+								update_fps(newval)
+							end
+						},
+					},
 				},
 				title="Stream"
 			},
@@ -420,52 +515,6 @@ function m.init()
 	--]]
 
 	m.container_title='Live'
-	m.timer = iup.timer{ 
-		time = "100",
-	}
-	function m.timer:action_cb()
-		if update_should_run() then
-			stats:start()
-			local what=0
-			if m.vp_active then
-				what = 1
-			end
-			if m.bm_active then
-				what = what + 4
-				what = what + 8 -- palette TODO shouldn't request if we don't understand type, but palette type is in dynamic data
-			end
-			if what == 0 then
-				return
-			end
-			if not m.livehandler then
-				m.livehandler = con:get_handler(1)
-				m.livebasedata = con:call_handler(m.livebasedata,m.livehandler,0x80)
-				if m.livebasedata then
-					update_basedata(m.livebasedata)
-				else
-					gui.update_connection_status() -- update connection status on error, to prevent spamming
-				end
-			end
-			stats:start_xfer()
-			m.livedata = con:call_handler(m.livedata,m.livehandler,what)
-			if m.livedata then
-				stats:end_xfer(m.livedata:len())
-				update_vidinfo(m.livedata)
-				record_dump(m.livebasedata,m.livedata)
-				update_canvas_size()
-			else
-				gui.update_connection_status() -- update connection status on error, to prevent spamming
-				stats:stop()
-			end
-			icnv:action()
-		elseif m.dump_replay then
-			read_dump_frame()
-			icnv:action()
-		else
-			stats:stop()
-		end
-		m.statslabel.title = stats:get()
-	end
 end
 
 function m.set_tabs(tabs)
@@ -508,7 +557,8 @@ end
 
 -- for anything that needs to be intialized when everything is started
 function m.on_dlg_run()
-	m.update_run_state()
+	init_timer()
+	--m.update_run_state()
 end
 
 return m
