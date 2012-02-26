@@ -291,7 +291,6 @@ end
 local function end_dump_replay()
 	m.dump_replay_file:close()
 	m.dump_replay_file=nil
-	m.dump_replay_filename=nil
 	stats:stop()
 end
 
