@@ -840,6 +840,134 @@ function con_methods:reconnect(opts)
 	end
 	return true
 end
+
+--[[
+all assumed to be 32 bit signed ints for the moment
+]]
+-- TODO this stuff should be broken out into a generic "bind fields to lbuf" lib
+chdku.live_base_fields={
+	'version_major',		-- Major version number
+	'version_minor',		-- Minor version number
+	'vp_max_width',			-- Maximum viewport width (in pixels)
+	'vp_max_height',		-- Maximum viewport height (in pixels)
+	'vp_buffer_width',		-- Viewport buffer width in case buffer is wider than visible viewport (in pixels)
+	'bm_max_width',			-- Maximum width of bitmap (in pixels)
+	'bm_max_height',		-- Maximum height of bitmap (in pixels)
+	'bm_buffer_width',		-- Bitmap buffer width in case buffer is wider than visible bitmap (in pixels)
+	'lcd_ascpect_ratio',	-- 0 = 4:3, 1 = 16:9
+}
+chdku.live_base_map={}
+chdku.live_frame_fields={
+	'vp_xoffset',             -- Viewport X offset in pixels (for cameras with variable image size)
+	'vp_yoffset',             -- Viewport Y offset in pixels (for cameras with variable image size)
+	'vp_width',               -- Actual viewport width in pixels (for cameras with variable image size)
+	'vp_height',              -- Actual viewport height in pixels (for cameras with variable image size)
+	'vp_buffer_start',        -- Offset in data transferred where the viewport data starts
+	'vp_buffer_size',         -- Size of viewport data sent (in bytes)
+	'bm_buffer_start',        -- Offset in data transferred where the bitmap data starts
+	'bm_buffer_size',         -- Size of bitmap data sent (in bytes)
+	'palette_type',           -- Camera palette type 
+							  -- (0 = no palette', 1 = 16 x 4 byte AYUV values, 2 = 16 x 4 byte AYUV values with A = 0..3, 3 = 256 x 4 byte AYUV values with A = 0..3)
+	'palette_buffer_start',   -- Offset in data transferred where the palette data starts
+	'palette_buffer_size',    -- Size of palette data sent (in bytes)
+}
+chdku.live_frame_map={}
+
+--[[
+init name->offset mapping
+]]
+local function live_init_maps()
+	for i,name in ipairs(chdku.live_base_fields) do
+		chdku.live_base_map[name] = (i-1)*4
+	end
+	for i,name in ipairs(chdku.live_frame_fields) do
+		chdku.live_frame_map[name] = (i-1)*4
+	end
+end
+live_init_maps()
+
+function chdku.live_get_base_field(base,field)
+	if not base then
+		return nil
+	end
+	return base:get_i32(chdku.live_base_map[field])
+end
+
+function chdku.live_get_frame_field(frame,field)
+	if not frame then
+		return nil
+	end
+	return frame:get_i32(chdku.live_frame_map[field])
+end
+
+local live_info_meta = {
+	__index=function(t,key)
+		if chdku.live_base_map[key] then
+			return chdku.live_get_base_field(t.base,key)
+		end
+		if chdku.live_frame_map[key] then
+			return chdku.live_get_frame_field(t.frame,key)
+		end
+	end
+}
+--[[
+return a new table for con.live with appropriate methods
+]]
+local function live_info_new(init) 
+	setmetatable(init,live_info_meta)
+	return init
+end
+
+function con_methods:live_is_api_compatible()
+	-- normally larger minor would be ok, but want to only work with dev version for now
+	if con.apiver.major == 2 and con.apiver.minor == 2 then
+		return true
+	end
+end
+--[[
+set up all once - per connection items for live streaming
+opts {
+	verbose:bool
+}
+]]
+function con_methods:live_init_streaming(opts)
+	self.live = nil
+	if not self:is_connected() then
+		return false,'not connected'
+	end
+	if not self:live_is_api_compatible() then
+		return false,'api is not compatible'
+	end
+	local handler,err = self:get_handler(1)
+	if not handler then
+		return false, string.format('error getting handler: %s',tostring(err))
+	end
+	if handler == 0 then
+		return false, string.format('failed to obtain handler')
+	end
+	local basedata, err = self:call_handler(nil,handler,0x80)
+	if not basedata then
+		return false, string.format('error getting basedata: %s',tostring(err))
+	end
+	local t = util.extend_table({},opts)
+	t.base = basedata
+	t.handler = handler
+	self.live = live_info_new(t)
+	return true
+end
+
+function con_methods:live_get_frame(what)
+	-- TODO check what or accept it in a more friendly format
+	if not self.live then
+		return false,'not initialized'
+	end
+	local err
+	self.live.frame, err = self:call_handler(self.live.frame,self.live.handler,what)
+	if not self.live.frame then
+		return false,string.format('error getting frame: %s',tostring(err))
+	end
+	return true
+end
 --[[
 meta table for wrapped connection object
 ]]
