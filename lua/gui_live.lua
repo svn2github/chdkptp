@@ -155,6 +155,9 @@ local function check_api_ver()
 	end
 end
 local function update_should_run()
+	if not m.livehandler then
+		return false
+	end
 	if not con:is_connected() or m.tabs.value ~= m.container then
 		return false
 	end
@@ -378,15 +381,6 @@ local function timer_action(self)
 		if what == 0 then
 			return
 		end
-		if not m.livehandler then
-			m.livehandler = con:get_handler(1)
-			m.livebasedata = con:call_handler(m.livebasedata,m.livehandler,0x80)
-			if m.livebasedata then
-				update_basedata(m.livebasedata)
-			else
-				gui.update_connection_status() -- update connection status on error, to prevent spamming
-			end
-		end
 		stats:start_xfer()
 		m.livedata = con:call_handler(m.livedata,m.livehandler,what)
 		if m.livedata then
@@ -536,13 +530,33 @@ function m.get_container_title()
 	return m.container_title
 end
 function m.on_connect_change(lcon)
-	-- reset on connect or disconnect, will get updated in timer
-	-- basedata will be reset when the new handler is obtained
 	m.livehandler = nil
 	if con:is_connected() then
 		-- TODO could disable live options
 		if not check_api_ver() then
-			printf('camera does not support live view api\n')
+			printf('CHDK on camera does not support live view api\n')
+			return
+		end
+		local handler,err = con:get_handler(1)
+		if not handler then
+			printf('error getting handler: %s\n',tostring(err))
+			return
+		end
+		if handler == 0 then
+			printf('failed to obtain handler\n')
+			return
+		end
+		m.livebasedata = con:call_handler(m.livebasedata,handler,0x80)
+		if m.livebasedata then
+			update_basedata(m.livebasedata)
+			if m.lbasedata.version_major ~= 1 then
+				printf('incompatible live view version %d %d\n',tonumber(m.lbasedata.version_major),tonumber(m.lbasedata.version_minor))
+				m.livebasedata = nil
+				return
+			end
+			m.livehandler = handler
+		else
+			printf('failed to obtain basedata\n')
 		end
 	end
 end

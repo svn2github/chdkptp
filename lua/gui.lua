@@ -102,8 +102,7 @@ function gui.update_connection_status()
 	if con:is_connected() then
 		connect_icon.active = "YES"
 		btn_connect.title = "Disconnect"
-		local cam_major, cam_minor = con:camera_api_version()
-		connect_label.title = string.format("host:%d.%d cam:%d.%d",host_major,host_minor,cam_major,cam_minor)
+		connect_label.title = string.format("host:%d.%d cam:%d.%d",host_major,host_minor,con.apiver.major,con.apiver.minor)
 	else
 		connect_icon.active = "NO"
 		btn_connect.title = "Connect"
