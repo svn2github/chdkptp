@@ -977,6 +977,9 @@ function con_methods:live_dump_start(filename)
 	if not self.live or not self.live.base then
 		return false,'not initialized'
 	end
+	if not self:is_connected() then
+		return false,'not connected'
+	end
 	if not filename then
 		filename = string.format('chdk_%x_%s.lvdump',con.usbdev.product_id,os.date('%Y%m%d_%H%M%S'))
 	end

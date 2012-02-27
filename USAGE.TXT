@@ -143,6 +143,16 @@ reboot       [options] [file]: - reboot the camera
    -norecon  don't try to reconnect
    -wait=<N> wait N ms before attempting to reconnect, default 3500
 
+dumpframes   [options] [file]: - dump camera display frames to file
+ file: optional output file name, defaults to chdk_<pid>_<date>_<time>.lvdump
+ options:
+   -count=<N> number of frames to dump
+   -wait=<N>  wait N ms between frames
+   -novp      don't get viewfinder data
+   -nobm      don't get ui overlay data
+   -nopal     don't get palette for ui overlay
+   -quiet         don't print progress
+
 =Examples=
 start chdkptp in interactive mode and connect to the camera
  chdkptp -i -c
@@ -196,7 +206,7 @@ Under linux, the .lua files will not automatically found relative to the executa
 You can set LUA_PATH on the command line to allow them to be located:
 $ LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp ...
 
-Similarly, if you have built IUP and not installed the libraries to the system lib directory,
+Similarly, if the IUP and CD shared libraries are not on the default system path,
 you must also set LD_LIBARARY_PATH
 $ LD_LIBRARY_PATH=/path/to/iup LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp -g
 

@@ -970,6 +970,75 @@ cli:add_commands{
 			return con:reconnect({wait=args.wait})
 		end,
 	},
+	{
+		names={'dumpframes'},
+		help='dump camera display frames to file',
+		arghelp="[options] [file]",
+		args=argparser.create({
+			count=5,
+			wait=100,
+			novp=false,
+			nobm=false,
+			nopal=false,
+			quiet=false,
+		}),
+		help_detail=[[
+ file: optional output file name, defaults to chdk_<pid>_<date>_<time>.lvdump
+ options:
+   -count=<N> number of frames to dump
+   -wait=<N>  wait N ms between frames
+   -novp      don't get viewfinder data
+   -nobm      don't get ui overlay data
+   -nopal     don't get palette for ui overlay
+   -quiet     don't print progress
+]],
+		func=function(self,args) 
+			local dumpfile=args[1]
+			local what = 0
+			if not args.novp then
+				what = 1
+			end
+			if not args.nobm then
+				what = what + 4
+				if not args.nopal then
+					what = what + 8
+				end
+			end
+			if what == 0 then
+				return false,'nothing selected'
+			end
+			local status,err
+			if not con.live or not con.live.base then
+				status,err = con:live_init_streaming()
+				if not status then
+					return false,err
+				end
+			end
+			status, err = con:live_dump_start(dumpfile)
+			if not status then
+				return false,err
+			end
+			for i=1,args.count do
+				if not args.quiet then
+					printf('grabbing frame %d\n',i)
+				end
+				status, err = con:live_get_frame(what)
+				if not status then
+					break
+				end
+				status, err = con:live_dump_frame()
+				if not status then
+					break
+				end
+				sys.sleep(args.wait)
+			end
+			con:live_dump_end()
+			if status then
+				err = string.format('%d bytes recorded to %s\n',tonumber(con.live.dump_size),tostring(con.live.dump_fn))
+			end
+			return status,err
+		end,
+	},
 };
 
 return cli;
