@@ -315,37 +315,40 @@ local function read_dump_frame()
 	update_canvas_size(m.dump_replay_base,m.dump_replay_frame)
 end
 
+local function end_dump()
+	if con.live and con.live.dump_fh then
+		printf('%d bytes recorded to %s\n',tonumber(con.live.dump_size),tostring(con.live.dump_fn))
+		con:live_dump_end()
+	end
+end
 
-local function record_dump(base,frame)
+local function record_dump()
 	if not m.dump_active then
 		return
 	end
-	if not m.dumpfile then
-		local dumpname = string.format('chdk_%x_%s.lvdump',con.usbdev.product_id,os.date('%Y%m%d_%H%M%S'))
-		printf('recording to %s\n',dumpname)
-		m.dumpfile = io.open(dumpname,"wb")
-		if not m.dumpfile then
-			printf("failed to open dumpfile\n")
+	if not con.live.dump_fh then
+		local status,err = con:live_dump_start()
+		if not status then
+			printf('error starting dump:%s\n',tostring(err))
 			m.dump_active = false
+			-- TODO update checkbox
 			return
 		end
-		dump_recsize:set_u32(0,base:len())
-		dump_recsize:fwrite(m.dumpfile)
-		base:fwrite(m.dumpfile)
+		printf('recording to %s\n',con.live.dump_fn)
 	end
-	dump_recsize:set_u32(0,frame:len())
-	dump_recsize:fwrite(m.dumpfile)
-	frame:fwrite(m.dumpfile)
+	local status,err = con:live_dump_frame()
+	if not status then
+		printf('error dumping frame:%s\n',tostring(err))
+		end_dump()
+		m.dump_active = false
+	end
 end
 
 local function toggle_dump(ih,state)
 	m.dump_active = (state == 1)
 	-- TODO this should be called on disconnect etc
 	if not m.dumpactive then
-		if m.dumpfile then
-			m.dumpfile:close()
-			m.dumpfile=nil
-		end
+		end_dump()
 	end
 end
 
@@ -395,13 +398,14 @@ local function timer_action(self)
 		stats:start_xfer()
 		local status,err = con:live_get_frame(what)
 		if not status then
+			end_dump()
 			printf('error getting frame: %s\n',tostring(err))
 			gui.update_connection_status() -- update connection status on error, to prevent spamming
 			stats:stop()
 		else
 			stats:end_xfer(con.live.frame:len())
 			update_frame_data(con.live.frame)
-			record_dump(con.live.base,con.live.frame)
+			record_dump()
 			update_canvas_size(con.live.base,con.live.frame)
 		end
 		m.icnv:action()

@@ -793,6 +793,7 @@ opts{
 ]]
 function con_methods:connect(opts)
 	opts = util.extend_table({},opts)
+	self.live = nil
 	local status,err=chdk_connection.connect(self._con)
 	if not status then
 		return false,err
@@ -927,7 +928,7 @@ end
 --[[
 set up all once - per connection items for live streaming
 opts {
-	verbose:bool
+	none yet
 }
 ]]
 function con_methods:live_init_streaming(opts)
@@ -956,6 +957,9 @@ function con_methods:live_init_streaming(opts)
 	return true
 end
 
+--[[
+get one frame of live data from the camera
+]]
 function con_methods:live_get_frame(what)
 	-- TODO check what or accept it in a more friendly format
 	if not self.live then
@@ -968,6 +972,53 @@ function con_methods:live_get_frame(what)
 	end
 	return true
 end
+
+function con_methods:live_dump_start(filename)
+	if not self.live or not self.live.base then
+		return false,'not initialized'
+	end
+	if not filename then
+		filename = string.format('chdk_%x_%s.lvdump',con.usbdev.product_id,os.date('%Y%m%d_%H%M%S'))
+	end
+	--printf('recording to %s\n',dumpname)
+	self.live.dump_fh = io.open(filename,"wb")
+	if not self.live.dump_fh then
+		return false, 'failed to open dumpfile'
+	end
+	self.live.dump_sz_buf = lbuf.new(4)
+	-- TODO error checking
+	-- TODO write a version header + camera information ?
+	self.live.dump_sz_buf:set_u32(0,self.live.base:len())
+	self.live.dump_sz_buf:fwrite(self.live.dump_fh)
+	self.live.base:fwrite(self.live.dump_fh)
+	self.live.dump_fn = filename
+	self.live.dump_size = self.live.base:len() + 4
+	return true
+end
+
+function con_methods:live_dump_frame()
+	if not self.live or not self.live.dump_fh then
+		return false,'not initialized'
+	end
+	if not self.live.frame then
+		return false,'no frame'
+	end
+
+	self.live.dump_sz_buf:set_u32(0,self.live.frame:len())
+	self.live.dump_sz_buf:fwrite(self.live.dump_fh)
+	self.live.frame:fwrite(self.live.dump_fh)
+	self.live.dump_size = self.live.dump_size + self.live.frame:len() + 4
+	return true
+end
+
+-- TODO should ensure this is automatically called when connection is closed, or re-connected
+function con_methods:live_dump_end()
+	if self.live.dump_fh then
+		self.live.dump_fh:close()
+		self.live.dump_fh=nil
+	end
+end
+
 --[[
 meta table for wrapped connection object
 ]]
