@@ -1441,7 +1441,7 @@ static int chdk_put_live_image_to_canvas(lua_State *L) {
 	cdCanvasPutImageRectRGB(cnv,
 							vi->vp_width/2,vi->vp_height, // image size
 							r,g,b, // data
-							vi->vp_xoffset/2,vi->vp_yoffset, // x,y,
+							vi->vp_xoffset/2,bi->vp_max_height - vi->vp_height - vi->vp_yoffset, // x,y,
 							0,0, // width, height (default)
 							0,0,0,0); // xmin, xmax, ymin, ymax
 	free(r);
