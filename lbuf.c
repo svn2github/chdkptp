@@ -202,12 +202,13 @@ void set_vals_uint32(lua_State *L,void *p,int i) {
 }
 
 /*
-buf:<set_vals_func>(offset,val[,...])
+numset = buf:<set_vals_func>(offset,val[,...])
 set elements of buff in starting at offset in chunks, exact format depending on functions
 
 offset is offset in bytes, default 0, negative not currently allowed
 if offset is larger than buffer size, nothing is changed
 vals that would extend past the end of buf are discarded
+returns the number of values actually set
 */
 static int set_vals(lua_State *L,unsigned size,set_vals_fn f) {
 	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
@@ -235,10 +236,12 @@ static int set_vals(lua_State *L,unsigned size,set_vals_fn f) {
 }
 
 static int lbuf_set_i32(lua_State *L) {
-	return set_vals(L,4,set_vals_int32);
+	lua_pushnumber(L,set_vals(L,4,set_vals_int32));
+	return 1;
 }
 static int lbuf_set_u32(lua_State *L) {
-	return set_vals(L,4,set_vals_uint32);
+	lua_pushnumber(L,set_vals(L,4,set_vals_uint32));
+	return 1;
 }
 
 /*
