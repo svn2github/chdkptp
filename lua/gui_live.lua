@@ -499,6 +499,12 @@ function m.init()
 					tabtitle="Debug",
 					iup.toggle{title="Dump to file",action=toggle_dump},
 					iup.toggle{title="Play from file",action=toggle_play_dump},
+					iup.button{
+						title="Quick dump",
+						action=function()
+							add_status(cli:execute('dumpframes'))
+						end,
+					},
 				},
 			},
 		},
