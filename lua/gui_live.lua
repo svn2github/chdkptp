@@ -163,14 +163,25 @@ local function toggle_bm(ih,state)
 	m.bm_active = (state == 1)
 end
 
+local function get_fb_selection()
+	local what=0
+	if m.vp_active then
+		what = 1
+	end
+	if m.bm_active then
+		what = what + 4
+		what = what + 8 -- palette TODO shouldn't request if we don't understand type, but palette type is in dynamic data
+	end
+	return what
+end
 --[[
 update canvas size from base and frame
 ]]
 local function update_canvas_size(base,frame)
 	-- TODO would be good to have a whole buffer mode for debugging
 	-- TODO this needs to account for "virtual" size for letterboxed etc
-	local vp_width = chdku.live_get_frame_field(frame,'vp_width')/2
-	local vp_height = chdku.live_get_frame_field(frame,'vp_height')
+	local vp_width = chdku.live_get_base_field(base,'vp_max_width')/2
+	local vp_height = chdku.live_get_base_field(base,'vp_max_height')
 
 	local w,h = gui.parsesize(m.icnv.rastersize)
 	
@@ -384,14 +395,7 @@ end
 local function timer_action(self)
 	if update_should_run() then
 		stats:start()
-		local what=0
-		if m.vp_active then
-			what = 1
-		end
-		if m.bm_active then
-			what = what + 4
-			what = what + 8 -- palette TODO shouldn't request if we don't understand type, but palette type is in dynamic data
-		end
+		local what=get_fb_selection()
 		if what == 0 then
 			return
 		end
@@ -514,22 +518,23 @@ function m.init()
 
 	function icnv:map_cb()
 		self.ccnv = cd.CreateCanvas(cd.IUP,self)
+		self.dccnv = cd.CreateCanvas(cd.DBUFFER,self.ccnv)
 	end
 
 	function icnv:action()
 		if m.tabs.value ~= m.container then
 			return;
 		end
-		local ccnv = self.ccnv     -- retrieve the CD canvas from the IUP attribute
+		local ccnv = self.dccnv
 		stats:start_frame()
 		ccnv:Activate()
+		ccnv:Clear()
 		if m.get_current_frame_data() then
-			if not chdk.put_live_image_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data()) then
+			if not chdk.put_live_image_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data(),get_fb_selection()) then
 				print('put fail')
 			end
-		else
-			ccnv:Clear()
 		end
+		ccnv:Flush()
 		stats:end_frame()
 	end
 

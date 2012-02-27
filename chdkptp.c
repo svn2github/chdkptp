@@ -1408,6 +1408,9 @@ static int chdk_put_live_image_to_canvas(lua_State *L) {
 	cdCanvas *cnv = cdlua_checkcanvas(L,1);
 	lBuf_t *buf = luaL_checkudata(L,2,LBUF_META);
 	lBuf_t *base_buf = luaL_checkudata(L,3,LBUF_META);
+
+	// TODO we don't pay attention to palette setting
+	int what = luaL_optint(L,4,LV_TFR_VIEWPORT|LV_TFR_BITMAP|LV_TFR_PALETTE);
 	vi = (lv_vid_info *)buf->bytes;
 	bi = (lv_base_info *)base_buf->bytes;
 
@@ -1417,7 +1420,7 @@ static int chdk_put_live_image_to_canvas(lua_State *L) {
 	char *r=malloc(dispsize);
 	char *g=malloc(dispsize);
 	char *b=malloc(dispsize);
-	if(vi->vp_buffer_start) {
+	if(vi->vp_buffer_start && (what & LV_TFR_VIEWPORT)) {
 		yuv_live_to_cd_rgb(buf->bytes+vi->vp_buffer_start,
 							bi->vp_buffer_width,
 							bi->vp_max_height,
@@ -1431,14 +1434,14 @@ static int chdk_put_live_image_to_canvas(lua_State *L) {
 		memset(g,32,dispsize);
 		memset(b,32,dispsize);
 	}
-	if(vi->bm_buffer_start) {
+	if(vi->bm_buffer_start & (what & LV_TFR_BITMAP)) {
 		merge_bitmap(vi,bi,r,g,b);
 	}
 
 	cdCanvasPutImageRectRGB(cnv,
 							vi->vp_width/2,vi->vp_height, // image size
 							r,g,b, // data
-							0,0, // x,y,
+							vi->vp_xoffset/2,vi->vp_yoffset, // x,y,
 							0,0, // width, height (default)
 							0,0,0,0); // xmin, xmax, ymin, ymax
 	free(r);
