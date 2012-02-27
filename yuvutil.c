@@ -111,7 +111,7 @@ void yuv_live_to_cd_rgb(const char *p_yuv,
 	// flip for CD
 	for(y=y_offset + height-1;y>y_offset;y--) {
 		p = p_yuv + y * y_inc + (x_offset*12)/8;
-		for(x=x_offset;x<width;x+=4,p+=6) {
+		for(x=x_offset;x<width+x_offset;x+=4,p+=6) {
 			*r++ = yuv_to_r(p[1],p[2]);
 			*g++ = yuv_to_g(p[1],p[0],p[2]);
 			*b++ = yuv_to_b(p[1],p[0]);
