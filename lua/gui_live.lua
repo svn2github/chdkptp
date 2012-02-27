@@ -538,6 +538,11 @@ function m.init()
 		stats:end_frame()
 	end
 
+	function icnv:unmap_cb()
+		self.dccnv:Kill()
+		self.ccnv:Kill()
+	end
+
 	--[[
 	function icnv:resize_cb(w,h)
 		print("Resize: Width="..w.."   Height="..h)
