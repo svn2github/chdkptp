@@ -29,9 +29,8 @@ statslabel -- text for stats
 ]]
 }
 function m.live_support()
-	return (cd ~= nil
-			and type(cd.CreateCanvas) == 'function'
-			and type(chdk.put_live_image_to_canvas ) == 'function')
+	local caps = guisys.caps()
+	return (caps.CD and caps.LIVEVIEW)
 end
 
 local stats={
@@ -530,7 +529,7 @@ function m.init()
 		ccnv:Activate()
 		ccnv:Clear()
 		if m.get_current_frame_data() then
-			if not chdk.put_live_image_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data(),get_fb_selection()) then
+			if not guisys.put_live_image_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data(),get_fb_selection()) then
 				print('put fail')
 			end
 		end
@@ -571,7 +570,7 @@ function m.on_connect_change(lcon)
 		end
 		
 		if con.live.version_major ~= 1 then
-			printf('incompatible live view version %d %d\n',tonumber(cone.live.version_major),tonumber(cone.live.version_minor))
+			printf('incompatible live view version %d %d\n',tonumber(con.live.version_major),tonumber(con.live.version_minor))
 			return
 		end
 		update_base_data(con.live.base)

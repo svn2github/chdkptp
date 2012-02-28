@@ -1,32 +1,40 @@
 chdkptp supports console CLI, a GUI, and batch operation.
 
-The gui is not currently very useful
+The gui is still unfinished
 
 =Command line=
 The interface is selected by command line options
 Usage: chdkptp [options]
 Options:
-  -g    start gui
-  -i    start interactive cli
-  -c    connect at startup, with optional device spec e.g. -c"-d001 -bbus-0"
-  -n    non-interactive - quit after processing command line options (default)
-  -e    execute cli command, multiple allowed, e.g -e"u DISKBOOT.BIN" -ereboot
-  -h    help
+ -g  start GUI - default if GUI available and no options given
+ -i  start interactive cli
+ -c  connect at startup, with optional device spec e.g. -c"-d001 -bbus-0"
+ -e  execute cli command, multiple allowed, e.g -e"u DISKBOOT.BIN" -ereboot
+ -h  help
+
+If invoked with no options, the GUI will be started if available.  Otherwise,
+the CLI will be started.
+
+If started with options and neither -g nor -i is given, chdkptp will run in
+batch mode, exiting after performing the actions specified by in the options
+
+When using -e or -c, you must quote any arguments that include spaces
 
 =CLI=
 CLI commands are available from the console, gui and the command line
 
 ==CLI parsing==
-The cli commands lua, luar, exec and putm all accept a single line of free-form text
-and pass it unmodified to the underlying function.
+The cli commands lua, luar, exec and putm all accept a single line of free-form
+text and pass it unmodified to the underlying function.
 
 Most other commands parse the remaining input into switches and arguments
 Switches are in the for -switchname and may take values with -switch=value
 Arguments are any other sequence of non-space or quoted characters.
 
 Both switches and words may be quoted as follows:
-The characters " or ' can be used to quote arguments or switch values that contain spaces
-Inside double quotes "",  backslash \ is treated as an escape character.
+The characters " or ' can be used to quote arguments or switch values that
+contain spaces. Inside double quotes "",  backslash \ is treated as an escape
+character.
 
 ==Command reference==
 output of help -v
@@ -202,8 +210,9 @@ con> list
 *2:Canon PowerShot A540 b=bus-0 d=\\.\libusb0-0002--0x04a9-0x311b v=0x4a9 p=0x311b s=nil
 
 =Running under linux=
-Under linux, the .lua files will not automatically found relative to the executable directory
-You can set LUA_PATH on the command line to allow them to be located:
+Under linux, the .lua files will not automatically found relative to the
+executable directory You can set LUA_PATH on the command line to allow them
+to be located:
 $ LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp ...
 
 Similarly, if the IUP and CD shared libraries are not on the default system path,

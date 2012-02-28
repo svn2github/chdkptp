@@ -35,7 +35,7 @@ end
 cmd_opts = {
 	{
 		opt="g",
-		help="start gui",
+		help="start GUI - default if GUI available and no options given",
 		process=bool_opt,
 	},
 	{
@@ -54,11 +54,6 @@ cmd_opts = {
 			end
 			return true,options.c
 		end,
-	},
-	{
-		opt="n",
-		help="non-interactive - quit after processing command line options (default)",
-		process=bool_opt,
 	},
 	{
 		opt="e",
@@ -87,14 +82,13 @@ Usage: chdkptp [options]
 Options:
 ]])
 	for i=1,#cmd_opts do
-		printf("  -%-4s %s\n",cmd_opts[i].opt,cmd_opts[i].help)
+		printf(" -%-2s %s\n",cmd_opts[i].opt,cmd_opts[i].help)
 	end
 end
 
 -- option values
 options = {}
 cmd_opts_map = {}
-start_commands = {}
 -- defaults TODO from prefs
 function process_options()
 	local i
@@ -126,7 +120,6 @@ function process_options()
 	end
 end
 
-process_options()
 
 function do_connect_option()
 	if options.c then
@@ -141,26 +134,43 @@ end
 function do_execute_option()
 	if options.e then
 		for i=1,#options.e do
---			printf("e:%s\n",options.e[i])
 			cli:print_status(cli:execute(options.e[i]))
 		end
 	end
 end
 
-con=chdku.connection()
-
-if options.g then
+function do_gui_startup()
 	printf('starting gui...\n')
-	if init_gui_libs() then
+	if guisys.init() then
 		gui=require('gui')
 		return gui:run()
 	else
-		error('gui not supported')
+		printf('gui not supported')
+		os.exit(1)
 	end
-else
+end
+
+local function do_no_gui_startup()
 	do_connect_option()
 	do_execute_option()
 	if options.i then
 		return cli:run()
 	end
+end
+
+con=chdku.connection()
+
+if #args > 0 then
+	process_options()
+	if options.g then
+		do_gui_startup()
+	else
+		do_no_gui_startup()
+	end
+-- if no options, start gui if available or cli if not
+elseif guisys.caps().IUP then
+	do_gui_startup()
+else
+	options.i=true
+	do_no_gui_startup()
 end

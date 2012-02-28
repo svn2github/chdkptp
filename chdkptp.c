@@ -1359,7 +1359,7 @@ static int chdk_reset_device(lua_State *L) {
 TODO temp test
 would be more flexible to render bmp to it's own alpha'd image and scale to fit
 */
-#ifdef CHDKPTP_CD
+#if defined(CHDKPTP_CD) && defined(CHDKPTP_LIVEVIEW)
 static void merge_bitmap(lv_vid_info *vi,lv_base_info *bi,char *r,char *g,char *b) {
 	char *bmp = ((char *)vi + vi->bm_buffer_start);
 	int vwidth = vi->vp_width/2;
@@ -1395,14 +1395,12 @@ static void merge_bitmap(lv_vid_info *vi,lv_base_info *bi,char *r,char *g,char *
 		}
 	}
 }
-#endif
 
 /*
 TODO temp test
 put_live_image_to_canvas(canvas,livedata,basedata)
 */
-static int chdk_put_live_image_to_canvas(lua_State *L) {
-#ifdef CHDKPTP_CD
+static int guisys_put_live_image_to_canvas(lua_State *L) {
 	lv_vid_info *vi;
 	lv_base_info *bi;
 	cdCanvas *cnv = cdlua_checkcanvas(L,1);
@@ -1447,10 +1445,15 @@ static int chdk_put_live_image_to_canvas(lua_State *L) {
 	free(r);
 	free(g);
 	free(b);
-#endif
 	lua_pushboolean(L,1);
 	return 1;
 }
+#else
+static int guisys_put_live_image_to_canvas(lua_State *L) {
+	lua_pushboolean(L,0);
+	return 1;
+}
+#endif
 
 /*
 most functions return result[,errormessage]
@@ -1465,7 +1468,6 @@ static const luaL_Reg chdklib[] = {
   {"list_usb_devices", chdk_list_usb_devices},
   {"get_conlist", chdk_get_conlist}, // TEMP TESTING
   {"reset_device", chdk_reset_device}, // TEMP TESTING
-  {"put_live_image_to_canvas", chdk_put_live_image_to_canvas}, // TEMP TESTING
   {NULL, NULL}
 };
 
@@ -1547,53 +1549,10 @@ static const luaL_Reg lua_syslib[] = {
   {NULL, NULL}
 };
 
-static int chdkptp_registerlibs(lua_State *L) {
-	/* set up meta table for connection object */
-	luaL_newmetatable(L,CHDK_CONNECTION_META);
-	lua_pushcfunction(L,chdk_connection_gc);
-	lua_setfield(L,-2,"__gc");
-
-	/* register functions that operate on a connection
-	 * lua code can use them to implement OO connection interface
-	*/
-	luaL_register(L, "chdk_connection", chdkconnection);  
-
-	/* register functions that don't require a connection */
-	luaL_register(L, "chdk", chdklib);
-	luaL_register(L, "sys", lua_syslib);
-	
-	// create a table to keep track of connections
-	lua_newtable(L);
-	// metatable for above
-	luaL_newmetatable(L, CHDK_CONNECTION_LIST_META);
-	lua_pushstring(L, "kv");  /* mode values: weak keys, weak values */
-	lua_setfield(L, -2, "__mode");  /* metatable.__mode */
-	lua_setmetatable(L,-2);
-	lua_setfield(L,LUA_REGISTRYINDEX,CHDK_CONNECTION_LIST);
-	return 1;
-}
-
-static int exec_lua_string(lua_State *L, const char *luacode) {
-	int r;
-	r=luaL_loadstring(L,luacode);
-	if(r) {
-		fprintf(stderr,"loadstring failed %d\n",r);
-		fprintf(stderr,"error %s\n",lua_tostring(L, -1));
-	} else {
-		r=lua_pcall(L,0,LUA_MULTRET, 0);
-		if(r) {
-			fprintf(stderr,"pcall failed %d\n",r);
-			fprintf(stderr,"error %s\n",lua_tostring(L, -1));
-			// TODO should get stack trace
-		}
-	}
-	return r==0;
-}
-
 static int gui_inited;
 
 // TODO we should allow loading IUP and CD with require
-static int init_gui_libs(lua_State *L) {
+static int guisys_init(lua_State *L) {
 #ifdef CHDKPTP_IUP
 	if(!gui_inited) {
 		gui_inited = 1;
@@ -1625,6 +1584,75 @@ static int uninit_gui_libs(lua_State *L) {
 	return 0;
 }
 
+static int guisys_caps(lua_State *L) {
+	lua_newtable(L);
+#ifdef CHDKPTP_IUP
+	lua_pushboolean(L,1);
+	lua_setfield(L,-2,"IUP");
+#endif
+#ifdef CHDKPTP_CD
+	lua_pushboolean(L,1);
+	lua_setfield(L,-2,"CD");
+#endif
+#ifdef CHDKPTP_LIVEVIEW
+	lua_pushboolean(L,1);
+	lua_setfield(L,-2,"LIVEVIEW");
+#endif
+	return 1;
+}
+
+static const luaL_Reg lua_guisyslib[] = {
+  {"init", guisys_init},
+  {"caps", guisys_caps},
+  {"put_live_image_to_canvas", guisys_put_live_image_to_canvas}, // TEMP TESTING
+  {NULL, NULL}
+};
+
+static int chdkptp_registerlibs(lua_State *L) {
+	/* set up meta table for connection object */
+	luaL_newmetatable(L,CHDK_CONNECTION_META);
+	lua_pushcfunction(L,chdk_connection_gc);
+	lua_setfield(L,-2,"__gc");
+
+	/* register functions that operate on a connection
+	 * lua code can use them to implement OO connection interface
+	*/
+	luaL_register(L, "chdk_connection", chdkconnection);  
+
+	/* register functions that don't require a connection */
+	luaL_register(L, "chdk", chdklib);
+	luaL_register(L, "sys", lua_syslib);
+	luaL_register(L, "guisys", lua_guisyslib);
+	
+	// create a table to keep track of connections
+	lua_newtable(L);
+	// metatable for above
+	luaL_newmetatable(L, CHDK_CONNECTION_LIST_META);
+	lua_pushstring(L, "kv");  /* mode values: weak keys, weak values */
+	lua_setfield(L, -2, "__mode");  /* metatable.__mode */
+	lua_setmetatable(L,-2);
+	lua_setfield(L,LUA_REGISTRYINDEX,CHDK_CONNECTION_LIST);
+	return 1;
+}
+
+static int exec_lua_string(lua_State *L, const char *luacode) {
+	int r;
+	r=luaL_loadstring(L,luacode);
+	if(r) {
+		fprintf(stderr,"loadstring failed %d\n",r);
+		fprintf(stderr,"error %s\n",lua_tostring(L, -1));
+	} else {
+		r=lua_pcall(L,0,LUA_MULTRET, 0);
+		if(r) {
+			fprintf(stderr,"pcall failed %d\n",r);
+			fprintf(stderr,"error %s\n",lua_tostring(L, -1));
+			// TODO should get stack trace
+		}
+	}
+	return r==0;
+}
+
+
 static int init_lua_globals (lua_State *L, int argc, char **argv) {
 	int i;
 	lua_createtable(L,argc-1,0);
@@ -1634,9 +1662,6 @@ static int init_lua_globals (lua_State *L, int argc, char **argv) {
 		lua_rawseti(L, -2, i); // add to array
 	}
 	lua_setglobal(L,"args");
-	// TODO hacky
-	lua_pushcfunction(L,init_gui_libs);
-	lua_setglobal(L,"init_gui_libs");
 }
 
 /* main program  */
