@@ -1360,20 +1360,22 @@ TODO temp test
 would be more flexible to render bmp to it's own alpha'd image and scale to fit
 */
 #if defined(CHDKPTP_CD) && defined(CHDKPTP_LIVEVIEW)
-static void merge_bitmap(lv_vid_info *vi,lv_base_info *bi,char *r,char *g,char *b) {
+static void merge_bitmap(lv_vid_info *vi,lv_base_info *bi,int vp_par,char *r,char *g,char *b) {
 	char *bmp = ((char *)vi + vi->bm_buffer_start);
-	int vwidth = vi->vp_width/2;
+	int vwidth = vi->vp_width/vp_par;
 	int height = bi->bm_max_height;
 	int width = bi->bm_max_width;
 	if(height > vi->vp_height) {
 		height = vi->vp_height;
 	}
 	// bmp with 1:2 pixels
-	int x_inc = 1;
-	if(width == vi->vp_width) {
-		x_inc = 2;
-	} else if (width > vwidth) {
-		width = vwidth;
+	int x_inc = vp_par;
+	// 1:1 bmp on 1:2 viewport
+	// TODO doesn't work if not exact (e.g. 360 bmp, 352 vp)
+	if (width == vi->vp_width/2) {
+		x_inc = 1;
+	} else if (width > vwidth*x_inc) {
+		width = vwidth*x_inc;
 	}
 	int y_inc = bi->bm_buffer_width;
 	//printf("width:%d height %d x_inc:%d y_inc:%d\n",width,height,x_inc,y_inc);
@@ -1409,11 +1411,12 @@ static int guisys_put_live_image_to_canvas(lua_State *L) {
 
 	// TODO we don't pay attention to palette setting
 	int what = luaL_optint(L,4,LV_TFR_VIEWPORT|LV_TFR_BITMAP|LV_TFR_PALETTE);
+	int vp_par = luaL_optint(L,5,2);
 	vi = (lv_vid_info *)buf->bytes;
 	bi = (lv_base_info *)base_buf->bytes;
 
 	unsigned size = vi->vp_width*vi->vp_height;
-	unsigned dispsize = size/2;
+	unsigned dispsize = size/vp_par;
 
 	char *r=malloc(dispsize);
 	char *g=malloc(dispsize);
@@ -1426,6 +1429,7 @@ static int guisys_put_live_image_to_canvas(lua_State *L) {
 							vi->vp_yoffset,
 							vi->vp_width,
 							vi->vp_height,
+							(vp_par == 2),
 							r,g,b);
 	} else {
 		memset(r,32,dispsize);
@@ -1433,13 +1437,13 @@ static int guisys_put_live_image_to_canvas(lua_State *L) {
 		memset(b,32,dispsize);
 	}
 	if(vi->bm_buffer_start & (what & LV_TFR_BITMAP)) {
-		merge_bitmap(vi,bi,r,g,b);
+		merge_bitmap(vi,bi,vp_par,r,g,b);
 	}
 
 	cdCanvasPutImageRectRGB(cnv,
-							vi->vp_width/2,vi->vp_height, // image size
+							vi->vp_width/vp_par,vi->vp_height, // image size
 							r,g,b, // data
-							vi->vp_xoffset/2,bi->vp_max_height - vi->vp_height - vi->vp_yoffset, // x,y,
+							vi->vp_xoffset/vp_par,bi->vp_max_height - vi->vp_height - vi->vp_yoffset, // x,y,
 							0,0, // width, height (default)
 							0,0,0,0); // xmin, xmax, ymin, ymax
 	free(r);
@@ -1448,9 +1452,156 @@ static int guisys_put_live_image_to_canvas(lua_State *L) {
 	lua_pushboolean(L,1);
 	return 1;
 }
-#else
-static int guisys_put_live_image_to_canvas(lua_State *L) {
-	lua_pushboolean(L,0);
+
+/*
+a single buffer to avoid constant malloc/free
+*/
+static char * get_im_buf(size_t size) {
+	static char *im_buf;
+	static int im_buf_size;
+	if(im_buf_size < size) {
+		free(im_buf);
+		im_buf = malloc(size);
+		if (!im_buf) {
+			im_buf_size = 0;
+		}
+	}
+	return im_buf;
+}
+static int guisys_put_viewport_to_canvas(lua_State *L) {
+	lv_vid_info *vi;
+	lv_base_info *bi;
+	cdCanvas *cnv = cdlua_checkcanvas(L,1);
+	lBuf_t *buf = luaL_checkudata(L,2,LBUF_META);
+	lBuf_t *base_buf = luaL_checkudata(L,3,LBUF_META);
+
+	int vp_par = luaL_optint(L,4,2);
+
+	vi = (lv_vid_info *)buf->bytes;
+	bi = (lv_base_info *)base_buf->bytes;
+
+	if(!vi->vp_buffer_start) {
+		lua_pushboolean(L,0);
+		return 1;
+	}
+
+	unsigned size = vi->vp_width*vi->vp_height;
+	unsigned dispsize = size/vp_par;
+
+	char *r=get_im_buf(dispsize*3);
+	char *g=r+dispsize;
+	char *b=g+dispsize;
+	yuv_live_to_cd_rgb(buf->bytes+vi->vp_buffer_start,
+						bi->vp_buffer_width,
+						bi->vp_max_height,
+						vi->vp_xoffset,
+						vi->vp_yoffset,
+						vi->vp_width,
+						vi->vp_height,
+						(vp_par == 2),
+						r,g,b);
+	cdCanvasPutImageRectRGB(cnv,
+							vi->vp_width/vp_par,vi->vp_height, // image size
+							r,g,b, // data
+							vi->vp_xoffset/vp_par,bi->vp_max_height - vi->vp_height - vi->vp_yoffset, // x,y,
+							0,0, // width, height (default)
+							0,0,0,0); // xmin, xmax, ymin, ymax
+	lua_pushboolean(L,1);
+	return 1;
+}
+
+typedef struct {
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+	uint8_t a;
+} palette_entry_rgba_t;
+
+static int guisys_put_bitmap_to_canvas(lua_State *L) {
+	static palette_entry_rgba_t pal_rgba[256];
+	lv_vid_info *vi;
+	lv_base_info *bi;
+	cdCanvas *cnv = cdlua_checkcanvas(L,1);
+	lBuf_t *buf = luaL_checkudata(L,2,LBUF_META);
+	lBuf_t *base_buf = luaL_checkudata(L,3,LBUF_META);
+
+	int bm_par = luaL_optint(L,4,2);
+
+	vi = (lv_vid_info *)buf->bytes;
+	bi = (lv_base_info *)base_buf->bytes;
+
+	if(!vi->bm_buffer_start) {
+		lua_pushboolean(L,0);
+		return 1;
+	}
+	// TEMP
+	if(bi->bm_max_width == 720) {
+		bm_par = 2;
+	} else {
+		bm_par = 1;
+	}
+	const char *pal=NULL;
+	yuv_palette_to_rgba_fn fn=yuv_get_palette_to_rgba_fn(vi->palette_type);
+	if(fn && vi->palette_buffer_start) {
+		pal = ((char *)vi + vi->palette_buffer_start);
+	} else {
+		pal = yuv_default_type1_palette;
+		fn = yuv_bmp_type1_set_rgba;
+	}
+	int i;
+	for(i=0;i<255;i++) {
+		fn(pal,i,&pal_rgba[i].r,&pal_rgba[i].g,&pal_rgba[i].b,&pal_rgba[i].a);
+	}
+
+	int height = bi->bm_max_height;
+	int width = bi->bm_max_width/bm_par;
+
+	unsigned dispsize = width*height;
+
+	char *im_buf=get_im_buf(dispsize*4);
+	char *r=im_buf;
+	char *g=r+dispsize;
+	char *b=g+dispsize;
+	char *a=b+dispsize;
+
+	int y_inc = bi->bm_buffer_width;
+	int x_inc = bm_par;
+	int x,y;
+
+	char *bmp = ((char *)vi + vi->bm_buffer_start);
+
+	char *p=bmp + (height-1)*y_inc;
+
+	for(y=0;y<height;y++,p-=y_inc) {
+		for(x=0;x<bi->bm_max_width;x+=x_inc) {
+			int c =*(p+x);
+			*r++ = pal_rgba[c].r;
+			*g++ = pal_rgba[c].g;
+			*b++ = pal_rgba[c].b;
+			*a++ = pal_rgba[c].a;
+		}
+	}
+	r=im_buf;
+	g=r+dispsize;
+	b=g+dispsize;
+	a=b+dispsize;
+
+	/*
+	cdCanvasPutImageRectRGB(cnv,
+							width,height, // image size
+							r,g,b, // data
+							0,bi->vp_max_height - height, // x,y,
+							0,0, // width, height (default)
+							0,0,0,0); // xmin, xmax, ymin, ymax 
+	*/
+	// TODO stretch as needed
+	cdCanvasPutImageRectRGBA(cnv,
+							width,height, // image size
+							r,g,b,a, // data
+							0,bi->vp_max_height - height, // x,y,
+							0,0, // width, height (default)
+							0,0,0,0); // xmin, xmax, ymin, ymax 
+	lua_pushboolean(L,1);
 	return 1;
 }
 #endif
@@ -1604,7 +1755,11 @@ static int guisys_caps(lua_State *L) {
 static const luaL_Reg lua_guisyslib[] = {
   {"init", guisys_init},
   {"caps", guisys_caps},
+#if defined(CHDKPTP_CD) && defined(CHDKPTP_LIVEVIEW)
   {"put_live_image_to_canvas", guisys_put_live_image_to_canvas}, // TEMP TESTING
+  {"put_viewport_to_canvas", guisys_put_viewport_to_canvas}, // TEMP TESTING
+  {"put_bitmap_to_canvas", guisys_put_bitmap_to_canvas}, // TEMP TESTING
+#endif
   {NULL, NULL}
 };
 

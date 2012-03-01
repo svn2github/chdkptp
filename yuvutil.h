@@ -26,17 +26,20 @@ typedef struct {
 	int8_t v;
 } yuv_palette_entry_ayuv_t;
 
-
 typedef void (*yuv_palette_to_rgb_fn)(const char *palette, uint8_t pixel,uint8_t *r,uint8_t *g,uint8_t *b);
 typedef void (*yuv_palette_to_rgba_fn)(const char *palette, uint8_t pixel,uint8_t *r,uint8_t *g,uint8_t *b,uint8_t *a);
 
 yuv_palette_to_rgb_fn yuv_get_palette_to_rgb_fn(unsigned type);
+yuv_palette_to_rgba_fn yuv_get_palette_to_rgba_fn(unsigned type);
 
 void yuv_bmp_type1_blend_rgb(const char *palette, uint8_t pixel,uint8_t *r,uint8_t *g,uint8_t *b);
+void yuv_bmp_type1_set_rgba(const char *palette, uint8_t pixel,uint8_t *r,uint8_t *g,uint8_t *b,uint8_t *a);
+
 void yuv_live_to_cd_rgb(const char *p_yuv,
 						unsigned buf_width, unsigned buf_height,
 						unsigned x_offset, unsigned y_offset,
 						unsigned width,unsigned height,
+						int skip,
 						uint8_t *r,uint8_t *g,uint8_t *b);
 
 extern const char yuv_default_type1_palette[];

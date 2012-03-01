@@ -35,7 +35,7 @@ struct {
 	yuv_palette_to_rgba_fn to_rgba;
 } yuv_palette_funcs[] = {
 	{NULL,NULL}, 					// type 0 - no palette, we could have a default func here
-	{yuv_bmp_type1_blend_rgb,NULL}, // type 1 - ayuv
+	{yuv_bmp_type1_blend_rgb,yuv_bmp_type1_set_rgba}, // type 1 - ayuv
 };
 
 #define N_PALETTE_FUNCS (sizeof(yuv_palette_funcs)/sizeof(yuv_palette_funcs[0]))
@@ -43,6 +43,13 @@ struct {
 yuv_palette_to_rgb_fn yuv_get_palette_to_rgb_fn(unsigned type) {
 	if(type<N_PALETTE_FUNCS) {
 		return yuv_palette_funcs[type].to_rgb;
+	}
+	return NULL;
+}
+
+yuv_palette_to_rgba_fn yuv_get_palette_to_rgba_fn(unsigned type) {
+	if(type<N_PALETTE_FUNCS) {
+		return yuv_palette_funcs[type].to_rgba;
 	}
 	return NULL;
 }
@@ -100,10 +107,26 @@ void yuv_bmp_type1_blend_rgb(const char *palette, uint8_t pixel,uint8_t *r,uint8
 	*b = blend(yuv_to_b(y,u),*b,a);
 }
 
+void yuv_bmp_type1_set_rgba(const char *palette, uint8_t pixel,uint8_t *r,uint8_t *g,uint8_t *b,uint8_t *a) {
+	const yuv_palette_entry_ayuv_t *pal = (const yuv_palette_entry_ayuv_t *)palette;
+	unsigned i1 = pixel & 0xF;
+	unsigned i2 = (pixel & 0xF0)>>4;
+	int8_t u,v;
+	uint8_t y;
+	*a = (pal[i1].a + pal[i2].a)/2;
+	y = clamp_uint8(pal[i1].y + pal[i2].y);
+	u = clamp_int8(pal[i1].u + pal[i2].u);
+	v = clamp_int8(pal[i1].v + pal[i2].v);
+	*r = yuv_to_r(y,v);
+	*g = yuv_to_g(y,u,v);
+	*b = yuv_to_b(y,u);
+}
+
 void yuv_live_to_cd_rgb(const char *p_yuv,
 						unsigned buf_width, unsigned buf_height,
 						unsigned x_offset, unsigned y_offset,
 						unsigned width,unsigned height,
+						int skip,
 						uint8_t *r,uint8_t *g,uint8_t *b) {
 	unsigned x,y;
 	unsigned y_inc = (buf_width*12)/8;
@@ -119,6 +142,16 @@ void yuv_live_to_cd_rgb(const char *p_yuv,
 			*r++ = yuv_to_r(p[3],p[2]);
 			*g++ = yuv_to_g(p[3],p[0],p[2]);
 			*b++ = yuv_to_b(p[3],p[0]);
+			if(!skip) {
+				// TODO it might be better to use the next pixels U and V values
+				*r++ = yuv_to_r(p[4],p[2]);
+				*g++ = yuv_to_g(p[4],p[0],p[2]);
+				*b++ = yuv_to_b(p[4],p[0]);
+
+				*r++ = yuv_to_r(p[5],p[2]);
+				*g++ = yuv_to_g(p[5],p[0],p[2]);
+				*b++ = yuv_to_b(p[5],p[0]);
+			}
 		}
 	}
 }

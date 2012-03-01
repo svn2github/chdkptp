@@ -18,6 +18,7 @@
 module for live view gui
 ]]
 local m={
+	vp_par = 2, -- pixel aspect ratio for viewport 1:n, n=1,2
 --[[
 note - these are 'private' but exposed in the module for easier debugging
 container -- outermost widget
@@ -149,19 +150,25 @@ function m.get_current_base_data()
 	if m.dump_replay then
 		return m.dump_replay_base
 	end
-	if con.live.base then
+	if con.live then
 		return con.live.base
 	end
 end
 
-local function toggle_vp(ih,state)
-	m.vp_active = (state == 1)
-end
+local vp_toggle=iup.toggle{
+	title="Viewfinder",
+	action=function(self,state)
+		m.vp_active = (state == 1)
+	end,
+}
 
-local function toggle_bm(ih,state)
-	m.bm_active = (state == 1)
-end
-
+local bm_toggle = iup.toggle{
+	title="UI Overlay",
+	action=function(self,state)
+		m.bm_active = (state == 1)
+	end,
+}
+					
 local function get_fb_selection()
 	local what=0
 	if m.vp_active then
@@ -179,7 +186,7 @@ update canvas size from base and frame
 local function update_canvas_size(base,frame)
 	-- TODO would be good to have a whole buffer mode for debugging
 	-- TODO this needs to account for "virtual" size for letterboxed etc
-	local vp_width = chdku.live_get_base_field(base,'vp_max_width')/2
+	local vp_width = chdku.live_get_base_field(base,'vp_max_width')/m.vp_par
 	local vp_height = chdku.live_get_base_field(base,'vp_max_height')
 
 	local w,h = gui.parsesize(m.icnv.rastersize)
@@ -199,6 +206,18 @@ local function update_canvas_size(base,frame)
 		gui.resize_for_content()
 	end
 end
+
+local vp_par_toggle = iup.toggle{
+	title="Viewfinder 1:1",
+	action=function(self,state)
+		if state == 1 then
+			m.vp_par = 1
+		else
+			m.vp_par = 2
+		end
+	end,
+}
+
 
 local function update_should_run()
 	if not m.live_con_valid then
@@ -464,8 +483,9 @@ function m.init()
 		iup.vbox{
 			iup.frame{
 				iup.vbox{
-					iup.toggle{title="Viewfinder",action=toggle_vp},
-					iup.toggle{title="UI Overlay",action=toggle_bm},
+					vp_toggle,
+					bm_toggle,
+					vp_par_toggle,
 					iup.hbox{
 						iup.label{title="Target FPS"},
 						iup.text{
@@ -518,6 +538,7 @@ function m.init()
 	function icnv:map_cb()
 		self.ccnv = cd.CreateCanvas(cd.IUP,self)
 		self.dccnv = cd.CreateCanvas(cd.DBUFFER,self.ccnv)
+		self.dccnv:SetBackground(cd.EncodeColor(32,32,32))
 	end
 
 	function icnv:action()
@@ -529,9 +550,17 @@ function m.init()
 		ccnv:Activate()
 		ccnv:Clear()
 		if m.get_current_frame_data() then
-			if not guisys.put_live_image_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data(),get_fb_selection()) then
+			if m.vp_active then
+				guisys.put_viewport_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data(),m.vp_par)
+			end
+			if m.bm_active then
+				guisys.put_bitmap_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data())
+			end
+			--[[
+			if not guisys.put_live_image_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data(),get_fb_selection(),m.vp_par) then
 				print('put fail')
 			end
+			]]
 		end
 		ccnv:Flush()
 		stats:end_frame()
