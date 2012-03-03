@@ -5,8 +5,12 @@ cameras.
 This is an alpha version - protocol, functionality, APIs, commands, command line options 
 are all subject to change.
 
-chdkptp source is available from http://subversion.assembla.com/svn/chdkptp/
+Source is available from http://subversion.assembla.com/svn/chdkptp/
+Binary snapshot builds are available from http://www.assembla.com/spaces/chdkptp/documents
 Roadmap is under development in http://www.assembla.com/spaces/chdkptp/tickets
+Changelog is at http://www.assembla.com/wiki/show/chdkptp/Changelog
+
+Documentation for end users can be found in USAGE.TXT
 
 For information about CHDK, see http://chdk.wikia.com/wiki/CHDK
 For information about the CHDK PTP extension, see http://chdk.wikia.com/wiki/PTP_Extension
@@ -24,13 +28,13 @@ the CHDKDE ptpcam source may be found at http://tools.assembla.com/chdkde/browse
 chdkptp includes software from several other projects, see THANKS.TXT for details.
 
 =Dependencies=
-- IUP version 3.4 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work)
+- IUP version 3.5 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work)
   Optional, edit makefile to build without iup gui support
-- CD Version 5.5 http://www.tecgraf.puc-rio.br/cd/
+- CD Version 5.5 http://www.tecgraf.puc-rio.br/cd/ (earlier 5.x versions may also work)
   Optional, will be used for live display
 - Lua version 5.1 http://www.lua.org/
 - LibUSB (libusb-win32 on windows)
-- CHDK source for PTP protocol header http://tools.assembla.com/chdk/browser/trunk
+- CHDK source for PTP protocol header from the appropriate branch, e.g. http://tools.assembla.com/chdk/browser/trunk
 
 =Windows development environment=
 Mingw with gcc 4.5+ is the primary development environment. 
@@ -44,8 +48,8 @@ E.g. http://sourceforge.net/projects/mingw/files/Automated%20MinGW%20Installer/m
 
 ==Installing IUP libraries==
 Get the mingw4 binary package of IUP, 
-http://sourceforge.net/projects/iup/files/3.3/Windows%20Libraries/
-file iup-3.3_Win32_mingw4_lib.zip
+http://sourceforge.net/projects/iup/files/3.5/Windows%20Libraries/
+file iup-3.5_Win32_mingw4_lib.zip
 
 Note, this package has the libraries in the root, with etc/ and include/ subdirectories.
 You may want to put the libraries in /lib to match the IUP recommended filesystem layout
@@ -55,7 +59,7 @@ The examples and win32 binaries are not required, but may be helpful
 Similar to IUP, from http://sourceforge.net/projects/canvasdraw/files/
 
 ==Installing and building Lua==
-Get the lua 5.1.4 source from http://www.lua.org/download.html
+Get the lua 5.1.x source from http://www.lua.org/download.html
 In a msys shell, go to the lua directory and type
 make mingw
 make local

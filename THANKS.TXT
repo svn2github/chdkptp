@@ -8,7 +8,7 @@ Lua http://www.lua.org/
 Copyright (c) 1994-2011 Lua.org, PUC-Rio.
 
 IUP http://www.tecgraf.puc-rio.br/iup/
-Copyright (c) 1994-2011 Tecgraf, PUC-Rio.
+Copyright (c) 1994-2012 Tecgraf, PUC-Rio.
 
 CD http://www.tecgraf.puc-rio.br/cd/
 Copyright (c) 1994-2012 Tecgraf, PUC-Rio.
