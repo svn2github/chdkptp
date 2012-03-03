@@ -1357,102 +1357,8 @@ static int chdk_reset_device(lua_State *L) {
 
 /*
 TODO temp test
-would be more flexible to render bmp to it's own alpha'd image and scale to fit
 */
 #if defined(CHDKPTP_CD) && defined(CHDKPTP_LIVEVIEW)
-static void merge_bitmap(lv_vid_info *vi,lv_base_info *bi,int vp_par,char *r,char *g,char *b) {
-	char *bmp = ((char *)vi + vi->bm_buffer_start);
-	int vwidth = vi->vp_width/vp_par;
-	int height = bi->bm_max_height;
-	int width = bi->bm_max_width;
-	if(height > vi->vp_height) {
-		height = vi->vp_height;
-	}
-	// bmp with 1:2 pixels
-	int x_inc = vp_par;
-	// 1:1 bmp on 1:2 viewport
-	// TODO doesn't work if not exact (e.g. 360 bmp, 352 vp)
-	if (width == vi->vp_width/2) {
-		x_inc = 1;
-	} else if (width > vwidth*x_inc) {
-		width = vwidth*x_inc;
-	}
-	int y_inc = bi->bm_buffer_width;
-	//printf("width:%d height %d x_inc:%d y_inc:%d\n",width,height,x_inc,y_inc);
-	int x,y;
-	char *p=bmp + (height-1)*y_inc;
-
-	const char *pal=NULL;
-	yuv_palette_to_rgb_fn fn=yuv_get_palette_to_rgb_fn(vi->palette_type);
-	if(fn && vi->palette_buffer_start) {
-		pal = ((char *)vi + vi->palette_buffer_start);
-	} else {
-		pal = yuv_default_type1_palette;
-		fn = yuv_bmp_type1_blend_rgb;
-	}
-	for(y=0;y<height;y++,p-=y_inc) {
-		int d_off = y * vwidth;
-		for(x=0;x<width;x+=x_inc,d_off++) {
-			fn(pal,*(p+x),r+d_off,g+d_off,b+d_off);
-		}
-	}
-}
-
-/*
-TODO temp test
-put_live_image_to_canvas(canvas,livedata,basedata)
-*/
-static int guisys_put_live_image_to_canvas(lua_State *L) {
-	lv_vid_info *vi;
-	lv_base_info *bi;
-	cdCanvas *cnv = cdlua_checkcanvas(L,1);
-	lBuf_t *buf = luaL_checkudata(L,2,LBUF_META);
-	lBuf_t *base_buf = luaL_checkudata(L,3,LBUF_META);
-
-	// TODO we don't pay attention to palette setting
-	int what = luaL_optint(L,4,LV_TFR_VIEWPORT|LV_TFR_BITMAP|LV_TFR_PALETTE);
-	int vp_par = luaL_optint(L,5,2);
-	vi = (lv_vid_info *)buf->bytes;
-	bi = (lv_base_info *)base_buf->bytes;
-
-	unsigned size = vi->vp_width*vi->vp_height;
-	unsigned dispsize = size/vp_par;
-
-	char *r=malloc(dispsize);
-	char *g=malloc(dispsize);
-	char *b=malloc(dispsize);
-	if(vi->vp_buffer_start && (what & LV_TFR_VIEWPORT)) {
-		yuv_live_to_cd_rgb(buf->bytes+vi->vp_buffer_start,
-							bi->vp_buffer_width,
-							bi->vp_max_height,
-							vi->vp_xoffset,
-							vi->vp_yoffset,
-							vi->vp_width,
-							vi->vp_height,
-							(vp_par == 2),
-							r,g,b);
-	} else {
-		memset(r,32,dispsize);
-		memset(g,32,dispsize);
-		memset(b,32,dispsize);
-	}
-	if(vi->bm_buffer_start & (what & LV_TFR_BITMAP)) {
-		merge_bitmap(vi,bi,vp_par,r,g,b);
-	}
-
-	cdCanvasPutImageRectRGB(cnv,
-							vi->vp_width/vp_par,vi->vp_height, // image size
-							r,g,b, // data
-							vi->vp_xoffset/vp_par,bi->vp_max_height - vi->vp_height - vi->vp_yoffset, // x,y,
-							0,0, // width, height (default)
-							0,0,0,0); // xmin, xmax, ymin, ymax
-	free(r);
-	free(g);
-	free(b);
-	lua_pushboolean(L,1);
-	return 1;
-}
-
 /*
 a single buffer to avoid constant malloc/free
 */
@@ -1756,7 +1662,6 @@ static const luaL_Reg lua_guisyslib[] = {
   {"init", guisys_init},
   {"caps", guisys_caps},
 #if defined(CHDKPTP_CD) && defined(CHDKPTP_LIVEVIEW)
-  {"put_live_image_to_canvas", guisys_put_live_image_to_canvas}, // TEMP TESTING
   {"put_viewport_to_canvas", guisys_put_viewport_to_canvas}, // TEMP TESTING
   {"put_bitmap_to_canvas", guisys_put_bitmap_to_canvas}, // TEMP TESTING
 #endif

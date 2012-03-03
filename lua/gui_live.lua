@@ -556,11 +556,6 @@ function m.init()
 			if m.bm_active then
 				guisys.put_bitmap_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data())
 			end
-			--[[
-			if not guisys.put_live_image_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data(),get_fb_selection(),m.vp_par) then
-				print('put fail')
-			end
-			]]
 		end
 		ccnv:Flush()
 		stats:end_frame()
