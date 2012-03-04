@@ -19,6 +19,7 @@ module for live view gui
 ]]
 local m={
 	vp_par = 2, -- pixel aspect ratio for viewport 1:n, n=1,2
+	bm_par = 1, -- pixel aspect ratio for bitmap 1:n, n=1,2
 --[[
 note - these are 'private' but exposed in the module for easier debugging
 container -- outermost widget
@@ -218,6 +219,17 @@ local vp_par_toggle = iup.toggle{
 	end,
 }
 
+local bm_par_toggle = iup.toggle{
+	title="Overlay 1:1",
+	value="1",
+	action=function(self,state)
+		if state == 1 then
+			m.bm_par = 1
+		else
+			m.bm_par = 2
+		end
+	end,
+}
 
 local function update_should_run()
 	if not m.live_con_valid then
@@ -472,8 +484,6 @@ function m.init()
 		return false
 	end
 	local icnv = iup.canvas{rastersize="360x240",border="NO",expand="NO"}
-	-- testing
-	--local icnv = iup.canvas{rastersize="160x100",border="NO",expand="NO"}
 	m.icnv = icnv
 	m.statslabel = iup.label{size="90x80",alignment="ALEFT:ATOP"}
 	m.container = iup.hbox{
@@ -486,6 +496,7 @@ function m.init()
 					vp_toggle,
 					bm_toggle,
 					vp_par_toggle,
+					bm_par_toggle,
 					iup.hbox{
 						iup.label{title="Target FPS"},
 						iup.text{
@@ -560,7 +571,7 @@ function m.init()
 			end
 			if m.bm_active then
 				-- TODO skip
-				m.bm_img = liveimg.get_bitmap_pimg(m.bm_img,m.get_current_base_data(),m.get_current_frame_data(),true)
+				m.bm_img = liveimg.get_bitmap_pimg(m.bm_img,m.get_current_base_data(),m.get_current_frame_data(),m.bm_par == 2)
 				if m.bm_img then
 					m.bm_img:blend_to_cd_canvas(ccnv, 0, m.li.vp_max_height - m.li.bm_max_height)
 				else
@@ -656,7 +667,6 @@ end
 -- for anything that needs to be intialized when everything is started
 function m.on_dlg_run()
 	init_timer()
-	--m.update_run_state()
 end
 
 return m
