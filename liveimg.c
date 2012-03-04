@@ -69,9 +69,18 @@ typedef struct {
 	int8_t v;
 } palette_entry_ayuv_t;
 
+typedef struct {
+	int8_t v;
+	int8_t u;
+	uint8_t y;
+	uint8_t a;
+} palette_entry_vuya_t;
+
 typedef void (*yuv_palette_to_rgba_fn)(const char *pal_yuv, uint8_t pixel,palette_entry_rgba_t *pal_rgb);
 
 void palette_type1_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
+void palette_type2_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
+void palette_type3_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
 
 void yuv_live_to_cd_rgb(const char *p_yuv,
 						unsigned buf_width, unsigned buf_height,
@@ -96,7 +105,9 @@ typedef struct {
 // TODO only one function for now
 palette_convert_t palette_funcs[] = {
 	{NULL}, 					// type 0 - no palette, we could have a default func here
-	{palette_type1_to_rgba}, // type 1 - ayuv
+	{palette_type1_to_rgba},	// type 1 - ayuv, 16 entries
+	{palette_type2_to_rgba}, 	// type 2 - like type 1, but with 3 bit alpha lookup - UNTESTED
+	{palette_type3_to_rgba}, 	// type 3 - vuya, 256 entries, 3
 };
 
 #define N_PALETTE_FUNCS (sizeof(palette_funcs)/sizeof(palette_funcs[0]))
@@ -147,12 +158,47 @@ void palette_type1_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba
 	int8_t u,v;
 	uint8_t y;
 	pal_rgb->a = (pal[i1].a + pal[i2].a)>>1;
+	// TODO not clear if these should be /2 or not
 	y = clamp_uint8(pal[i1].y + pal[i2].y);
 	u = clamp_int8(pal[i1].u + pal[i2].u);
 	v = clamp_int8(pal[i1].v + pal[i2].v);
 	pal_rgb->r = yuv_to_r(y,v);
 	pal_rgb->g = yuv_to_g(y,u,v);
 	pal_rgb->b = yuv_to_b(y,u);
+}
+
+static const uint8_t alpha2_lookup[] = {128,171,214,255};
+// like above, but with alpha lookup
+void palette_type2_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba_t *pal_rgb) {
+	const palette_entry_ayuv_t *pal = (const palette_entry_ayuv_t *)palette;
+	unsigned i1 = pixel & 0xF;
+	unsigned i2 = (pixel & 0xF0)>>4;
+	int8_t u,v;
+	uint8_t y;
+	uint8_t a = (pal[i1].a + pal[i2].a)>>1;
+	pal_rgb->a = alpha2_lookup[a&3];
+	// TODO not clear if these should be /2 or not
+	y = clamp_uint8(pal[i1].y + pal[i2].y);
+	u = clamp_int8(pal[i1].u + pal[i2].u);
+	v = clamp_int8(pal[i1].v + pal[i2].v);
+	pal_rgb->r = yuv_to_r(y,v);
+	pal_rgb->g = yuv_to_g(y,u,v);
+	pal_rgb->b = yuv_to_b(y,u);
+}
+
+void palette_type3_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba_t *pal_rgb) {
+	const palette_entry_vuya_t *pal = (const palette_entry_vuya_t *)palette;
+	int8_t u,v;
+	uint8_t y;
+	// special case for index 0
+	if(pixel == 0) {
+		pal_rgb->a = pal_rgb->r = pal_rgb->g = pal_rgb->b = 0;
+		return;
+	}
+	pal_rgb->a = alpha2_lookup[pal[pixel].a&3];
+	pal_rgb->r = yuv_to_r(pal[pixel].y,pal[pixel].v);
+	pal_rgb->g = yuv_to_g(pal[pixel].y,pal[pixel].u,pal[pixel].v);
+	pal_rgb->b = yuv_to_b(pal[pixel].y,pal[pixel].u);
 }
 
 void yuv_live_to_cd_rgb(const char *p_yuv,
