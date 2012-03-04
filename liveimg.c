@@ -427,9 +427,7 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 	int x,y;
 	int height = bi->bm_max_height;
 
-	char *bmp = ((char *)vi + vi->bm_buffer_start);
-
-	char *p=bmp + (height-1)*y_inc;
+	uint8_t *p=((uint8_t *)vi + vi->bm_buffer_start) + (height-1)*y_inc;
 
 	uint8_t *r = im->r;
 	uint8_t *g = im->g;
