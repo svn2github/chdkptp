@@ -4,6 +4,8 @@
 IUP_SUPPORT=0
 # should CD support be built
 CD_SUPPORT=0
+# enable "plus" context support with cairo, you will need libcairo2-dev or similar
+#CD_USE_PLUS=cairo
 
 # for CHDK ptp.h this intentionaly uses the ROOT of the CHDK tree, to avoid header name conflicts 
 # so core/ptp.h should be found relative to this

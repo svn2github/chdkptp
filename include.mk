@@ -42,7 +42,7 @@ CD_PLUS_SYS_LIBS=$(GDI_PLUS_LIBS)
 endif
 # TODO not tested
 ifeq ("$(CD_USE_PLUS)","cairo")
-CD_PLUS_LIB+=cairo cdcairo
+CD_PLUS_LIB+=cairo cdcairo cdx11
 endif
 
 DEP_DIR=.dep
