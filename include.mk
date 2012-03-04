@@ -35,6 +35,8 @@ GDI_PLUS_LIBS=gdiplus stdc++
 ifdef DEBUG
 CFLAGS+=-g
 LDFLAGS+=-g
+else
+CFLAGS+=-O2
 endif
 
 ifeq ("$(CD_USE_PLUS)","gdiplus")

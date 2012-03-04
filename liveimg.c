@@ -105,9 +105,9 @@ typedef struct {
 // TODO only one function for now
 palette_convert_t palette_funcs[] = {
 	{NULL}, 					// type 0 - no palette, we could have a default func here
-	{palette_type1_to_rgba},	// type 1 - ayuv, 16 entries
-	{palette_type2_to_rgba}, 	// type 2 - like type 1, but with 3 bit alpha lookup - UNTESTED
-	{palette_type3_to_rgba}, 	// type 3 - vuya, 256 entries, 3
+	{palette_type1_to_rgba},	// type 1 - ayuv, 16 entries double 4 bit index
+	{palette_type2_to_rgba}, 	// type 2 - like type 1, but with 2 bit alpha lookup - UNTESTED
+	{palette_type3_to_rgba}, 	// type 3 - vuya, 256 entries, 2 bit alpha lookup
 };
 
 #define N_PALETTE_FUNCS (sizeof(palette_funcs)/sizeof(palette_funcs[0]))
@@ -350,7 +350,7 @@ liveimg_pimg_t * pimg_get(lua_State *L,int i) {
 }
 
 /*
-convert viewport data to lbuf to RGB pimg
+convert viewport data to RGB pimg
 pimg=liveimg.get_viewport_pimg(pimg,base_info,vid_info,skip)
 pimg: pimg to re-use, created if nil, replaced if size doesn't match
 vid_info, base_info: from handler
