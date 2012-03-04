@@ -37,7 +37,6 @@
 #endif
 #include "core/live_view.h"
 #include "lbuf.h"
-#include "yuvutil.h"
 #include "liveimg.h"
 /*
 planar img
@@ -63,11 +62,139 @@ typedef struct {
 	uint8_t a;
 } palette_entry_rgba_t;
 
+typedef struct {
+	uint8_t a;
+	uint8_t y;
+	int8_t u;
+	int8_t v;
+} palette_entry_ayuv_t;
+
+typedef void (*yuv_palette_to_rgba_fn)(const char *pal_yuv, uint8_t pixel,palette_entry_rgba_t *pal_rgb);
+
+void palette_type1_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
+
+void yuv_live_to_cd_rgb(const char *p_yuv,
+						unsigned buf_width, unsigned buf_height,
+						unsigned x_offset, unsigned y_offset,
+						unsigned width,unsigned height,
+						int skip,
+						uint8_t *r,uint8_t *g,uint8_t *b);
+
+// from a540, playback mode
+static const char palette_type1_default[]={
+0x00, 0x00, 0x00, 0x00, 0xff, 0xe0, 0x00, 0x00, 0xff, 0x60, 0xee, 0x62, 0xff, 0xb9, 0x00, 0x00,
+0x7f, 0x00, 0x00, 0x00, 0xff, 0x7e, 0xa1, 0xb3, 0xff, 0xcc, 0xb8, 0x5e, 0xff, 0x5f, 0x00, 0x00,
+0xff, 0x94, 0xc5, 0x5d, 0xff, 0x8a, 0x50, 0xb0, 0xff, 0x4b, 0x3d, 0xd4, 0x7f, 0x28, 0x00, 0x00,
+0x7f, 0x00, 0x7b, 0xe2, 0xff, 0x30, 0x00, 0x00, 0xff, 0x69, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
+};
+
+typedef struct {
+	yuv_palette_to_rgba_fn to_rgba;
+} palette_convert_t;
+
+// type implied from index
+// TODO only one function for now
+palette_convert_t palette_funcs[] = {
+	{NULL}, 					// type 0 - no palette, we could have a default func here
+	{palette_type1_to_rgba}, // type 1 - ayuv
+};
+
+#define N_PALETTE_FUNCS (sizeof(palette_funcs)/sizeof(palette_funcs[0]))
+
+static palette_convert_t* get_palette_convert(unsigned type) {
+	if(type<N_PALETTE_FUNCS) {
+		return &(palette_funcs[type]);
+	}
+	return NULL;
+}
+
+static uint8_t clip_yuv(int v) {
+	if (v<0) return 0;
+	if (v>255) return 255;
+	return v;
+}
+
+static uint8_t yuv_to_r(uint8_t y, int8_t v) {
+	return clip_yuv(((y<<12) +          v*5743 + 2048)>>12);
+}
+
+static uint8_t yuv_to_g(uint8_t y, int8_t u, int8_t v) {
+	return clip_yuv(((y<<12) - u*1411 - v*2925 + 2048)>>12);
+}
+
+static uint8_t yuv_to_b(uint8_t y, int8_t u) {
+	return clip_yuv(((y<<12) + u*7258          + 2048)>>12);
+}
+
+static uint8_t clamp_uint8(unsigned v) {
+	return (v>255)?255:v;
+}
+
+static int8_t clamp_int8(int v) {
+	if(v>127) {
+		return 127;
+	}
+	if(v<-128) {
+		return -128;
+	}
+	return v;
+}
+
+void palette_type1_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba_t *pal_rgb) {
+	const palette_entry_ayuv_t *pal = (const palette_entry_ayuv_t *)palette;
+	unsigned i1 = pixel & 0xF;
+	unsigned i2 = (pixel & 0xF0)>>4;
+	int8_t u,v;
+	uint8_t y;
+	pal_rgb->a = (pal[i1].a + pal[i2].a)>>1;
+	y = clamp_uint8(pal[i1].y + pal[i2].y);
+	u = clamp_int8(pal[i1].u + pal[i2].u);
+	v = clamp_int8(pal[i1].v + pal[i2].v);
+	pal_rgb->r = yuv_to_r(y,v);
+	pal_rgb->g = yuv_to_g(y,u,v);
+	pal_rgb->b = yuv_to_b(y,u);
+}
+
+void yuv_live_to_cd_rgb(const char *p_yuv,
+						unsigned buf_width, unsigned buf_height,
+						unsigned x_offset, unsigned y_offset,
+						unsigned width,unsigned height,
+						int skip,
+						uint8_t *r,uint8_t *g,uint8_t *b) {
+	unsigned x,y;
+	unsigned y_inc = (buf_width*12)/8;
+	const char *p;
+	// flip for CD
+	for(y=y_offset + height-1;y>y_offset;y--) {
+		p = p_yuv + y * y_inc + (x_offset*12)/8;
+		for(x=x_offset;x<width+x_offset;x+=4,p+=6) {
+			*r++ = yuv_to_r(p[1],p[2]);
+			*g++ = yuv_to_g(p[1],p[0],p[2]);
+			*b++ = yuv_to_b(p[1],p[0]);
+
+			*r++ = yuv_to_r(p[3],p[2]);
+			*g++ = yuv_to_g(p[3],p[0],p[2]);
+			*b++ = yuv_to_b(p[3],p[0]);
+			if(!skip) {
+				// TODO it might be better to use the next pixels U and V values
+				*r++ = yuv_to_r(p[4],p[2]);
+				*g++ = yuv_to_g(p[4],p[0],p[2]);
+				*b++ = yuv_to_b(p[4],p[0]);
+
+				*r++ = yuv_to_r(p[5],p[2]);
+				*g++ = yuv_to_g(p[5],p[0],p[2]);
+				*b++ = yuv_to_b(p[5],p[0]);
+			}
+		}
+	}
+}
+
 static void pimg_destroy(liveimg_pimg_t *im) {
 	free(im->data);
 	im->width = im->height = 0;
 	im->data = im->r = im->g = im->b = im->a = NULL;
 }
+
 static int pimg_gc(lua_State *L) {
 	liveimg_pimg_t *im = (liveimg_pimg_t *)luaL_checkudata(L,1,LIVEIMG_PIMG_META);
 	pimg_destroy(im);
@@ -82,6 +209,7 @@ static int pimg_get_width(lua_State *L) {
 	lua_pushnumber(L,im->width);
 	return 1;
 }
+
 static int pimg_get_height(lua_State *L) {
 	liveimg_pimg_t *im = (liveimg_pimg_t *)luaL_checkudata(L,1,LIVEIMG_PIMG_META);
 	if(!im->data) {
@@ -230,6 +358,23 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 	return 1;
 }
 
+static void convert_palette(palette_entry_rgba_t *pal_rgba,lv_vid_info *vi) {
+	const char *pal=NULL;
+	palette_convert_t *convert=get_palette_convert(vi->palette_type);
+	yuv_palette_to_rgba_fn fn = NULL;
+	if(convert && vi->palette_buffer_start) {
+		fn = convert->to_rgba;
+		pal = ((char *)vi + vi->palette_buffer_start);
+	} else {
+		pal = palette_type1_default;
+		fn = palette_type1_to_rgba;
+	}
+	int i;
+	for(i=0;i<255;i++) {
+		fn(pal,i,&pal_rgba[i]);
+	}
+}
+
 /*
 convert bitmap data to RGBA pimg
 pimg=liveimg.get_bitmap_pimg(pimg,base_info,vid_info,skip)
@@ -258,18 +403,7 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 		return 1;
 	}
 
-	const char *pal=NULL;
-	yuv_palette_to_rgba_fn fn=yuv_get_palette_to_rgba_fn(vi->palette_type);
-	if(fn && vi->palette_buffer_start) {
-		pal = ((char *)vi + vi->palette_buffer_start);
-	} else {
-		pal = yuv_default_type1_palette;
-		fn = yuv_bmp_type1_set_rgba;
-	}
-	int i;
-	for(i=0;i<255;i++) {
-		fn(pal,i,&pal_rgba[i].r,&pal_rgba[i].g,&pal_rgba[i].b,&pal_rgba[i].a);
-	}
+	convert_palette(pal_rgba,vi);
 
 	unsigned vwidth = bi->bm_max_width/par;
 	unsigned dispsize = vwidth*bi->bm_max_height;
@@ -304,11 +438,11 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 
 	for(y=0;y<height;y++,p-=y_inc) {
 		for(x=0;x<bi->bm_max_width;x+=x_inc) {
-			int c =*(p+x);
-			*r++ = pal_rgba[c].r;
-			*g++ = pal_rgba[c].g;
-			*b++ = pal_rgba[c].b;
-			*a++ = pal_rgba[c].a;
+			palette_entry_rgba_t *c =&pal_rgba[*(p+x)];
+			*r++ = c->r;
+			*g++ = c->g;
+			*b++ = c->b;
+			*a++ = c->a;
 		}
 	}
 	return 1;

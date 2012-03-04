@@ -58,7 +58,7 @@ endif
 endif
 ifeq ("$(LIVEVIEW_SUPPORT)","1")
 CFLAGS+=-DCHDKPTP_LIVEVIEW=1
-LIVEVIEW_SRCS=yuvutil.c liveimg.c
+LIVEVIEW_SRCS=liveimg.c
 endif
 
 INC_PATHS+=-I$(CHDK_SRC_DIR)

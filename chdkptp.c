@@ -79,7 +79,6 @@
 #endif
 #endif
 #include "lfs/lfs.h"
-#include "yuvutil.h"
 #include "lbuf.h"
 
 /* some defines comes here */
