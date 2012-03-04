@@ -416,7 +416,7 @@ static void convert_palette(palette_entry_rgba_t *pal_rgba,lv_vid_info *vi) {
 		fn = palette_type1_to_rgba;
 	}
 	int i;
-	for(i=0;i<255;i++) {
+	for(i=0;i<256;i++) {
 		fn(pal,i,&pal_rgba[i]);
 	}
 }
