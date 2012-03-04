@@ -1459,11 +1459,14 @@ static int guisys_init(lua_State *L) {
 #ifdef CHDKPTP_CD
 		cdlua_open(L); 
 		cdluaiup_open(L); 
-#endif
+#ifdef CHDKPTP_CD_PLUS
+		cdInitContextPlus();
+#endif // CD_PLUS
+#endif // CD
 	}
 	lua_pushboolean(L,1);
 	return 1;
-#else
+#else // IUP
 	lua_pushboolean(L,0);
 	return 1;
 #endif
@@ -1496,6 +1499,10 @@ static int guisys_caps(lua_State *L) {
 #ifdef CHDKPTP_LIVEVIEW
 	lua_pushboolean(L,1);
 	lua_setfield(L,-2,"LIVEVIEW");
+#endif
+#ifdef CHDKPTP_CD_PLUS
+	lua_pushboolean(L,1);
+	lua_setfield(L,-2,"CDPLUS");
 #endif
 	return 1;
 }

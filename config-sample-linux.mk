@@ -1,5 +1,5 @@
 # configurable build settings
-# these can be set on the command line or in localbuildconf.inc
+# these can be set on the command line or config.mk
 # should IUP gui be built ?
 IUP_SUPPORT=0
 # should CD support be built

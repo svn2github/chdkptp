@@ -1,9 +1,11 @@
 # configurable build settings
-# these can be set on the command line or in localbuildconf.inc
+# these can be set on the command line or in config.mk
 # should IUP gui be built ?
 IUP_SUPPORT=1
 # should gui include CD
 CD_SUPPORT=1
+# use CD "plus" context. gdiplus on windows, may have better alpha support
+#CD_USE_PLUS=gdiplus
 
 # root directories of various packages, not used to set subdirs below.
 # Not required by main makefile

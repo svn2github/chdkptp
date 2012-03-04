@@ -552,8 +552,16 @@ function m.init()
 	}
 
 	function icnv:map_cb()
+		-- TODO UseContextPlus seems harmless if not built with plus support
+		if guisys.caps().CDPLUS then
+			cd.UseContextPlus(true)
+			printf("ContexIsPlus iup:%s cd:%s\n",tostring(cd.ContextIsPlus(cd.IUP)),tostring(cd.ContextIsPlus(cd.DBUFFER)))
+		end
 		self.ccnv = cd.CreateCanvas(cd.IUP,self)
 		self.dccnv = cd.CreateCanvas(cd.DBUFFER,self.ccnv)
+		if guisys.caps().CDPLUS then
+			cd.UseContextPlus(false)
+		end
 		self.dccnv:SetBackground(cd.EncodeColor(32,32,32))
 	end
 

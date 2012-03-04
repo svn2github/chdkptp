@@ -27,7 +27,8 @@ CD_LIB=cd
 CD_LUA_LIB=cdlua51
 IUP_CD_LIB=iupcd
 IUP_CD_LUA_LIB=iupluacd51
-
+CD_PLUS_LIB=cdcontextplus cdluacontextplus51
+GDI_PLUS_LIBS=gdiplus stdc++
 #see config-sample-*.mk
 -include $(TOPDIR)/config.mk
 
@@ -36,6 +37,13 @@ CFLAGS+=-g
 LDFLAGS+=-g
 endif
 
+ifeq ("$(CD_USE_PLUS)","gdiplus")
+CD_PLUS_SYS_LIBS=$(GDI_PLUS_LIBS)
+endif
+# TODO not tested
+ifeq ("$(CD_USE_PLUS)","cairo")
+CD_PLUS_LIB+=cairo cdcairo
+endif
 
 DEP_DIR=.dep
 
