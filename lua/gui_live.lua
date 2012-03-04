@@ -22,6 +22,7 @@ local stats=require('gui_live_stats')
 local m={
 	vp_par = 2, -- pixel aspect ratio for viewport 1:n, n=1,2
 	bm_par = 1, -- pixel aspect ratio for bitmap 1:n, n=1,2
+	vp_aspect_factor = 1, -- correction factor for height values when scaling for aspect
 --[[
 note - these are 'private' but exposed in the module for easier debugging
 container -- outermost widget
@@ -32,6 +33,12 @@ timer -- timer for fetching updates
 statslabel -- text for stats
 ]]
 }
+
+local screen_aspects = {
+	[0]=4/3,
+	16/9,
+}
+
 function m.live_support()
 	local caps = guisys.caps()
 	return (caps.CD and caps.LIVEVIEW)
@@ -68,6 +75,10 @@ local bm_toggle = iup.toggle{
 		m.bm_active = (state == 1)
 	end,
 }
+
+local aspect_toggle = iup.toggle{
+	title="Scale for A/R",
+}
 					
 local function get_fb_selection()
 	local what=0
@@ -80,28 +91,39 @@ local function get_fb_selection()
 	end
 	return what
 end
+
+--[[
+get the canvas size for the current settings
+return w,h
+]]
+local function get_canvas_size()
+end
 --[[
 update canvas size from base and frame
 ]]
-local function update_canvas_size(base,frame)
+local function update_canvas_size()
 	-- TODO would be good to have a whole buffer mode for debugging
-	-- TODO this needs to account for "virtual" size for letterboxed etc
-	local vp_width = m.li.vp_max_width/m.vp_par
-	local vp_height = m.li.vp_max_height
+	local vp_w = m.li.vp_max_width/m.vp_par
+	local vp_h
+	if aspect_toggle.value == 'ON' then
+		vp_h = vp_w/screen_aspects[m.li.lcd_aspect_ratio]
+		m.vp_aspect_factor = vp_h/m.li.vp_max_height
+	else
+		m.vp_aspect_factor = 1
+		vp_h = m.li.vp_max_height
+	end
 
 	local w,h = gui.parsesize(m.icnv.rastersize)
 	
 	local update
-	if w ~= vp_width  then
-		w = vp_width
+	if w ~= vp_w then
 		update = true
 	end
-	if h ~= vp_height  then
-		h = vp_height
+	if h ~= vp_h then
 		update = true
 	end
 	if update then
-		m.icnv.rastersize = w.."x"..h
+		m.icnv.rastersize = vp_w.."x"..vp_h
 		iup.Refresh(m.container)
 		gui.resize_for_content()
 	end
@@ -256,7 +278,7 @@ local function read_dump_frame()
 	update_frame_data(m.dump_replay_frame)
 	stats:end_xfer(m.dump_replay_frame:len())
 	-- TODO
-	update_canvas_size(m.dump_replay_base,m.dump_replay_frame)
+	update_canvas_size()
 end
 
 local function end_dump()
@@ -343,7 +365,7 @@ local function timer_action(self)
 			stats:end_xfer(con.live.frame:len())
 			update_frame_data(con.live.frame)
 			record_dump()
-			update_canvas_size(con.live.base,con.live.frame)
+			update_canvas_size()
 		end
 		m.icnv:action()
 	elseif m.dump_replay then
@@ -382,6 +404,48 @@ local function update_fps(val)
 	end
 end
 
+local function redraw_canvas(self)
+	if m.tabs.value ~= m.container then
+		return;
+	end
+	local ccnv = self.dccnv
+	stats:start_frame()
+	ccnv:Activate()
+	ccnv:Clear()
+	if m.get_current_frame_data() then
+		if m.vp_active then
+			m.vp_img = liveimg.get_viewport_pimg(m.vp_img,m.get_current_base_data(),m.get_current_frame_data(),m.vp_par == 2)
+			if m.vp_img then
+				if aspect_toggle.value == "ON" then
+					m.vp_img:put_to_cd_canvas(ccnv,
+						m.li.vp_xoffset/m.vp_par,
+						(m.li.vp_max_height - m.li.vp_height - m.li.vp_yoffset)*m.vp_aspect_factor,
+						m.vp_img:width(),
+						m.vp_img:height()*m.vp_aspect_factor)
+				else
+					m.vp_img:put_to_cd_canvas(ccnv,
+						m.li.vp_xoffset/m.vp_par,
+						m.li.vp_max_height - m.li.vp_height - m.li.vp_yoffset)
+				end
+			end
+		end
+		if m.bm_active then
+			m.bm_img = liveimg.get_bitmap_pimg(m.bm_img,m.get_current_base_data(),m.get_current_frame_data(),m.bm_par == 2)
+			if m.bm_img then
+				if bm_fit_toggle.value == "ON" then
+					m.bm_img:blend_to_cd_canvas(ccnv, 0, 0, m.li.vp_max_width/m.vp_par, m.li.vp_max_height*m.vp_aspect_factor)
+				else
+					m.bm_img:blend_to_cd_canvas(ccnv, 0, m.li.vp_max_height - m.li.bm_max_height)
+				end
+			else
+				print('no bm')
+			end
+		end
+	end
+	ccnv:Flush()
+	stats:end_frame()
+end
+
 function m.init()
 	if not m.live_support() then
 		return false
@@ -401,6 +465,7 @@ function m.init()
 					vp_par_toggle,
 					bm_par_toggle,
 					bm_fit_toggle,
+					aspect_toggle,
 					iup.hbox{
 						iup.label{title="Target FPS"},
 						iup.text{
@@ -464,39 +529,7 @@ function m.init()
 		self.dccnv:SetBackground(cd.EncodeColor(32,32,32))
 	end
 
-	function icnv:action()
-		if m.tabs.value ~= m.container then
-			return;
-		end
-		local ccnv = self.dccnv
-		stats:start_frame()
-		ccnv:Activate()
-		ccnv:Clear()
-		if m.get_current_frame_data() then
-			if m.vp_active then
-				m.vp_img = liveimg.get_viewport_pimg(m.vp_img,m.get_current_base_data(),m.get_current_frame_data(),m.vp_par == 2)
-				if m.vp_img then
-					m.vp_img:put_to_cd_canvas(ccnv,
-						m.li.vp_xoffset/m.vp_par,
-						m.li.vp_max_height - m.li.vp_height - m.li.vp_yoffset)
-				end
-			end
-			if m.bm_active then
-				m.bm_img = liveimg.get_bitmap_pimg(m.bm_img,m.get_current_base_data(),m.get_current_frame_data(),m.bm_par == 2)
-				if m.bm_img then
-					if bm_fit_toggle.value == "ON" then
-						m.bm_img:blend_to_cd_canvas(ccnv, 0, 0, m.li.vp_max_width/m.vp_par, m.li.vp_max_height)
-					else
-						m.bm_img:blend_to_cd_canvas(ccnv, 0, m.li.vp_max_height - m.li.bm_max_height)
-					end
-				else
-					print('no bm')
-				end
-			end
-		end
-		ccnv:Flush()
-		stats:end_frame()
-	end
+	icnv.action=redraw_canvas
 
 	function icnv:unmap_cb()
 		self.dccnv:Kill()
