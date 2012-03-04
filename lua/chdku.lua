@@ -855,7 +855,7 @@ chdku.live_base_fields={
 	'bm_max_width',			-- Maximum width of bitmap (in pixels)
 	'bm_max_height',		-- Maximum height of bitmap (in pixels)
 	'bm_buffer_width',		-- Bitmap buffer width in case buffer is wider than visible bitmap (in pixels)
-	'lcd_ascpect_ratio',	-- 0 = 4:3, 1 = 16:9
+	'lcd_aspect_ratio',		-- 0 = 4:3, 1 = 16:9
 }
 chdku.live_base_map={}
 chdku.live_frame_fields={
