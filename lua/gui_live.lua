@@ -230,6 +230,10 @@ local bm_par_toggle = iup.toggle{
 		end
 	end,
 }
+local bm_fit_toggle = iup.toggle{
+	title="Overlay fit",
+	value="0",
+}
 
 local function update_should_run()
 	if not m.live_con_valid then
@@ -497,6 +501,7 @@ function m.init()
 					bm_toggle,
 					vp_par_toggle,
 					bm_par_toggle,
+					bm_fit_toggle,
 					iup.hbox{
 						iup.label{title="Target FPS"},
 						iup.text{
@@ -570,10 +575,13 @@ function m.init()
 				end
 			end
 			if m.bm_active then
-				-- TODO skip
 				m.bm_img = liveimg.get_bitmap_pimg(m.bm_img,m.get_current_base_data(),m.get_current_frame_data(),m.bm_par == 2)
 				if m.bm_img then
-					m.bm_img:blend_to_cd_canvas(ccnv, 0, m.li.vp_max_height - m.li.bm_max_height)
+					if bm_fit_toggle.value == "ON" then
+						m.bm_img:blend_to_cd_canvas(ccnv, 0, 0, m.li.vp_max_width/m.vp_par, m.li.vp_max_height)
+					else
+						m.bm_img:blend_to_cd_canvas(ccnv, 0, m.li.vp_max_height - m.li.bm_max_height)
+					end
 				else
 					print('no bm')
 				end
