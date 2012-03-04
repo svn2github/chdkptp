@@ -186,8 +186,8 @@ update canvas size from base and frame
 local function update_canvas_size(base,frame)
 	-- TODO would be good to have a whole buffer mode for debugging
 	-- TODO this needs to account for "virtual" size for letterboxed etc
-	local vp_width = chdku.live_get_base_field(base,'vp_max_width')/m.vp_par
-	local vp_height = chdku.live_get_base_field(base,'vp_max_height')
+	local vp_width = m.li.vp_max_width/m.vp_par
+	local vp_height = m.li.vp_max_height
 
 	local w,h = gui.parsesize(m.icnv.rastersize)
 	
@@ -551,10 +551,21 @@ function m.init()
 		ccnv:Clear()
 		if m.get_current_frame_data() then
 			if m.vp_active then
-				guisys.put_viewport_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data(),m.vp_par)
+				m.vp_img = liveimg.get_viewport_pimg(m.vp_img,m.get_current_base_data(),m.get_current_frame_data(),m.vp_par == 2)
+				if m.vp_img then
+					m.vp_img:put_to_cd_canvas(ccnv,
+						m.li.vp_xoffset/m.vp_par,
+						m.li.vp_max_height - m.li.vp_height - m.li.vp_yoffset)
+				end
 			end
 			if m.bm_active then
-				guisys.put_bitmap_to_canvas(ccnv,m.get_current_frame_data(),m.get_current_base_data())
+				-- TODO skip
+				m.bm_img = liveimg.get_bitmap_pimg(m.bm_img,m.get_current_base_data(),m.get_current_frame_data(),true)
+				if m.bm_img then
+					m.bm_img:blend_to_cd_canvas(ccnv, 0, m.li.vp_max_height - m.li.bm_max_height)
+				else
+					print('no bm')
+				end
 			end
 		end
 		ccnv:Flush()
@@ -571,6 +582,23 @@ function m.init()
 		print("Resize: Width="..w.."   Height="..h)
 	end
 	--]]
+	-- TODO - convenience meta table to access base and frame info. This should be bound to the lbuf somehow
+
+	local live_info_meta = {
+		__index=function(t,key)
+			local base = m.get_current_base_data()
+			local frame = m.get_current_frame_data()
+
+			if base and chdku.live_base_map[key] then
+				return chdku.live_get_base_field(base,key)
+			end
+			if frame and chdku.live_frame_map[key] then
+				return chdku.live_get_frame_field(frame,key)
+			end
+		end
+	}
+	m.li = {}
+	setmetatable(m.li,live_info_meta)
 
 	m.container_title='Live'
 end

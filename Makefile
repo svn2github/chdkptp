@@ -58,6 +58,7 @@ endif
 endif
 ifeq ("$(LIVEVIEW_SUPPORT)","1")
 CFLAGS+=-DCHDKPTP_LIVEVIEW=1
+LIVEVIEW_SRCS=yuvutil.c liveimg.c
 endif
 
 INC_PATHS+=-I$(CHDK_SRC_DIR)
@@ -71,7 +72,7 @@ EXES=chdkptp$(EXE)
 
 all: $(EXES)
 
-SRCS=myusb.c properties.c ptp.c chdkptp.c yuvutil.c lbuf.c
+SRCS=myusb.c properties.c ptp.c chdkptp.c lbuf.c $(LIVEVIEW_SRCS)
 OBJS=$(SRCS:.c=.o)
 
 chdkptp$(EXE): $(OBJS)
