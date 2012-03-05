@@ -78,6 +78,7 @@ local bm_toggle = iup.toggle{
 
 local aspect_toggle = iup.toggle{
 	title="Scale for A/R",
+	value="ON",
 }
 					
 local function get_fb_selection()
@@ -102,7 +103,6 @@ end
 update canvas size from base and frame
 ]]
 local function update_canvas_size()
-	-- TODO would be good to have a whole buffer mode for debugging
 	local vp_w = m.li.vp_max_width/m.vp_par
 	local vp_h
 	if aspect_toggle.value == 'ON' then
@@ -153,7 +153,7 @@ local bm_par_toggle = iup.toggle{
 }
 local bm_fit_toggle = iup.toggle{
 	title="Overlay fit",
-	value="0",
+	value="ON",
 }
 
 local function update_should_run()
