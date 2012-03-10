@@ -31,7 +31,7 @@ usage:
 local mc={}
 --[[
 connect to all available cams
-TODO add matching support, store camera name, serial etc with con
+TODO add matching support
 ]]
 function mc:connect()
 	local devices = chdk.list_usb_devices()
@@ -55,20 +55,47 @@ function mc:connect()
 				lcon.usbdev.dev,
 				lcon.usbdev.bus,
 				tostring(lcon.ptpdev.serial_number))
+			lcon.mc_id = string.format('%d:%s',i,lcon.ptpdev.model)
 			table.insert(self.cams,lcon)
 		end
 	end
 end
 
+function mc:start_single(lcon)
+	local status,err = lcon:script_status()
+	if not status then
+		warnf('%s: load script failed: %s\n',lcon.mc_id,tostring(err))
+		return
+	end
+	-- attempt to end a running mc (otherwise script id is wrong)
+	if status.run then
+		warnf('%s: attempting to stop running script\n',lcon.mc_id)
+		lcon:write_msg('exit')
+		status,err = lcon:wait_status{
+			run=false,
+			timeout=250,
+		}
+		if not status then
+			warnf('%s: status check failed: %s\n',lcon.mc_id,tostring(err))
+			return
+		end
+		if status.timeout then
+			warnf('%s: failed to end running script\n',lcon.mc_id)
+			return
+		end
+	end
+
+	local status,err = lcon:exec('mc.run('..util.serialize(opts)..')',{libs='multicam'})
+	if not status then
+		warnf('%s: load script failed: %s\n',lcon.mc_id,tostring(err))
+	end
+end
 --[[
 start the script on all cameras
 ]]
 function mc:start(opts)
 	for i,lcon in ipairs(self.cams) do
-		local status,err = lcon:exec('mc.run('..util.serialize(opts)..')',{libs='multicam'})
-		if not status then
-			warnf('%d: load script failed: %s\n',i,tostring(err))
-		end
+		self:start_single(lcon)
 	end
 end
 
@@ -113,7 +140,7 @@ function mc:init_sync_single(lcon,lt0,rt0)
 			})
 			if status then
 				printf('%s: send %d diff %d pred=%d r=%d delta=%d\n',
-					lcon.ptpdev.model,
+					lcon.mc_id,
 					sends[i],
 					diff,
 					expect,
@@ -134,8 +161,8 @@ function mc:init_sync_single(lcon,lt0,rt0)
 -- msend average time to complete a send, accounts for a portion of latency
 -- not clear what this includes, or how much is spent in each direction
 	local msend = util.table_amean(sends)
-	printf('%s: mean offset %f (%d)\n',lcon.ptpdev.model,tickoff,#ticks)
-	printf('%s: mean send %f (%d)\n',lcon.ptpdev.model,msend,#sends)
+	printf('%s: mean offset %f (%d)\n',lcon.mc_id,tickoff,#ticks)
+	printf('%s: mean send %f (%d)\n',lcon.mc_id,msend,#sends)
 	lcon.mc_sync = {
 		lt0=lt0, -- base local time
 		rt0=rt0, -- base remote time obtained at lt0 + latency
@@ -156,16 +183,16 @@ function mc:init_sync_single(lcon,lt0,rt0)
 			})
 			if status then
 				printf('%s: expect=%d r=%d d=%d %s\n',
-					lcon.ptpdev.model,
+					lcon.mc_id,
 					expect,
 					msg.status,
 					expect-msg.status,
 					msg.msg)
 			else
-				warnf('sync_single wait_msg failed: %s\n',msg)
+				warnf('%s: sync_single wait_msg failed: %s\n',lcon.mc_id,msg)
 			end
 		else
-			warnf('sync_single write_msg failed: %s\n',err)
+			warnf('%s: sync_single write_msg failed: %s\n',lcon.mc_id,err)
 		end
 		sys.sleep(50) -- don't want messages to get queued
 	end
@@ -174,6 +201,7 @@ end
 initialize values to allow all cameras to execute a given command as close as possible to the same real time
 ]]
 function mc:init_sync()
+	self.min_sync_delay = 0 -- minimum time required to send to all cams
 	for i,lcon in ipairs(self.cams) do
 		local t0=ustime.new()
 		local status,err=lcon:write_msg('tick')
@@ -185,6 +213,8 @@ function mc:init_sync()
 			})
 			if status then
 				self:init_sync_single(lcon,t0,msg.status)
+				-- TODO mean send time might not be enough
+				self.min_sync_delay = self.min_sync_delay + lcon.mc_sync.msend 
 			else
 				warnf('%d:wait_msg failed: %s\n',i,tostring(msg))
 			end
@@ -192,6 +222,7 @@ function mc:init_sync()
 			warnf('%d:write_msg failed: %s\n',i,tostring(err))
 		end
 	end
+	printf('minimum sync delay %d\n',self.min_sync_delay)
 end
 
 function mc:get_single_status(lcon,cmd,r)
@@ -309,9 +340,9 @@ function mc:cmd(cmd,opts)
 			sendcmd = string.format('%s %d',cmd,self:get_sync_tick(lcon,tstart,opts.syncat))
 		end
 		local status,err = lcon:write_msg(sendcmd)
-		printf('%s:%s\n',lcon.ptpdev.model,sendcmd)
+		printf('%s:%s\n',lcon.mc_id,sendcmd)
 		if not status then
-			warnf('%d: send %s cmd failed: %s\n',i,tostring(sendcmd),tostring(err))
+			warnf('%s: send %s cmd failed: %s\n',lcon.mc_id,tostring(sendcmd),tostring(err))
 		end
 	end
 	if not opts.wait then
@@ -341,20 +372,42 @@ function mc:print_cmd_status(status,results)
 		end
 	end
 end
-function mc:testshots(nshots) 
-	if not nshots then
-		nshots = 1
+function mc:testshots(opts) 
+	opts = util.extend_table({ nshots=1 },opts)
+	if not self.min_sync_delay then
+		warnf('sync not initialized\n')
+		return
 	end
 	self:flushmsgs()
-	for i=1,nshots do
+	if not opts.synctime or opts.synctime < self.min_sync_delay then
+		opts.synctime = self.min_sync_delay + 50
+	end
+	if opts.defexp then
+		opts.tv = 768
+		opts.sv = 672
+	end
+	local init_cmds = {}
+	local init_cmd
+	if opts.tv then
+		table.insert(init_cmds,string.format('set_tv96_direct(%d)',opts.tv))
+	end
+	if opts.sv then
+		table.insert(init_cmds,string.format('set_sv96(%d)',opts.sv))
+	end
+	if #init_cmds > 0 then
+		init_cmd = 'call '..table.concat(init_cmds,';')
+	end
+	for i=1,opts.nshots do
 		self:print_cmd_status(self:cmdwait('call return get_exp_count()'))
-		self:print_cmd_status(self:cmdwait('call set_tv96_direct(768);set_sv96(672)'))
+		if init_cmd then
+			self:print_cmd_status(self:cmdwait(init_cmd))
+		end
 		self:print_cmd_status(self:cmdwait('preshoot'))
 		local t=ustime.new()
-		self:cmd('shoot',{syncat=300})
-		sys.sleep(240)
+		self:cmd('shoot',{syncat=opts.synctime})
+		sys.sleep(opts.synctime - 60)
 		for j=1,25 do
-			printf('%d %d\n',i,ustime.diffms(t)-300)
+			printf('%d %d\n',i,ustime.diffms(t)-opts.synctime)
 			sys.sleep(20)
 		end
 		self:print_cmd_status(self:wait_status_msg('shoot'))
