@@ -29,9 +29,9 @@ chdkptp includes software from several other projects, see THANKS.TXT for detail
 
 =Dependencies=
 - IUP version 3.5 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work)
-  Optional, edit makefile to build without iup gui support
+  Optional, edit config.mk to build without IUP GUI support
 - CD Version 5.5 http://www.tecgraf.puc-rio.br/cd/ (earlier 5.x versions may also work)
-  Optional, will be used for live display
+  Optional, used for remote display
 - Lua version 5.1 http://www.lua.org/
 - LibUSB (libusb-win32 on windows)
 - CHDK source for PTP protocol header from the appropriate branch, e.g. http://tools.assembla.com/chdk/browser/trunk
@@ -43,8 +43,10 @@ Using a mingw bash shell for development is suggested.
 
 ==Installing mingw==
 http://www.mingw.org/
-Download the gui installer. Install at least mingw C compiler. Msys is suggested, and may be required
-E.g. http://sourceforge.net/projects/mingw/files/Automated%20MinGW%20Installer/mingw-get-inst/mingw-get-inst-20101030/
+Download the gui installer. Install at least mingw C compiler.
+C++ support is required to use CD "context plus", not required or used by default.
+Msys is suggested, and may be required
+http://sourceforge.net/projects/mingw/files/Installer/mingw-get-inst/
 
 ==Installing IUP libraries==
 Get the mingw4 binary package of IUP, 
