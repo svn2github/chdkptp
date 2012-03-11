@@ -941,6 +941,10 @@ opts {
 ]]
 function con_methods:live_init_streaming(opts)
 	self.live = nil
+	-- TODO this shouldn't really be in gui_sys
+	if not guisys.caps().LIVEVIEW then
+		return false,'this chdkptp not compiled with liveview support'
+	end
 	if not self:is_connected() then
 		return false,'not connected'
 	end
