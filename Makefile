@@ -77,7 +77,8 @@ EXES=chdkptp$(EXE)
 
 all: $(EXES)
 
-SRCS=myusb.c properties.c ptp.c chdkptp.c lbuf.c $(LIVEVIEW_SRCS)
+#SRCS=myusb.c properties.c ptp.c chdkptp.c lbuf.c $(LIVEVIEW_SRCS)
+SRCS=properties.c ptp.c chdkptp.c lbuf.c $(LIVEVIEW_SRCS)
 OBJS=$(SRCS:.c=.o)
 
 chdkptp$(EXE): $(OBJS)
