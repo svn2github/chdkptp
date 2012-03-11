@@ -1086,6 +1086,16 @@ static int chdk_call_handler(lua_State *L) {
 		lua_pushstring(L,"ptp error");
 		return 2;
 	}
+	if(!data) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"no data");
+		return 2;
+	}
+	if(!data_size) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"zero data size");
+		return 2;
+	}
 	if(buf) {
 		if(buf->flags & LBUF_FL_FREE) {
 			free(buf->bytes);
