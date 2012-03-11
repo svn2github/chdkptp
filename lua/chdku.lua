@@ -777,13 +777,22 @@ end
 
 --[[
 set usbdev, ptpdev apiver for current connection
-TODO handle not connected/errors
 ]]
 function con_methods:update_connection_info()
+	-- this currently can't fail, devinfo is always stored in connection object
 	self.usbdev=self:get_usb_devinfo()
-	self.ptpdev=self:get_ptp_devinfo()	
+	local status,err=self:get_ptp_devinfo()	
+	if status then
+		self.ptpdev = status
+	else
+		return false,err
+	end
 	local major,minor=self:camera_api_version()
+	if not major then
+		return false,minor
+	end
 	self.apiver={major=major,minor=minor}
+	return true
 end
 --[[
 override low level connect to gather some useful information that shouldn't change over life of connection
@@ -801,8 +810,7 @@ function con_methods:connect(opts)
 	if opts.raw then
 		return true
 	end
-	self:update_connection_info()
-	return true
+	return self:update_connection_info()
 end
 
 --[[

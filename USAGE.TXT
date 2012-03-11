@@ -61,12 +61,15 @@ luar (=)     <lua code>  : - execute remote lua, wait for result
 
 rmem         <address> [count]: - read memory
 list                     : - list devices
- Lists all recognized PTP devices in the following format
-  <status><num><modelname> b=<bus> d=<device> v=<usb vendor> p=<usb pid> s=<serial number>
+ Lists all recognized PTP devices in the following format on success
+  <status><num>:<modelname> b=<bus> d=<device> v=<usb vendor> p=<usb pid> s=<serial number>
+ or on error
+  <status><num> b=<bus> d=<device> ERROR: <error message>
  status values
   * connected, current target for CLI commands (con global variable)
   + connected, not CLI target
   - not connected
+  ! error querying status
  serial numbers are not available from all models
 
 upload (u)   [-nolua] <local> [remote]: - upload a file to the camera
@@ -159,7 +162,7 @@ dumpframes   [options] [file]: - dump camera display frames to file
    -novp      don't get viewfinder data
    -nobm      don't get ui overlay data
    -nopal     don't get palette for ui overlay
-   -quiet         don't print progress
+   -quiet     don't print progress
 
 =Examples=
 start chdkptp in interactive mode and connect to the camera

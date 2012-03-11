@@ -439,12 +439,15 @@ cli:add_commands{
 		names={'list'},
 		help='list devices',
 		help_detail=[[
- Lists all recognized PTP devices in the following format
-  <status><num><modelname> b=<bus> d=<device> v=<usb vendor> p=<usb pid> s=<serial number>
+ Lists all recognized PTP devices in the following format on success
+  <status><num>:<modelname> b=<bus> d=<device> v=<usb vendor> p=<usb pid> s=<serial number>
+ or on error
+  <status><num> b=<bus> d=<device> ERROR: <error message>
  status values
   * connected, current target for CLI commands (con global variable)
   + connected, not CLI target
   - not connected
+  ! error querying status
  serial numbers are not available from all models
 ]],
 		func=function() 
@@ -453,27 +456,33 @@ cli:add_commands{
 			for i,desc in ipairs(devs) do
 				local lcon = chdku.connection(desc)
 				local tempcon = false
-				local status = "+"
+				local con_status = "+"
+				local status,err
 				if not lcon:is_connected() then
 					tempcon = true
-					status = "-"
-					lcon:connect()
+					con_status = "-"
+					status,err = lcon:connect()
 				else
 					-- existing con wrapped in new object won't have info set
-					lcon:update_connection_info()
+					status,err = lcon:update_connection_info()
 				end
 
-				if lcon._con == con._con then
-					status = "*"
-				end
+				if status then
+					if lcon._con == con._con then
+						con_status = "*"
+					end
 
-				msg = msg .. string.format("%s%d:%s b=%s d=%s v=0x%x p=0x%x s=%s\n",
-											status, i,
-											tostring(lcon.ptpdev.model),
-											lcon.usbdev.bus, lcon.usbdev.dev,
-											tostring(lcon.usbdev.vendor_id),
-											tostring(lcon.usbdev.product_id),
-											tostring(lcon.ptpdev.serial_number))
+					msg = msg .. string.format("%s%d:%s b=%s d=%s v=0x%x p=0x%x s=%s\n",
+												con_status, i,
+												tostring(lcon.ptpdev.model),
+												lcon.usbdev.bus, lcon.usbdev.dev,
+												tostring(lcon.usbdev.vendor_id),
+												tostring(lcon.usbdev.product_id),
+												tostring(lcon.ptpdev.serial_number))
+				else
+					-- use the requested dev/bus here, since the lcon data may not be set
+					msg = msg .. string.format('!%d: b=%s d=%s ERROR: %s\n',i,desc.bus, desc.dev,tostring(err))
+				end
 				if tempcon then
 					lcon:disconnect()
 				end
