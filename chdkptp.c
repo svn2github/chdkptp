@@ -661,9 +661,10 @@ int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
 	find_endpoints(dev,&ptp_usb->inep,&ptp_usb->outep,&ptp_usb->intep);
 	init_ptp_usb(params, ptp_usb, dev);   
 
-	if(ptp_opensession(params,1)!=PTP_RC_OK) {
+	ret = ptp_opensession(params,1);
+	if(ret!=PTP_RC_OK) {
 // TODO temp debug - this appears to be needed on linux if other stuff grabbed the dev
-		printf("open_camera_dev: ptp_opensession failed\n");
+		printf("open_camera_dev: ptp_opensession failed 0x%x\n",ret);
 		ret = usb_ptp_device_reset(ptp_usb);
 		if (ret<0)perror ("open_camera_dev:usb_ptp_device_reset()");
 		/* get device status (devices likes that regardless of its result)*/
@@ -680,8 +681,9 @@ int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
 		close_usb(ptp_usb, dev);
 		find_endpoints(dev,&ptp_usb->inep,&ptp_usb->outep,&ptp_usb->intep);
 		init_ptp_usb(params, ptp_usb, dev);   
-		if(ptp_opensession(params,1)!=PTP_RC_OK) {
-			printf("open_camera_dev: ptp_opensession 2 failed\n");
+		ret=ptp_opensession(params,1);
+		if(ret!=PTP_RC_OK) {
+			printf("open_camera_dev: ptp_opensession 2 failed: 0x%x\n",ret);
 			return 0;
 		}
 
