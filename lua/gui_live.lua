@@ -319,31 +319,31 @@ local function toggle_dump(ih,state)
 end
 
 local function toggle_play_dump(self,state)
-	if state == 1 then
-		local filedlg = iup.filedlg{
-			dialogtype = "OPEN",
-			title = "File to play", 
-			filter = "*.lvdump", 
-		} 
-		filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
+		if state == 1 then
+			local filedlg = iup.filedlg{
+				dialogtype = "OPEN",
+				title = "File to play", 
+				filter = "*.lvdump", 
+			} 
+			filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
 
-	-- Gets file dialog status
-		local status = filedlg.status
-		local value = filedlg.value
-	-- new or overwrite (windows native dialog already prompts for overwrite
-		if status ~= "0" then
-			printf('play dump canceled\n')
-			self.value = "OFF"
-			return
+		-- Gets file dialog status
+			local status = filedlg.status
+			local value = filedlg.value
+		-- new or overwrite (windows native dialog already prompts for overwrite
+			if status ~= "0" then
+				printf('play dump canceled\n')
+				self.value = "OFF"
+				return
+			end
+			printf('playing %s\n',tostring(value))
+			m.dump_replay_filename = value
+			init_dump_replay()
+			m.dump_replay = true
+		else
+			end_dump_replay()
+			m.dump_replay = false
 		end
-		printf('playing %s\n',tostring(value))
-		m.dump_replay_filename = value
-		init_dump_replay()
-		m.dump_replay = true
-	else
-		end_dump_replay()
-		m.dump_replay = false
-	end
 end
 
 
@@ -386,7 +386,14 @@ local function init_timer(time)
 	end
 	m.timer = iup.timer{ 
 		time = time,
-		action_cb = timer_action,
+		action_cb = function()
+			-- use xpcall so we don't get a popup every frame
+			local cstatus,msg = xpcall(timer_action,util.err_traceback)
+			if not cstatus then
+				printf('live timer update error\n%s',tostring(msg))
+				-- TODO could stop live updates here, for now just spam the console
+			end
+		end,
 	}
 	m.update_run_state()
 end
