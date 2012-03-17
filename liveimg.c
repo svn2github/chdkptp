@@ -99,15 +99,16 @@ static const char palette_type1_default[]={
 
 typedef struct {
 	yuv_palette_to_rgba_fn to_rgba;
+	unsigned num_entries;
 } palette_convert_t;
 
 // type implied from index
 // TODO only one function for now
 palette_convert_t palette_funcs[] = {
-	{NULL}, 					// type 0 - no palette, we could have a default func here
-	{palette_type1_to_rgba},	// type 1 - ayuv, 16 entries double 4 bit index
-	{palette_type2_to_rgba}, 	// type 2 - like type 1, but with 2 bit alpha lookup - UNTESTED
-	{palette_type3_to_rgba}, 	// type 3 - vuya, 256 entries, 2 bit alpha lookup
+	{NULL,0}, 					// type 0 - no palette, we could have a default func here
+	{palette_type1_to_rgba,16},	// type 1 - ayuv, 16 entries double 4 bit index
+	{palette_type2_to_rgba,16}, 	// type 2 - like type 1, but with 2 bit alpha lookup - UNTESTED
+	{palette_type3_to_rgba,256}, 	// type 3 - vuya, 256 entries, 2 bit alpha lookup
 };
 
 #define N_PALETTE_FUNCS (sizeof(palette_funcs)/sizeof(palette_funcs[0]))
@@ -117,6 +118,14 @@ static palette_convert_t* get_palette_convert(unsigned type) {
 		return &(palette_funcs[type]);
 	}
 	return NULL;
+}
+
+static unsigned get_palette_size(unsigned type) {
+	palette_convert_t* convert = get_palette_convert(type);
+	if(convert) {
+		return convert->num_entries*4;
+	}
+	return 0;
 }
 
 static uint8_t clip_yuv(int v) {
@@ -370,6 +379,7 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 	bi = (lv_base_info *)base_lb->bytes;
 	vi = (lv_vid_info *)vi_lb->bytes;
 
+	// this is not currently an error, if sent live data without viewport selected, just return nil image
 	if(!vi->vp_buffer_start) {
 		lua_pushnil(L);
 		return 1;
@@ -377,6 +387,19 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 
 	unsigned vwidth = vi->vp_width/par;
 	unsigned dispsize = vwidth*vi->vp_height;
+
+	// sanity checks - TODO might want to have this standalone somewhere
+	if(vi->vp_buffer_start + (bi->vp_buffer_width*bi->vp_max_height*12)/8 > vi_lb->len) {
+		return luaL_error(L,"data < buffer_width*max_height");
+	}
+
+	if(vi->vp_height + vi->vp_yoffset > bi->vp_max_height) {
+		return luaL_error(L,"vp_height + vp_yoffset > vp_max_height");
+	}
+
+	if(vi->vp_width + vi->vp_xoffset > bi->vp_buffer_width) {
+		return luaL_error(L,"vp_width + vp_xoffset > vp_buffer_width");
+	}
 
 	if(im && dispsize != im->width*im->height) {
 		pimg_destroy(im);
@@ -407,14 +430,13 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 static void convert_palette(palette_entry_rgba_t *pal_rgba,lv_vid_info *vi) {
 	const char *pal=NULL;
 	palette_convert_t *convert=get_palette_convert(vi->palette_type);
-	yuv_palette_to_rgba_fn fn = NULL;
-	if(convert && vi->palette_buffer_start) {
-		fn = convert->to_rgba;
-		pal = ((char *)vi + vi->palette_buffer_start);
-	} else {
+	if(!convert || !vi->palette_buffer_start) {
+		convert = get_palette_convert(1);
 		pal = palette_type1_default;
-		fn = palette_type1_to_rgba;
+	} else {
+		pal = ((char *)vi + vi->palette_buffer_start);
 	}
+	yuv_palette_to_rgba_fn fn = convert->to_rgba;
 	int i;
 	for(i=0;i<256;i++) {
 		fn(pal,i,&pal_rgba[i]);
@@ -449,10 +471,19 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 		return 1;
 	}
 
+	if(bi->bm_max_height*bi->bm_max_width + vi->bm_buffer_start > vi_lb->len) {
+		return luaL_error(L,"data < max_height*max_width");
+	}
+
+	if(get_palette_size(vi->palette_type) + vi->palette_buffer_start > vi_lb->len) {
+		return luaL_error(L,"data < palette size");
+	}
+
 	convert_palette(pal_rgba,vi);
 
 	unsigned vwidth = bi->bm_max_width/par;
 	unsigned dispsize = vwidth*bi->bm_max_height;
+
 
 	if(im && dispsize != im->width*im->height) {
 		pimg_destroy(im);
