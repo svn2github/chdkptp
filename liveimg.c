@@ -216,13 +216,13 @@ void yuv_live_to_cd_rgb(const char *p_yuv,
 						unsigned width,unsigned height,
 						int skip,
 						uint8_t *r,uint8_t *g,uint8_t *b) {
-	unsigned x,y;
-	unsigned y_inc = (buf_width*12)/8;
+	unsigned x,row;
+	unsigned row_inc = (buf_width*12)/8;
 	const char *p;
-	// flip for CD
-	for(y=y_offset + height-1;y>y_offset;y--) {
-		p = p_yuv + y * y_inc + (x_offset*12)/8;
-		for(x=x_offset;x<width+x_offset;x+=4,p+=6) {
+	// start at end to flip for CD
+	const char *p_row = p_yuv + (height - 1) * row_inc + (x_offset*12)/8;
+	for(row=0;row<height;row++,p_row -= row_inc) {
+		for(x=0,p=p_row;x<width;x+=4,p+=6) {
 			*r++ = yuv_to_r(p[1],p[2]);
 			*g++ = yuv_to_g(p[1],p[0],p[2]);
 			*b++ = yuv_to_b(p[1],p[0]);
