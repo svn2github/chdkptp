@@ -94,12 +94,6 @@ local function get_fb_selection()
 end
 
 --[[
-get the canvas size for the current settings
-return w,h
-]]
-local function get_canvas_size()
-end
---[[
 update canvas size from base and frame
 ]]
 local function update_canvas_size()
@@ -319,31 +313,29 @@ local function toggle_dump(ih,state)
 end
 
 local function toggle_play_dump(self,state)
-		if state == 1 then
-			local filedlg = iup.filedlg{
-				dialogtype = "OPEN",
-				title = "File to play", 
-				filter = "*.lvdump", 
-			} 
-			filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
+	if state == 1 then
+		local filedlg = iup.filedlg{
+			dialogtype = "OPEN",
+			title = "File to play", 
+			filter = "*.lvdump", 
+		} 
+		filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
 
-		-- Gets file dialog status
-			local status = filedlg.status
-			local value = filedlg.value
-		-- new or overwrite (windows native dialog already prompts for overwrite
-			if status ~= "0" then
-				printf('play dump canceled\n')
-				self.value = "OFF"
-				return
-			end
-			printf('playing %s\n',tostring(value))
-			m.dump_replay_filename = value
-			init_dump_replay()
-			m.dump_replay = true
-		else
-			end_dump_replay()
-			m.dump_replay = false
+		local status = filedlg.status
+		local value = filedlg.value
+		if status ~= "0" then
+			printf('play dump canceled\n')
+			self.value = "OFF"
+			return
 		end
+		printf('playing %s\n',tostring(value))
+		m.dump_replay_filename = value
+		init_dump_replay()
+		m.dump_replay = true
+	else
+		end_dump_replay()
+		m.dump_replay = false
+	end
 end
 
 
