@@ -97,16 +97,69 @@ function gui.parsesize(size)
 	return tonumber(w),tonumber(h)
 end
 
+local function update_mode_dropdown(cur)
+	printf('update mode dropdown %s\n',tostring(cur))
+	gui.mode_dropdown["1"] = nil -- empty the list
+	if not gui.mode_list or not cur or cur == 0 then
+		return
+	end
+	gui.mode_map = {}
+	local curid
+	for i=1,#gui.mode_list do
+		gui.mode_dropdown[tostring(i)] = gui.mode_list[i].name
+		-- list index to chdk value
+		gui.mode_map[i] = gui.mode_list[i].id
+		if cur == gui.mode_list[i].id then
+			curid = i 
+		end
+	end
+	gui.mode_dropdown.value = curid
+	printf('new value %s\n',tostring(gui.mode_map[curid]))
+end
+
+local function clear_mode_list()
+	gui.mode_list = nil
+	gui.mode_map = nil
+	update_mode_dropdown()
+end
+
+local function update_mode_list()
+	gui.mode_list = nil
+	gui.mode_map = nil
+	local status,modes,cur = con:execwait([[
+capmode=require'capmode'
+local l={}
+local i=1
+for id,name in ipairs(capmode.mode_to_name) do
+	if capmode.valid(id) then
+		l[i] = {name=name,id=id}
+		i = i + 1
+	end
+end
+return l,capmode.get()
+]])
+	-- TODO need to do something about play,
+	-- would be good to select the current mode in rec mode
+	if status then
+		gui.mode_list = modes
+	else
+		add_status(false,modes)
+	end
+	update_mode_dropdown(cur)
+end
+
 function gui.update_connection_status()
 	local host_major, host_minor = chdk.host_api_version()
 	if con:is_connected() then
 		connect_icon.active = "YES"
 		btn_connect.title = "Disconnect"
 		connect_label.title = string.format("host:%d.%d cam:%d.%d",host_major,host_minor,con.apiver.major,con.apiver.minor)
+		update_mode_list()
 	else
 		connect_icon.active = "NO"
 		btn_connect.title = "Connect"
 		connect_label.title = string.format("host:%d.%d cam:-.-",host_major,host_minor)
+		clear_mode_list()
 	end
 	live.on_connect_change(con)
 end
@@ -173,6 +226,31 @@ function statusupdatepos()
 	end
 end
 
+--[[
+switch play / rec mode, update capture mode dropdown
+]]
+function switch_mode(m)
+	local capmode
+	if m == 0 then
+		add_status(con:execlua('switch_mode_usb(0)'))
+	else
+		local status
+		-- switch mode, wait for complete, return current mode
+		status,capmode=con:execwait([[
+switch_mode_usb(1)
+local i=0
+local capmode = require'capmode'
+while capmode.get() == 0 and i < 50 do
+	sleep(10)
+end
+return capmode.get()
+]])
+		if not status then
+			add_status(false,capmode)
+		end
+	end
+	update_mode_dropdown(capmode)
+end
 -- creates a button
 btn_exec = iup.button{ 
 	title = "Execute",
@@ -200,6 +278,20 @@ cam_btn("right")
 cam_btn("display","disp")
 cam_btn("down")
 cam_btn("menu")
+
+gui.mode_dropdown = iup.list{
+	VISIBLECOLUMNS="10",
+	DROPDOWN="YES",
+}
+function gui.mode_dropdown:valuechanged_cb()
+	print('mode_dropdown',self.value)
+	local v = tonumber(self.value)
+	if not gui.mode_map or not gui.mode_map[v] then
+		printf('tried to set invalid mode %s',tostring(v))
+		return
+	end
+	add_status(con:execlua(string.format('set_capture_mode(%d)',gui.mode_map[v])))
+end
 
 cam_btn_frame = iup.vbox{
 	iup.hbox{ 
@@ -262,6 +354,8 @@ cam_btn_frame = iup.vbox{
 	iup.label{separator="HORIZONTAL"},
 
 	iup.hbox{ 
+		-- TODO we should have a way to press shoot half and have it stay down,
+		-- so we can do normal shooting proccess
 		iup.button{
 			title='shoot half',
 			size='45x15',
@@ -294,7 +388,8 @@ cam_btn_frame = iup.vbox{
 			title='rec',
 			size='45x15',
 			action=function(self)
-				add_status(con:execlua('switch_mode_usb(1)'))
+				switch_mode(1)
+				--add_status(con:execlua('switch_mode_usb(1)'))
 			end,
 		},
 		iup.fill{},
@@ -302,10 +397,15 @@ cam_btn_frame = iup.vbox{
 			title='play',
 			size='45x15',
 			action=function(self)
-				add_status(con:execlua('switch_mode_usb(0)'))
+				switch_mode(0)
+				--add_status(con:execlua('switch_mode_usb(0)'))
 			end,
 		},
 		expand="HORIZONTAL",
+	},
+	iup.label{separator="HORIZONTAL"},
+	iup.hbox{
+		gui.mode_dropdown,
 	},
 	iup.fill{},
 	iup.hbox{
