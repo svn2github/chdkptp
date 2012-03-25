@@ -217,6 +217,7 @@ cam_btn_frame = iup.vbox{
 		cam_btns.down,
 		cam_btns.menu,
 	},
+
 	iup.label{separator="HORIZONTAL"},
 	iup.hbox{ 
 		iup.button{
@@ -237,7 +238,49 @@ cam_btn_frame = iup.vbox{
 		},
 		expand="HORIZONTAL",
 	},
+
+	iup.hbox{ 
+		iup.button{
+			title='wheel l',
+			size='45x15',
+			action=function(self)
+				add_status(con:execlua('post_levent_to_ui("RotateJogDialLeft",1)'))
+			end,
+		},
+		iup.fill{
+		},
+		iup.button{
+			title='wheel r',
+			size='45x15',
+			action=function(self)
+				add_status(con:execlua('post_levent_to_ui("RotateJogDialRight",1)'))
+			end,
+		},
+		expand="HORIZONTAL",
+	},
+
 	iup.label{separator="HORIZONTAL"},
+
+	iup.hbox{ 
+		iup.button{
+			title='shoot half',
+			size='45x15',
+			action=function(self)
+				add_status(con:execlua('press("shoot_half") repeat sleep(10) until get_shooting() == true release("shoot_half")'))
+			end,
+		},
+		iup.fill{
+		},
+		iup.button{
+			title='video',
+			size='45x15',
+			action=function(self)
+				add_status(con:execlua('click("video")'))
+			end,
+		},
+		expand="HORIZONTAL",
+	},
+
 	iup.button{
 		title='shoot',
 		size='94x15',
