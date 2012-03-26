@@ -80,6 +80,7 @@
 #endif
 #include "lfs/lfs.h"
 #include "lbuf.h"
+#include "liveimg.h"
 
 /* some defines comes here */
 
@@ -590,7 +591,6 @@ get the connection user data specified by bus/path and push it on the stack
 if nothing is found, returns 0 and pushes nothing
 */
 int get_connection_udata_by_path(lua_State *L, const char *bus, const char *dev) {
-	PTP_USB *ptp_usb;
 	char dev_path[LIBUSB_PATH_MAX*2];
 	if(!bus || !dev) {
 		return 0;
@@ -713,7 +713,6 @@ An existing connection may or may not be connected
 if devinfo is absent, the dummy connection is returned
 */
 static int chdk_connection(lua_State *L) {
-	devinfo_lua ldevinfo;
 	PTP_USB *ptp_usb;
 	PTPParams *params;
 	const char *bus="dummy";
@@ -1364,6 +1363,7 @@ static int chdk_reset_device(lua_State *L) {
 		struct usb_device *dev = find_device_ldev(&ldevinfo);
 		reset_device(dev);
 	}
+	return 0;
 }
 
 /*
@@ -1572,7 +1572,7 @@ static int exec_lua_string(lua_State *L, const char *luacode) {
 }
 
 
-static int init_lua_globals (lua_State *L, int argc, char **argv) {
+static void init_lua_globals (lua_State *L, int argc, char **argv) {
 	int i;
 	lua_createtable(L,argc-1,0);
 // make the command line args available in lua
@@ -1588,7 +1588,6 @@ int main(int argc, char ** argv)
 {
 	/* register signal handlers */
 //	signal(SIGINT, ptpcam_siginthandler);
-	int i;
 	usb_init();
 	lua_State *L = lua_open();
 	luaL_openlibs(L);

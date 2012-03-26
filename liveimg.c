@@ -197,8 +197,6 @@ void palette_type2_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba
 
 void palette_type3_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba_t *pal_rgb) {
 	const palette_entry_vuya_t *pal = (const palette_entry_vuya_t *)palette;
-	int8_t u,v;
-	uint8_t y;
 	// special case for index 0
 	if(pixel == 0) {
 		pal_rgb->a = pal_rgb->r = pal_rgb->g = pal_rgb->b = 0;

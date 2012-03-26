@@ -13,7 +13,7 @@ endif
 endif
 
 CC=gcc
-CFLAGS=-DCHDKPTP_OSTYPE=\"$(OSTYPE)\"
+CFLAGS=-DCHDKPTP_OSTYPE=\"$(OSTYPE)\" -Wall
 LDFLAGS=
 #LD=ld
 
