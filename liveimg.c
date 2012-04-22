@@ -357,75 +357,6 @@ liveimg_pimg_t * pimg_get(lua_State *L,int i) {
 }
 
 /*
-convert viewport data to RGB pimg
-pimg=liveimg.get_viewport_pimg(pimg,base_info,vid_info,skip)
-pimg: pimg to re-use, created if nil, replaced if size doesn't match
-vid_info, base_info: from handler
-skip: boolean - if true, each U Y V Y Y Y is converted to 2 pixels, otherwise 4
-returns nil if info does not contain a live view
-*/
-static int liveimg_get_viewport_pimg(lua_State *L) {
-	lv_vid_info *vi;
-	lv_base_info *bi;
-	liveimg_pimg_t *im = pimg_get(L,1);
-	lBuf_t *base_lb = luaL_checkudata(L,2,LBUF_META);
-	lBuf_t *vi_lb = luaL_checkudata(L,3,LBUF_META);
-	int skip = lua_toboolean(L,4);
-	// pixel aspect ratio
-	int par = (skip == 1)?2:1;
-
-	bi = (lv_base_info *)base_lb->bytes;
-	vi = (lv_vid_info *)vi_lb->bytes;
-
-	// this is not currently an error, if sent live data without viewport selected, just return nil image
-	if(!vi->vp_buffer_start) {
-		lua_pushnil(L);
-		return 1;
-	}
-
-	unsigned vwidth = vi->vp_width/par;
-	unsigned dispsize = vwidth*vi->vp_height;
-
-	// sanity checks - TODO might want to have this standalone somewhere
-	if(vi->vp_buffer_start + (bi->vp_buffer_width*bi->vp_max_height*12)/8 > vi_lb->len) {
-		return luaL_error(L,"data < buffer_width*max_height");
-	}
-
-	if(vi->vp_height + vi->vp_yoffset > bi->vp_max_height) {
-		return luaL_error(L,"vp_height + vp_yoffset > vp_max_height");
-	}
-
-	if(vi->vp_width + vi->vp_xoffset > bi->vp_buffer_width) {
-		return luaL_error(L,"vp_width + vp_xoffset > vp_buffer_width");
-	}
-
-	if(im && dispsize != im->width*im->height) {
-		pimg_destroy(im);
-		im = NULL;
-	}
-	if(im) {
-		lua_pushvalue(L, 1); // copy im onto top for return
-	} else { // create an new im 
-		pimg_create(L);
-		im = luaL_checkudata(L,-1,LIVEIMG_PIMG_META);
-		if(!pimg_init_rgb(im,vwidth,vi->vp_height)) {
-			return luaL_error(L,"failed to create image");
-		}
-	}
-
-	yuv_live_to_cd_rgb(vi_lb->bytes+vi->vp_buffer_start,
-						bi->vp_buffer_width,
-						bi->vp_max_height,
-						vi->vp_xoffset,
-						vi->vp_yoffset,
-						vi->vp_width,
-						vi->vp_height,
-						skip,
-						im->r,im->g,im->b);
-	return 1;
-}
-
-/*
 check framebuffer desc values, and return a descriptive error or NULL
 TODO can't check total size without bpp
 */
@@ -509,102 +440,6 @@ static int liveimg_get_viewport2_pimg(lua_State *L) {
 						frame->vp.visible_height,
 						skip,
 						im->r,im->g,im->b);
-	return 1;
-}
-
-static void convert_palette(palette_entry_rgba_t *pal_rgba,lv_vid_info *vi) {
-	const char *pal=NULL;
-	palette_convert_t *convert=get_palette_convert(vi->palette_type);
-	if(!convert || !vi->palette_buffer_start) {
-		convert = get_palette_convert(1);
-		pal = palette_type1_default;
-	} else {
-		pal = ((char *)vi + vi->palette_buffer_start);
-	}
-	yuv_palette_to_rgba_fn fn = convert->to_rgba;
-	int i;
-	for(i=0;i<256;i++) {
-		fn(pal,i,&pal_rgba[i]);
-	}
-}
-
-/*
-convert bitmap data to RGBA pimg
-pimg=liveimg.get_bitmap_pimg(pimg,base_info,vid_info,skip)
-pimg: pimg to re-use, created if nil, replaced if size doesn't match
-vid_info, base_info: from handler
-skip: boolean - if true, every other pixel in the x axis is discarded (for viewports with a 1:2 par)
-returns nil if info does not contain a bitmap
-*/
-static int liveimg_get_bitmap_pimg(lua_State *L) {
-	palette_entry_rgba_t pal_rgba[256];
-
-	lv_vid_info *vi;
-	lv_base_info *bi;
-	liveimg_pimg_t *im = pimg_get(L,1);
-	lBuf_t *base_lb = luaL_checkudata(L,2,LBUF_META);
-	lBuf_t *vi_lb = luaL_checkudata(L,3,LBUF_META);
-	int skip = lua_toboolean(L,4);
-	// pixel aspect ratio
-	int par = (skip == 1)?2:1;
-
-	bi = (lv_base_info *)base_lb->bytes;
-	vi = (lv_vid_info *)vi_lb->bytes;
-
-	if(!vi->bm_buffer_start) {
-		lua_pushnil(L);
-		return 1;
-	}
-
-	if(bi->bm_max_height*bi->bm_max_width + vi->bm_buffer_start > vi_lb->len) {
-		return luaL_error(L,"data < max_height*max_width");
-	}
-
-	if(get_palette_size(vi->palette_type) + vi->palette_buffer_start > vi_lb->len) {
-		return luaL_error(L,"data < palette size");
-	}
-
-	convert_palette(pal_rgba,vi);
-
-	unsigned vwidth = bi->bm_max_width/par;
-	unsigned dispsize = vwidth*bi->bm_max_height;
-
-
-	if(im && dispsize != im->width*im->height) {
-		pimg_destroy(im);
-		im = NULL;
-	}
-	if(im) {
-		lua_pushvalue(L, 1); // copy im onto top for return
-	} else { // create an new im 
-		pimg_create(L);
-		im = luaL_checkudata(L,-1,LIVEIMG_PIMG_META);
-		if(!pimg_init_rgba(im,vwidth,bi->bm_max_height)) {
-			return luaL_error(L,"failed to create image");
-		}
-	}
-
-	int y_inc = bi->bm_buffer_width;
-	int x_inc = par;
-	int x,y;
-	int height = bi->bm_max_height;
-
-	uint8_t *p=((uint8_t *)vi + vi->bm_buffer_start) + (height-1)*y_inc;
-
-	uint8_t *r = im->r;
-	uint8_t *g = im->g;
-	uint8_t *b = im->b;
-	uint8_t *a = im->a;
-
-	for(y=0;y<height;y++,p-=y_inc) {
-		for(x=0;x<bi->bm_max_width;x+=x_inc) {
-			palette_entry_rgba_t *c =&pal_rgba[*(p+x)];
-			*r++ = c->r;
-			*g++ = c->g;
-			*b++ = c->b;
-			*a++ = c->a;
-		}
-	}
 	return 1;
 }
 
@@ -773,9 +608,7 @@ static int pimg_blend_to_cd_canvas(lua_State *L) {
 #endif
 
 static const luaL_Reg liveimg_funcs[] = {
-  {"get_bitmap_pimg", liveimg_get_bitmap_pimg},
   {"get_bitmap2_pimg", liveimg_get_bitmap2_pimg},
-  {"get_viewport_pimg", liveimg_get_viewport_pimg},
   {"get_viewport2_pimg", liveimg_get_viewport2_pimg},
   {NULL, NULL}
 };

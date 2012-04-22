@@ -1935,52 +1935,6 @@ int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_ch
 }
 
 #ifdef CHDKPTP_LIVEVIEW
-int ptp_chdk_get_handler(PTPParams* params, PTPDeviceInfo* deviceinfo,int id,int *handler) {
-  uint16_t r;
-  PTPContainer ptp;
-
-  PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
-  ptp.Nparam=2;
-  ptp.Param1=PTP_CHDK_GetHandler;
-  ptp.Param2=id;
-
-  r=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-  if ( r != 0x2001 )
-  {
-    ptp_error(params,"unexpected return code 0x%x",r);
-	*handler = 0;
-    return 0;
-  }
-  *handler = ptp.Param1;
-  return 1;
-}
-int ptp_chdk_call_handler(PTPParams* params, PTPDeviceInfo* deviceinfo,int handler,int harg1,int harg2,char **data,int *data_size) {
-  uint16_t r;
-  PTPContainer ptp;
-
-  PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
-  ptp.Nparam=4;
-  ptp.Param1=PTP_CHDK_CallHandler;
-  ptp.Param2=handler;
-  ptp.Param3=harg1;
-  ptp.Param4=harg2;
-  *data = NULL;
-  *data_size = 0;
-
-  r=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, data);
-  if ( r != 0x2001 )
-  {
-    ptp_error(params,"unexpected return code 0x%x",r);
-    free(*data);
-    *data = NULL;
-    return 0;
-  }
-  *data_size = ptp.Param1;
-  return 1;
-
-}
 int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,int flags,char **data,int *data_size) {
   uint16_t r;
   PTPContainer ptp;

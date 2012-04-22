@@ -1041,74 +1041,6 @@ static int chdk_script_status(lua_State *L) {
 }
 #ifdef CHDKPTP_LIVEVIEW
 /*
-TODO why not just use the handler_id to identify the handler ?
-handler[,errmsg]=con:get_handler(handler_id)
-handler - handler handle
-*/
-static int chdk_get_handler(lua_State *L) {
-  	CHDK_CONNECTION_METHOD;
-	int handler_id=lua_tonumber(L,2);
-	int handler;
-	if ( !ptp_usb->connected ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
-	if ( !ptp_chdk_get_handler(params,&params->deviceinfo,handler_id,&handler) ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"ptp error");
-		return 2;
-	}
-	lua_pushnumber(L,handler);
-	return 1;
-}
-/*
-lbuf[,errmsg]=con:get_handler(lbuf,handler[,arg1[,arg2]])
-handler - handler handle
-lbuf - lbuf to re-use, will be created if nil
-*/
-static int chdk_call_handler(lua_State *L) {
-  	CHDK_CONNECTION_METHOD;
-	lBuf_t *buf = lbuf_getlbuf(L,2);
-	int handler=lua_tonumber(L,3);
-	int harg1=luaL_optnumber(L,4,0);
-	int harg2=luaL_optnumber(L,5,0);
-	char *data=NULL;
-	unsigned data_size = 0;
-	if ( !ptp_usb->connected ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
-	if ( !ptp_chdk_call_handler(params,&params->deviceinfo,handler,harg1,harg2,&data,&data_size) ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"ptp error");
-		return 2;
-	}
-	if(!data) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"no data");
-		return 2;
-	}
-	if(!data_size) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"zero data size");
-		return 2;
-	}
-	if(buf) {
-		if(buf->flags & LBUF_FL_FREE) {
-			free(buf->bytes);
-		}
-		buf->bytes = data;
-		buf->len = data_size;
-		buf->flags = LBUF_FL_FREE;
-		lua_pushvalue(L,2); // copy it to stack top for return
-	} else {
-		lbuf_create(L,data,data_size,LBUF_FL_FREE);
-	}
-	return 1;
-}
-/*
 lbuf[,errmsg]=con:get_live_data(lbuf,flags)
 lbuf - lbuf to re-use, will be created if nil
 */
@@ -1461,8 +1393,6 @@ static const luaL_Reg chdkconnection[] = {
   {"get_ptp_devinfo", chdk_get_ptp_devinfo},
   {"get_usb_devinfo", chdk_get_usb_devinfo}, // does not need to be connected, returns bus and dev at minimum
 #ifdef CHDKPTP_LIVEVIEW
-  {"get_handler",chdk_get_handler},
-  {"call_handler",chdk_call_handler},
   {"get_live_data",chdk_get_live_data},
 #endif
   {NULL, NULL}

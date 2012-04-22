@@ -94,34 +94,8 @@ local function get_fb_selection()
 end
 
 --[[
-update canvas size from base and frame
+update canvas size from frame
 ]]
-local function update_canvas_size()
-	local vp_w = m.li.vp_max_width/m.vp_par
-	local vp_h
-	if aspect_toggle.value == 'ON' then
-		vp_h = vp_w/screen_aspects[m.li.lcd_aspect_ratio]
-		m.vp_aspect_factor = vp_h/m.li.vp_max_height
-	else
-		m.vp_aspect_factor = 1
-		vp_h = m.li.vp_max_height
-	end
-
-	local w,h = gui.parsesize(m.icnv.rastersize)
-	
-	local update
-	if w ~= vp_w then
-		update = true
-	end
-	if h ~= vp_h then
-		update = true
-	end
-	if update then
-		m.icnv.rastersize = vp_w.."x"..vp_h
-		iup.Refresh(m.container)
-		gui.resize_for_content()
-	end
-end
 
 local function update_canvas_size2()
 	if not con.live2 then
@@ -190,63 +164,7 @@ local function update_should_run()
 	return (m.vp_active or m.bm_active)
 end
 
-local function update_base_data(base)
-	printf('update base data:\n')
-	for i,f in ipairs(chdku.live_base_fields) do
-		printf("%s:%s\n",f,tostring(chdku.live_get_base_field(base,f)))
-	end
-end
-
 local last_frame_fields = {}
-local function update_frame_data(frame)
-	local dirty
-	for i,f in ipairs(chdku.live_frame_fields) do
-		local v = chdku.live_get_frame_field(frame,f)
-		if v ~= last_frame_fields[f] then
-			dirty = true
-		end
-	end
-	if dirty then
-		printf('update_frame_data: changed\n')
-		for i,f in ipairs(chdku.live_frame_fields) do
-			local v = chdku.live_get_frame_field(frame,f)
-			printf("%s:%s->%s\n",f,tostring(last_frame_fields[f]),v)
-			last_frame_fields[f]=v
-		end
-		if last_frame_fields.palette_buffer_start > 0 and last_frame_fields.palette_buffer_size > 0 then
-			printf('palette:\n')
-			local c=0
-			---[[
-			local bytes = {frame:byte(last_frame_fields.palette_buffer_start+1,
-										last_frame_fields.palette_buffer_start+last_frame_fields.palette_buffer_size)}
-			for i,v in ipairs(bytes) do
-				printf("0x%02x,",v)
-				c = c + 1
-				if c == 16 then
-					printf('\n')
-					c=0
-				else
-					printf(' ')
-				end
-			end
-			--]]
-			--[[
-			for i=0, m.lvidinfo.palette_buffer_size-1, 4 do
-				local v = livedata:get_i32(m.lvidinfo.palette_buffer_start+i)
-				printf("%08x",v)
-				c = c + 1
-				if c == 4 then
-					c=0
-					printf('\n')
-				else 
-					printf(' ')
-				end
-			end
-			--]]
-		end
-	end
-end
-
 local palette_size_for_type={
 	16*4,
 	16*4,
@@ -267,10 +185,12 @@ local function update_frame_data2(frame)
 			printf("%s:%s->%s\n",f,tostring(last_frame_fields[f]),v)
 			last_frame_fields[f]=v
 		end
+		-- for big palettes this lags, should be an otpion
+		--[[
 		if last_frame_fields.palette_data_start > 0 then
 			printf('palette:\n')
 			local c=0
-			---[[
+
 			local bytes = {frame:byte(last_frame_fields.palette_data_start+1,
 										last_frame_fields.palette_data_start+palette_size_for_type[last_frame_fields.palette_type])}
 			for i,v in ipairs(bytes) do
@@ -284,6 +204,7 @@ local function update_frame_data2(frame)
 				end
 			end
 		end
+		]]
 	end
 end
 
@@ -515,38 +436,6 @@ local function redraw_canvas(self)
 			end
 		end
 	end
-	--[[
-	if m.get_current_frame_data() then
-		if m.vp_active then
-			m.vp_img = liveimg.get_viewport_pimg(m.vp_img,m.get_current_base_data(),m.get_current_frame_data(),m.vp_par == 2)
-			if m.vp_img then
-				if aspect_toggle.value == "ON" then
-					m.vp_img:put_to_cd_canvas(ccnv,
-						m.li.vp_xoffset/m.vp_par,
-						(m.li.vp_max_height - m.li.vp_height - m.li.vp_yoffset)*m.vp_aspect_factor,
-						m.vp_img:width(),
-						m.vp_img:height()*m.vp_aspect_factor)
-				else
-					m.vp_img:put_to_cd_canvas(ccnv,
-						m.li.vp_xoffset/m.vp_par,
-						m.li.vp_max_height - m.li.vp_height - m.li.vp_yoffset)
-				end
-			end
-		end
-		if m.bm_active then
-			m.bm_img = liveimg.get_bitmap_pimg(m.bm_img,m.get_current_base_data(),m.get_current_frame_data(),m.bm_par == 2)
-			if m.bm_img then
-				if bm_fit_toggle.value == "ON" then
-					m.bm_img:blend_to_cd_canvas(ccnv, 0, 0, m.li.vp_max_width/m.vp_par, m.li.vp_max_height*m.vp_aspect_factor)
-				else
-					m.bm_img:blend_to_cd_canvas(ccnv, 0, m.li.vp_max_height - m.li.bm_max_height)
-				end
-			else
-				print('no bm')
-			end
-		end
-	end
-	--]]
 	ccnv:Flush()
 	stats:end_frame()
 end
@@ -678,18 +567,7 @@ function m.get_container_title()
 end
 function m.on_connect_change(lcon)
 	m.live_con_valid = false
-	if con:is_connected() then
-		local status, err = con:live_init_streaming()
-		if not status then
-			printf('error initializing live streaming: %s\n',tostring(err))
-			return
-		end
-		
-		if con.live.version_major ~= 1 then
-			printf('incompatible live view version %d %d\n',tonumber(con.live.version_major),tonumber(con.live.version_minor))
-			return
-		end
-		--update_base_data(con.live.base)
+	if con:is_connected() and con:live_is_api_compatible() then
 		m.live_con_valid = true
 	end
 end
