@@ -97,18 +97,18 @@ end
 update canvas size from frame
 ]]
 
-local function update_canvas_size2()
-	if not con.live2 then
+local function update_canvas_size()
+	if not con.live then
 		return
 	end
-	local vp_w = con.live2.vp_logical_width/m.vp_par
+	local vp_w = con.live.vp_logical_width/m.vp_par
 	local vp_h
 	if aspect_toggle.value == 'ON' then
-		vp_h = vp_w/screen_aspects[con.live2.lcd_aspect_ratio]
-		m.vp_aspect_factor = vp_h/con.live2.vp_logical_height
+		vp_h = vp_w/screen_aspects[con.live.lcd_aspect_ratio]
+		m.vp_aspect_factor = vp_h/con.live.vp_logical_height
 	else
 		m.vp_aspect_factor = 1
-		vp_h = con.live2.vp_logical_height
+		vp_h = con.live.vp_logical_height
 	end
 
 	local w,h = gui.parsesize(m.icnv.rastersize)
@@ -170,18 +170,18 @@ local palette_size_for_type={
 	16*4,
 	256*4,
 }
-local function update_frame_data2(frame)
+local function update_frame_data(frame)
 	local dirty
-	for i,f in ipairs(chdku.live2_field_names) do
-		local v = chdku.live2_get_frame_field(frame,f)
+	for i,f in ipairs(chdku.live_field_names) do
+		local v = chdku.live_get_frame_field(frame,f)
 		if v ~= last_frame_fields[f] then
 			dirty = true
 		end
 	end
 	if dirty then
 		printf('update_frame_data: changed\n')
-		for i,f in ipairs(chdku.live2_field_names) do
-			local v = chdku.live2_get_frame_field(frame,f)
+		for i,f in ipairs(chdku.live_field_names) do
+			local v = chdku.live_get_frame_field(frame,f)
 			printf("%s:%s->%s\n",f,tostring(last_frame_fields[f]),v)
 			last_frame_fields[f]=v
 		end
@@ -338,20 +338,17 @@ local function timer_action(self)
 			return
 		end
 		stats:start_xfer()
-		--local status,err = con:live_get_frame(what)
-		local status,err = con:live2_get_frame(what)
+		local status,err = con:live_get_frame(what)
 		if not status then
 			end_dump()
 			printf('error getting frame: %s\n',tostring(err))
 			gui.update_connection_status() -- update connection status on error, to prevent spamming
 			stats:stop()
 		else
-			--stats:end_xfer(con.live.frame:len())
-			stats:end_xfer(con.live2._frame:len())
-			update_frame_data2(con.live2._frame)
-			--update_frame_data(con.live.frame)
+			stats:end_xfer(con.live._frame:len())
+			update_frame_data(con.live._frame)
 			--record_dump()
-			update_canvas_size2()
+			update_canvas_size()
 		end
 		m.icnv:action()
 	elseif m.dump_replay then
@@ -405,10 +402,10 @@ local function redraw_canvas(self)
 	stats:start_frame()
 	ccnv:Activate()
 	ccnv:Clear()
-	local lv = con.live2
+	local lv = con.live
 	if lv and lv._frame then
 		if m.vp_active then
-			m.vp_img = liveimg.get_viewport2_pimg(m.vp_img,lv._frame,m.vp_par == 2)
+			m.vp_img = liveimg.get_viewport_pimg(m.vp_img,lv._frame,m.vp_par == 2)
 			if m.vp_img then
 				if aspect_toggle.value == "ON" then
 					m.vp_img:put_to_cd_canvas(ccnv,
@@ -424,7 +421,7 @@ local function redraw_canvas(self)
 			end
 		end
 		if m.bm_active then
-			m.bm_img = liveimg.get_bitmap2_pimg(m.bm_img,lv._frame,m.bm_par == 2)
+			m.bm_img = liveimg.get_bitmap_pimg(m.bm_img,lv._frame,m.bm_par == 2)
 			if m.bm_img then
 				if bm_fit_toggle.value == "ON" then
 					m.bm_img:blend_to_cd_canvas(ccnv, 0, 0, lv.vp_logical_width/m.vp_par, lv.vp_logical_height*m.vp_aspect_factor)

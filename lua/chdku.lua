@@ -854,7 +854,7 @@ end
 all assumed to be 32 bit signed ints for the moment
 ]]
 
-chdku.live2_fields={
+chdku.live_fields={
 	'version_major',
 	'version_minor',
 	'lcd_aspect_ratio',
@@ -862,7 +862,7 @@ chdku.live2_fields={
 	'palette_data_start',
 }
 
-chdku.live2_fb_desc_fields={
+chdku.live_fb_desc_fields={
 	'logical_width',
 	'logical_height',
 
@@ -878,45 +878,45 @@ chdku.live2_fb_desc_fields={
 	'data_start',
 }
 
-chdku.live2_frame_map={}
-chdku.live2_field_names={}
+chdku.live_frame_map={}
+chdku.live_field_names={}
 
 --[[
 init name->offset mapping
 ]]
 local function live_init_maps()
-	for i,name in ipairs(chdku.live2_fields) do
-		chdku.live2_frame_map[name] = (i-1)*4
-		table.insert(chdku.live2_field_names,name)
+	for i,name in ipairs(chdku.live_fields) do
+		chdku.live_frame_map[name] = (i-1)*4
+		table.insert(chdku.live_field_names,name)
 	end
-	local off = #chdku.live2_fields * 4
+	local off = #chdku.live_fields * 4
 	for i,pfx in ipairs({'vp','bm'}) do
-		for j,name in ipairs(chdku.live2_fb_desc_fields) do
-			chdku.live2_frame_map[pfx .. '_' .. name] = off
-			table.insert(chdku.live2_field_names,pfx .. '_' .. name)
+		for j,name in ipairs(chdku.live_fb_desc_fields) do
+			chdku.live_frame_map[pfx .. '_' .. name] = off
+			table.insert(chdku.live_field_names,pfx .. '_' .. name)
 			off = off + 4;
 		end
 	end
 end
 live_init_maps()
 
-function chdku.live2_get_frame_field(frame,field)
+function chdku.live_get_frame_field(frame,field)
 	if not frame then
 		return nil
 	end
-	return frame:get_i32(chdku.live2_frame_map[field])
+	return frame:get_i32(chdku.live_frame_map[field])
 end
-local live2_info_meta={
+local live_info_meta={
 	__index=function(t,key)
 		local frame = rawget(t,'_frame')
-		if frame and chdku.live2_frame_map[key] then
-			return chdku.live2_get_frame_field(frame,key)
+		if frame and chdku.live_frame_map[key] then
+			return chdku.live_get_frame_field(frame,key)
 		end
 	end
 }
-function chdku.live2_wrap(frame)
+function chdku.live_wrap(frame)
 	local t={ _frame = frame}
-	setmetatable(t,live2_info_meta)
+	setmetatable(t,live_info_meta)
 	return t
 end
 
@@ -927,14 +927,14 @@ function con_methods:live_is_api_compatible()
 	end
 end
 
-function con_methods:live2_get_frame(what)
-	if not self.live2 then
-		self.live2 = chdku.live2_wrap()
+function con_methods:live_get_frame(what)
+	if not self.live then
+		self.live = chdku.live_wrap()
 	end
 
-	local frame, err = self:get_live_data(self.live2._frame,what)
+	local frame, err = self:get_live_data(self.live._frame,what)
 	if frame then
-		self.live2._frame = frame
+		self.live._frame = frame
 		return true
 	end
 	return false, err

@@ -380,13 +380,13 @@ static const char * check_fb_desc(lv_framebuffer_desc *desc) {
 
 /*
 convert viewport data to RGB pimg
-pimg=liveimg.get_viewport2_pimg(pimg,live_frame,skip)
+pimg=liveimg.get_viewport_pimg(pimg,live_frame,skip)
 pimg: pimg to re-use, created if nil, replaced if size doesn't match
 live_fream: from get_live_data
 skip: boolean - if true, each U Y V Y Y Y is converted to 2 pixels, otherwise 4
 returns nil if info does not contain a live view
 */
-static int liveimg_get_viewport2_pimg(lua_State *L) {
+static int liveimg_get_viewport_pimg(lua_State *L) {
 	lv_data_header *frame;
 	liveimg_pimg_t *im = pimg_get(L,1);
 	lBuf_t *frame_lb = luaL_checkudata(L,2,LBUF_META);
@@ -443,7 +443,7 @@ static int liveimg_get_viewport2_pimg(lua_State *L) {
 	return 1;
 }
 
-static void convert_palette2(palette_entry_rgba_t *pal_rgba,lv_data_header *frame) {
+static void convert_palette(palette_entry_rgba_t *pal_rgba,lv_data_header *frame) {
 	const char *pal=NULL;
 	palette_convert_t *convert=get_palette_convert(frame->palette_type);
 	if(!convert || !frame->palette_data_start) {
@@ -461,13 +461,13 @@ static void convert_palette2(palette_entry_rgba_t *pal_rgba,lv_data_header *fram
 
 /*
 convert bitmap data to RGBA pimg
-pimg=liveimg.get_bitmap2_pimg(pimg,frame,skip)
+pimg=liveimg.get_bitmap_pimg(pimg,frame,skip)
 pimg: pimg to re-use, created if nil, replaced if size doesn't match
 frame: from live_get_data
 skip: boolean - if true, every other pixel in the x axis is discarded (for viewports with a 1:2 par)
 returns nil if info does not contain a bitmap
 */
-static int liveimg_get_bitmap2_pimg(lua_State *L) {
+static int liveimg_get_bitmap_pimg(lua_State *L) {
 	palette_entry_rgba_t pal_rgba[256];
 
 	lv_data_header *frame;
@@ -498,7 +498,7 @@ static int liveimg_get_bitmap2_pimg(lua_State *L) {
 		return luaL_error(L,"data < palette size");
 	}
 
-	convert_palette2(pal_rgba,frame);
+	convert_palette(pal_rgba,frame);
 
 	unsigned vwidth = frame->bm.visible_width/par;
 	unsigned dispsize = vwidth*frame->bm.visible_height;
@@ -608,8 +608,8 @@ static int pimg_blend_to_cd_canvas(lua_State *L) {
 #endif
 
 static const luaL_Reg liveimg_funcs[] = {
-  {"get_bitmap2_pimg", liveimg_get_bitmap2_pimg},
-  {"get_viewport2_pimg", liveimg_get_viewport2_pimg},
+  {"get_bitmap_pimg", liveimg_get_bitmap_pimg},
+  {"get_viewport_pimg", liveimg_get_viewport_pimg},
   {NULL, NULL}
 };
 
