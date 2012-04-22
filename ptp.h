@@ -896,6 +896,7 @@ int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_ch
 #ifdef CHDKPTP_LIVEVIEW
 int ptp_chdk_get_handler(PTPParams* params, PTPDeviceInfo* deviceinfo,int id,int *handler);
 int ptp_chdk_call_handler(PTPParams* params, PTPDeviceInfo* deviceinfo,int handler,int harg1,int harg2,char **data,int *data_size);
+int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,int flags,char **data,int *data_size);
 #endif
 
 #endif /* __PTP_H__ */

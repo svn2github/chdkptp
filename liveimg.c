@@ -425,6 +425,93 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 	return 1;
 }
 
+/*
+check framebuffer desc values, and return a descriptive error or NULL
+TODO can't check total size without bpp
+*/
+static const char * check_fb_desc(lv_framebuffer_desc *desc) {
+	if(desc->visible_height + desc->visible_buffer_yoffset > desc->buffer_height) {
+		return "height + yoffset > buffer_height";
+	}
+
+	if(desc->visible_width + desc->visible_buffer_xoffset > desc->buffer_width) {
+		return "vp_width + vp_xoffset > vp_buffer_width";
+	}
+	// sanity check, this should actually be harmless 
+	if(desc->visible_width > desc->logical_width) {
+		return "visible_width > logical_width";
+	}
+	if(desc->visible_height > desc->logical_height) {
+		return "visible_height > logical_height";
+	}
+	return NULL;
+}
+
+/*
+convert viewport data to RGB pimg
+pimg=liveimg.get_viewport2_pimg(pimg,live_frame,skip)
+pimg: pimg to re-use, created if nil, replaced if size doesn't match
+live_fream: from get_live_data
+skip: boolean - if true, each U Y V Y Y Y is converted to 2 pixels, otherwise 4
+returns nil if info does not contain a live view
+*/
+static int liveimg_get_viewport2_pimg(lua_State *L) {
+	lv_data_header *frame;
+	liveimg_pimg_t *im = pimg_get(L,1);
+	lBuf_t *frame_lb = luaL_checkudata(L,2,LBUF_META);
+	int skip = lua_toboolean(L,3);
+	// pixel aspect ratio
+	int par = (skip == 1)?2:1;
+
+	frame = (lv_data_header *)frame_lb->bytes;
+
+	// this is not currently an error, if sent live data without viewport selected, just return nil image
+	if(!frame->vp.data_start) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	unsigned vwidth = frame->vp.visible_width/par;
+	unsigned dispsize = vwidth*frame->vp.visible_height;
+
+	// sanity check size - depends on type
+	if(frame->vp.data_start + (frame->vp.buffer_width*frame->vp.buffer_height*12)/8 > frame_lb->len) {
+		return luaL_error(L,"data < buffer_width*buffer_height");
+	}
+	const char *fb_desc_err = check_fb_desc(&frame->vp);
+	if(fb_desc_err) {
+		return luaL_error(L,fb_desc_err);
+	}
+
+	if(im && dispsize != im->width*im->height) {
+		pimg_destroy(im);
+		im = NULL;
+	}
+	if(im) {
+		lua_pushvalue(L, 1); // copy im onto top for return
+		// set width and height, could have changed without changing byte count
+		im->width = vwidth;
+		im->height = frame->vp.visible_height;
+	} else { // create an new im 
+		pimg_create(L);
+		im = luaL_checkudata(L,-1,LIVEIMG_PIMG_META);
+		if(!pimg_init_rgb(im,vwidth,frame->vp.visible_height)) {
+			return luaL_error(L,"failed to create image");
+		}
+	}
+
+	yuv_live_to_cd_rgb(frame_lb->bytes+frame->vp.data_start,
+						frame->vp.buffer_width,
+						frame->vp.buffer_height,
+						frame->vp.visible_buffer_xoffset,
+						frame->vp.visible_buffer_yoffset,
+						frame->vp.visible_width,
+						frame->vp.visible_height,
+						skip,
+						im->r,im->g,im->b);
+	return 1;
+}
+
 static void convert_palette(palette_entry_rgba_t *pal_rgba,lv_vid_info *vi) {
 	const char *pal=NULL;
 	palette_convert_t *convert=get_palette_convert(vi->palette_type);
@@ -521,6 +608,106 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 	return 1;
 }
 
+static void convert_palette2(palette_entry_rgba_t *pal_rgba,lv_data_header *frame) {
+	const char *pal=NULL;
+	palette_convert_t *convert=get_palette_convert(frame->palette_type);
+	if(!convert || !frame->palette_data_start) {
+		convert = get_palette_convert(1);
+		pal = palette_type1_default;
+	} else {
+		pal = ((char *)frame + frame->palette_data_start);
+	}
+	yuv_palette_to_rgba_fn fn = convert->to_rgba;
+	int i;
+	for(i=0;i<256;i++) {
+		fn(pal,i,&pal_rgba[i]);
+	}
+}
+
+/*
+convert bitmap data to RGBA pimg
+pimg=liveimg.get_bitmap2_pimg(pimg,frame,skip)
+pimg: pimg to re-use, created if nil, replaced if size doesn't match
+frame: from live_get_data
+skip: boolean - if true, every other pixel in the x axis is discarded (for viewports with a 1:2 par)
+returns nil if info does not contain a bitmap
+*/
+static int liveimg_get_bitmap2_pimg(lua_State *L) {
+	palette_entry_rgba_t pal_rgba[256];
+
+	lv_data_header *frame;
+	liveimg_pimg_t *im = pimg_get(L,1);
+	lBuf_t *frame_lb = luaL_checkudata(L,2,LBUF_META);
+	int skip = lua_toboolean(L,3);
+	// pixel aspect ratio
+	int par = (skip == 1)?2:1;
+
+	frame = (lv_data_header *)frame_lb->bytes;
+
+	if(!frame->bm.data_start) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	// sanity check size - depends on type
+	if(frame->bm.data_start + frame->bm.buffer_width*frame->bm.buffer_height > frame_lb->len) {
+		return luaL_error(L,"data < buffer_width*buffer_height");
+	}
+
+	const char *fb_desc_err = check_fb_desc(&frame->bm);
+	if(fb_desc_err) {
+		return luaL_error(L,fb_desc_err);
+	}
+
+	if(get_palette_size(frame->palette_type) + frame->palette_data_start > frame_lb->len) {
+		return luaL_error(L,"data < palette size");
+	}
+
+	convert_palette2(pal_rgba,frame);
+
+	unsigned vwidth = frame->bm.visible_width/par;
+	unsigned dispsize = vwidth*frame->bm.visible_height;
+
+
+	if(im && dispsize != im->width*im->height) {
+		pimg_destroy(im);
+		im = NULL;
+	}
+	if(im) {
+		lua_pushvalue(L, 1); // copy im onto top for return
+	} else { // create an new im 
+		pimg_create(L);
+		im = luaL_checkudata(L,-1,LIVEIMG_PIMG_META);
+		if(!pimg_init_rgba(im,vwidth,frame->bm.visible_height)) {
+			return luaL_error(L,"failed to create image");
+		}
+	}
+
+	int y_inc = frame->bm.buffer_width;
+	int x_inc = par;
+	int x,y;
+	int height = frame->bm.visible_height;
+
+	uint8_t *p=((uint8_t *)frame_lb->bytes + frame->bm.data_start) + (height-1)*y_inc;
+
+	uint8_t *r = im->r;
+	uint8_t *g = im->g;
+	uint8_t *b = im->b;
+	uint8_t *a = im->a;
+
+	// TODO we don't actually check the various offsets
+	for(y=0;y<height;y++,p-=y_inc) {
+		for(x=0;x<frame->bm.visible_width;x+=x_inc) {
+			palette_entry_rgba_t *c =&pal_rgba[*(p+x)];
+			*r++ = c->r;
+			*g++ = c->g;
+			*b++ = c->b;
+			*a++ = c->a;
+		}
+	}
+	return 1;
+}
+
 #if defined(CHDKPTP_CD)
 /*
 pimg:put_to_cd_canvas(canvas, x, y, width, height, xmin, xmax, ymin, ymax)
@@ -587,7 +774,9 @@ static int pimg_blend_to_cd_canvas(lua_State *L) {
 
 static const luaL_Reg liveimg_funcs[] = {
   {"get_bitmap_pimg", liveimg_get_bitmap_pimg},
+  {"get_bitmap2_pimg", liveimg_get_bitmap2_pimg},
   {"get_viewport_pimg", liveimg_get_viewport_pimg},
+  {"get_viewport2_pimg", liveimg_get_viewport2_pimg},
   {NULL, NULL}
 };
 

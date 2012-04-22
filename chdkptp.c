@@ -1108,6 +1108,49 @@ static int chdk_call_handler(lua_State *L) {
 	}
 	return 1;
 }
+/*
+lbuf[,errmsg]=con:get_live_data(lbuf,flags)
+lbuf - lbuf to re-use, will be created if nil
+*/
+static int chdk_get_live_data(lua_State *L) {
+  	CHDK_CONNECTION_METHOD;
+	lBuf_t *buf = lbuf_getlbuf(L,2);
+	int flags=lua_tonumber(L,3);
+	char *data=NULL;
+	unsigned data_size = 0;
+	if ( !ptp_usb->connected ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"not connected");
+		return 2;
+	}
+	if ( !ptp_chdk_get_live_data(params,&params->deviceinfo,flags,&data,&data_size) ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"ptp error");
+		return 2;
+	}
+	if(!data) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"no data");
+		return 2;
+	}
+	if(!data_size) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"zero data size");
+		return 2;
+	}
+	if(buf) {
+		if(buf->flags & LBUF_FL_FREE) {
+			free(buf->bytes);
+		}
+		buf->bytes = data;
+		buf->len = data_size;
+		buf->flags = LBUF_FL_FREE;
+		lua_pushvalue(L,2); // copy it to stack top for return
+	} else {
+		lbuf_create(L,data,data_size,LBUF_FL_FREE);
+	}
+	return 1;
+}
 #endif
 
 // TODO these assume numbers are 0 based and contiguous 
@@ -1420,6 +1463,7 @@ static const luaL_Reg chdkconnection[] = {
 #ifdef CHDKPTP_LIVEVIEW
   {"get_handler",chdk_get_handler},
   {"call_handler",chdk_call_handler},
+  {"get_live_data",chdk_get_live_data},
 #endif
   {NULL, NULL}
 };

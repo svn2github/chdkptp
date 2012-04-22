@@ -880,7 +880,35 @@ chdku.live_frame_fields={
 	'palette_buffer_start',   -- Offset in data transferred where the palette data starts
 	'palette_buffer_size',    -- Size of palette data sent (in bytes)
 }
+
+chdku.live2_fields={
+	'lcd_aspect_ratio',
+	'palette_type',
+	'palette_data_start',
+}
+
+chdku.live2_fb_desc_fields={
+	'logical_width',
+	'logical_height',
+
+	'buffer_width',
+	'buffer_height',
+
+	'buffer_logical_xoffset',
+	'buffer_logical_yoffset',
+
+	'visible_width',
+	'visible_height',
+
+	'visible_buffer_xoffset',
+	'visible_buffer_yoffset',
+
+	'data_start',
+}
+
 chdku.live_frame_map={}
+chdku.live2_frame_map={}
+chdku.live2_field_names={}
 
 --[[
 init name->offset mapping
@@ -892,8 +920,40 @@ local function live_init_maps()
 	for i,name in ipairs(chdku.live_frame_fields) do
 		chdku.live_frame_map[name] = (i-1)*4
 	end
+	for i,name in ipairs(chdku.live2_fields) do
+		chdku.live2_frame_map[name] = (i-1)*4
+		table.insert(chdku.live2_field_names,name)
+	end
+	local off = #chdku.live2_fields * 4
+	for i,pfx in ipairs({'vp','bm'}) do
+		for j,name in ipairs(chdku.live2_fb_desc_fields) do
+			chdku.live2_frame_map[pfx .. '_' .. name] = off
+			table.insert(chdku.live2_field_names,pfx .. '_' .. name)
+			off = off + 4;
+		end
+	end
 end
 live_init_maps()
+
+function chdku.live2_get_frame_field(frame,field)
+	if not frame then
+		return nil
+	end
+	return frame:get_i32(chdku.live2_frame_map[field])
+end
+local live2_info_meta={
+	__index=function(t,key)
+		local frame = rawget(t,'_frame')
+		if frame and chdku.live2_frame_map[key] then
+			return chdku.live2_get_frame_field(frame,key)
+		end
+	end
+}
+function chdku.live2_wrap(frame)
+	local t={ _frame = frame}
+	setmetatable(t,live2_info_meta)
+	return t
+end
 
 function chdku.live_get_base_field(base,field)
 	if not base then
@@ -983,6 +1043,19 @@ function con_methods:live_get_frame(what)
 		return false,string.format('error getting frame: %s',tostring(err))
 	end
 	return true
+end
+
+function con_methods:live2_get_frame(what)
+	if not self.live2 then
+		self.live2 = chdku.live2_wrap()
+	end
+
+	local frame, err = self:get_live_data(self.live2._frame,what)
+	if frame then
+		self.live2._frame = frame
+		return true
+	end
+	return false, err
 end
 
 function con_methods:live_dump_start(filename)

@@ -123,6 +123,36 @@ local function update_canvas_size()
 	end
 end
 
+local function update_canvas_size2()
+	if not con.live2 then
+		return
+	end
+	local vp_w = con.live2.vp_logical_width/m.vp_par
+	local vp_h
+	if aspect_toggle.value == 'ON' then
+		vp_h = vp_w/screen_aspects[con.live2.lcd_aspect_ratio]
+		m.vp_aspect_factor = vp_h/con.live2.vp_logical_height
+	else
+		m.vp_aspect_factor = 1
+		vp_h = con.live2.vp_logical_height
+	end
+
+	local w,h = gui.parsesize(m.icnv.rastersize)
+	
+	local update
+	if w ~= vp_w then
+		update = true
+	end
+	if h ~= vp_h then
+		update = true
+	end
+	if update then
+		m.icnv.rastersize = vp_w.."x"..vp_h
+		iup.Refresh(m.container)
+		gui.resize_for_content()
+	end
+end
+
 local vp_par_toggle = iup.toggle{
 	title="Viewfinder 1:1",
 	action=function(self,state)
@@ -213,6 +243,46 @@ local function update_frame_data(frame)
 				end
 			end
 			--]]
+		end
+	end
+end
+
+local palette_size_for_type={
+	16*4,
+	16*4,
+	256*4,
+}
+local function update_frame_data2(frame)
+	local dirty
+	for i,f in ipairs(chdku.live2_field_names) do
+		local v = chdku.live2_get_frame_field(frame,f)
+		if v ~= last_frame_fields[f] then
+			dirty = true
+		end
+	end
+	if dirty then
+		printf('update_frame_data: changed\n')
+		for i,f in ipairs(chdku.live2_field_names) do
+			local v = chdku.live2_get_frame_field(frame,f)
+			printf("%s:%s->%s\n",f,tostring(last_frame_fields[f]),v)
+			last_frame_fields[f]=v
+		end
+		if last_frame_fields.palette_data_start > 0 then
+			printf('palette:\n')
+			local c=0
+			---[[
+			local bytes = {frame:byte(last_frame_fields.palette_data_start+1,
+										last_frame_fields.palette_data_start+palette_size_for_type[last_frame_fields.palette_type])}
+			for i,v in ipairs(bytes) do
+				printf("0x%02x,",v)
+				c = c + 1
+				if c == 16 then
+					printf('\n')
+					c=0
+				else
+					printf(' ')
+				end
+			end
 		end
 	end
 end
@@ -347,17 +417,20 @@ local function timer_action(self)
 			return
 		end
 		stats:start_xfer()
-		local status,err = con:live_get_frame(what)
+		--local status,err = con:live_get_frame(what)
+		local status,err = con:live2_get_frame(what)
 		if not status then
 			end_dump()
 			printf('error getting frame: %s\n',tostring(err))
 			gui.update_connection_status() -- update connection status on error, to prevent spamming
 			stats:stop()
 		else
-			stats:end_xfer(con.live.frame:len())
-			update_frame_data(con.live.frame)
-			record_dump()
-			update_canvas_size()
+			--stats:end_xfer(con.live.frame:len())
+			stats:end_xfer(con.live2._frame:len())
+			update_frame_data2(con.live2._frame)
+			--update_frame_data(con.live.frame)
+			--record_dump()
+			update_canvas_size2()
 		end
 		m.icnv:action()
 	elseif m.dump_replay then
@@ -411,6 +484,38 @@ local function redraw_canvas(self)
 	stats:start_frame()
 	ccnv:Activate()
 	ccnv:Clear()
+	local lv = con.live2
+	if lv and lv._frame then
+		if m.vp_active then
+			m.vp_img = liveimg.get_viewport2_pimg(m.vp_img,lv._frame,m.vp_par == 2)
+			if m.vp_img then
+				if aspect_toggle.value == "ON" then
+					m.vp_img:put_to_cd_canvas(ccnv,
+						lv.vp_buffer_logical_xoffset/m.vp_par,
+						(lv.vp_logical_height - lv.vp_visible_height - lv.vp_buffer_logical_yoffset)*m.vp_aspect_factor,
+						m.vp_img:width(),
+						m.vp_img:height()*m.vp_aspect_factor)
+				else
+					m.vp_img:put_to_cd_canvas(ccnv,
+						lv.vp_buffer_logical_xoffset/m.vp_par,
+						lv.vp_logical_height - lv.vp_visible_height - lv.vp_buffer_logical_yoffset)
+				end
+			end
+		end
+		if m.bm_active then
+			m.bm_img = liveimg.get_bitmap2_pimg(m.bm_img,lv._frame,m.bm_par == 2)
+			if m.bm_img then
+				if bm_fit_toggle.value == "ON" then
+					m.bm_img:blend_to_cd_canvas(ccnv, 0, 0, lv.vp_logical_width/m.vp_par, lv.vp_logical_height*m.vp_aspect_factor)
+				else
+					m.bm_img:blend_to_cd_canvas(ccnv, 0, lv.vp_logical_height - lv.bm_visible_height)
+				end
+			else
+				print('no bm')
+			end
+		end
+	end
+	--[[
 	if m.get_current_frame_data() then
 		if m.vp_active then
 			m.vp_img = liveimg.get_viewport_pimg(m.vp_img,m.get_current_base_data(),m.get_current_frame_data(),m.vp_par == 2)
@@ -441,6 +546,7 @@ local function redraw_canvas(self)
 			end
 		end
 	end
+	--]]
 	ccnv:Flush()
 	stats:end_frame()
 end
@@ -583,7 +689,7 @@ function m.on_connect_change(lcon)
 			printf('incompatible live view version %d %d\n',tonumber(con.live.version_major),tonumber(con.live.version_minor))
 			return
 		end
-		update_base_data(con.live.base)
+		--update_base_data(con.live.base)
 		m.live_con_valid = true
 	end
 end
