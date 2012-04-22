@@ -900,9 +900,6 @@ chdku.live2_fb_desc_fields={
 	'visible_width',
 	'visible_height',
 
-	'visible_buffer_xoffset',
-	'visible_buffer_yoffset',
-
 	'data_start',
 }
 

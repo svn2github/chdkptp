@@ -430,12 +430,12 @@ check framebuffer desc values, and return a descriptive error or NULL
 TODO can't check total size without bpp
 */
 static const char * check_fb_desc(lv_framebuffer_desc *desc) {
-	if(desc->visible_height + desc->visible_buffer_yoffset > desc->buffer_height) {
-		return "height + yoffset > buffer_height";
+	if(desc->visible_height > desc->buffer_height) {
+		return "height > buffer_height";
 	}
 
-	if(desc->visible_width + desc->visible_buffer_xoffset > desc->buffer_width) {
-		return "vp_width + vp_xoffset > vp_buffer_width";
+	if(desc->visible_width > desc->buffer_width) {
+		return "width  > buffer_width";
 	}
 	// sanity check, this should actually be harmless 
 	if(desc->visible_width > desc->logical_width) {
@@ -503,8 +503,8 @@ static int liveimg_get_viewport2_pimg(lua_State *L) {
 	yuv_live_to_cd_rgb(frame_lb->bytes+frame->vp.data_start,
 						frame->vp.buffer_width,
 						frame->vp.buffer_height,
-						frame->vp.visible_buffer_xoffset,
-						frame->vp.visible_buffer_yoffset,
+						0,
+						0,
 						frame->vp.visible_width,
 						frame->vp.visible_height,
 						skip,
