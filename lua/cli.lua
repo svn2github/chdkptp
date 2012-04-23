@@ -1017,11 +1017,8 @@ cli:add_commands{
 				return false,'nothing selected'
 			end
 			local status,err
-			if not con.live or not con.live.base then
-				status,err = con:live_init_streaming()
-				if not status then
-					return false,err
-				end
+			if not con.live_is_api_compatible() then
+				return false,'incompatible api'
 			end
 			status, err = con:live_dump_start(dumpfile)
 			if not status then

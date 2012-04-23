@@ -944,11 +944,15 @@ end
 TODO convert to new protocol
 ]]
 function con_methods:live_dump_start(filename)
-	if not self.live or not self.live.base then
-		return false,'not initialized'
-	end
 	if not self:is_connected() then
 		return false,'not connected'
+	end
+	if not self:live_is_api_compatible() then
+		return false,'api not compatible'
+	end
+	-- TODO
+	if not self.live then
+		self.live = chdku.live_wrap()
 	end
 	if not filename then
 		filename = string.format('chdk_%x_%s.lvdump',con.usbdev.product_id,os.date('%Y%m%d_%H%M%S'))
@@ -958,14 +962,22 @@ function con_methods:live_dump_start(filename)
 	if not self.live.dump_fh then
 		return false, 'failed to open dumpfile'
 	end
+
+	-- used to write the size field of each frame
 	self.live.dump_sz_buf = lbuf.new(4)
-	-- TODO error checking
-	-- TODO write a version header + camera information ?
-	self.live.dump_sz_buf:set_u32(0,self.live.base:len())
+
+	-- TODO header (magic, size of following data, version major, version minor)
+	self.live.dump_fh:write('chlv') -- magic
+	self.live.dump_sz_buf:set_u32(0,8) -- header size (version major, minor)
 	self.live.dump_sz_buf:fwrite(self.live.dump_fh)
-	self.live.base:fwrite(self.live.dump_fh)
+	self.live.dump_sz_buf:set_u32(0,0) -- version major
+	self.live.dump_sz_buf:fwrite(self.live.dump_fh)
+	self.live.dump_sz_buf:set_u32(0,0) -- version minor
+	self.live.dump_sz_buf:fwrite(self.live.dump_fh)
+
+	self.live.dump_size = 16;
+
 	self.live.dump_fn = filename
-	self.live.dump_size = self.live.base:len() + 4
 	return true
 end
 
@@ -973,14 +985,14 @@ function con_methods:live_dump_frame()
 	if not self.live or not self.live.dump_fh then
 		return false,'not initialized'
 	end
-	if not self.live.frame then
+	if not self.live._frame then
 		return false,'no frame'
 	end
 
-	self.live.dump_sz_buf:set_u32(0,self.live.frame:len())
+	self.live.dump_sz_buf:set_u32(0,self.live._frame:len())
 	self.live.dump_sz_buf:fwrite(self.live.dump_fh)
-	self.live.frame:fwrite(self.live.dump_fh)
-	self.live.dump_size = self.live.dump_size + self.live.frame:len() + 4
+	self.live._frame:fwrite(self.live.dump_fh)
+	self.live.dump_size = self.live.dump_size + self.live._frame:len() + 4
 	return true
 end
 

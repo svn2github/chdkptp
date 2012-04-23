@@ -48,18 +48,7 @@ function m.get_current_frame_data()
 	if m.dump_replay then
 		return m.dump_replay_frame
 	end
-	if con.live then
-		return con.live.frame
-	end
-end
-
-function m.get_current_base_data()
-	if m.dump_replay then
-		return m.dump_replay_base
-	end
-	if con.live then
-		return con.live.base
-	end
+	return con.live
 end
 
 local vp_toggle=iup.toggle{
@@ -98,17 +87,18 @@ update canvas size from frame
 ]]
 
 local function update_canvas_size()
-	if not con.live then
+	local lv = m.get_current_frame_data()
+	if not lv then
 		return
 	end
-	local vp_w = con.live.vp_logical_width/m.vp_par
+	local vp_w = lv.vp_logical_width/m.vp_par
 	local vp_h
 	if aspect_toggle.value == 'ON' then
-		vp_h = vp_w/screen_aspects[con.live.lcd_aspect_ratio]
-		m.vp_aspect_factor = vp_h/con.live.vp_logical_height
+		vp_h = vp_w/screen_aspects[lv.lcd_aspect_ratio]
+		m.vp_aspect_factor = vp_h/lv.vp_logical_height
 	else
 		m.vp_aspect_factor = 1
-		vp_h = con.live.vp_logical_height
+		vp_h = lv.vp_logical_height
 	end
 
 	local w,h = gui.parsesize(m.icnv.rastersize)
@@ -230,20 +220,41 @@ local function read_dump_rec(lb,fh)
 end
 
 local function init_dump_replay()
+	m.dump_replay = false
 	m.dump_replay_file = io.open(m.dump_replay_filename,"rb")
 	if not m.dump_replay_file then
 		printf("failed to open dumpfile\n")
-		m.dump_replay = false
 		return
 	end
-	m.dump_replay_base = read_dump_rec(m.dump_replay_frame,m.dump_replay_file)
-	update_base_data(m.dump_replay_base)
+	local magic = m.dump_replay_file:read(4)
+	if magic ~= 'chlv' then
+		printf("unrecognized file\n")
+		return
+	end
+--	m.dump_replay_file:seek('set',4)
+	local header = read_dump_rec(nil,m.dump_replay_file)
+
+	if not header then
+		printf("failed to read header\n")
+		return
+	end
+
+	-- TODO should be defined somewhere
+	if header:get_u32() ~= 0 then
+		printf("incompatible version %s\n",tostring(header:get_u32()))
+		return
+	end
+	printf("loading dump ver %s.%s\n",tostring(header:get_u32()),tostring(header:get_u32(4)))
+	m.dump_replay = true
+	if not m.dump_replay_frame then
+		m.dump_replay_frame = chdku.live_wrap()
+	end
 end
 
 local function end_dump_replay()
+	m.dump_replay = false
 	m.dump_replay_file:close()
 	m.dump_replay_file=nil
-	m.dump_replay_base=nil
 	m.dump_replay_frame=nil
 	stats:stop()
 end
@@ -252,16 +263,16 @@ local function read_dump_frame()
 	stats:start()
 	stats:start_xfer()
 
-	local data = read_dump_rec(m.dump_replay_frame,m.dump_replay_file)
+	local data = read_dump_rec(m.dump_replay_frame._frame,m.dump_replay_file)
 	-- EOF, loop
 	if not data then
 		end_dump_replay()
 		init_dump_replay()
-		data = read_dump_rec(m.dump_replay_frame,m.dump_replay_file)
+		data = read_dump_rec(m.dump_replay_frame._frame,m.dump_replay_file)
 	end
-	m.dump_replay_frame = data
-	update_frame_data(m.dump_replay_frame)
-	stats:end_xfer(m.dump_replay_frame:len())
+	m.dump_replay_frame._frame = data
+	update_frame_data(m.dump_replay_frame._frame)
+	stats:end_xfer(m.dump_replay_frame._frame:len())
 	-- TODO
 	update_canvas_size()
 end
@@ -322,10 +333,8 @@ local function toggle_play_dump(self,state)
 		printf('playing %s\n',tostring(value))
 		m.dump_replay_filename = value
 		init_dump_replay()
-		m.dump_replay = true
 	else
 		end_dump_replay()
-		m.dump_replay = false
 	end
 end
 
@@ -347,7 +356,7 @@ local function timer_action(self)
 		else
 			stats:end_xfer(con.live._frame:len())
 			update_frame_data(con.live._frame)
-			--record_dump()
+			record_dump()
 			update_canvas_size()
 		end
 		m.icnv:action()
@@ -402,7 +411,7 @@ local function redraw_canvas(self)
 	stats:start_frame()
 	ccnv:Activate()
 	ccnv:Clear()
-	local lv = con.live
+	local lv = m.get_current_frame_data()
 	if lv and lv._frame then
 		if m.vp_active then
 			m.vp_img = liveimg.get_viewport_pimg(m.vp_img,lv._frame,m.vp_par == 2)
@@ -533,22 +542,6 @@ function m.init()
 	end
 	--]]
 	-- TODO - convenience meta table to access base and frame info. This should be bound to the lbuf somehow
-
-	local live_info_meta = {
-		__index=function(t,key)
-			local base = m.get_current_base_data()
-			local frame = m.get_current_frame_data()
-
-			if base and chdku.live_base_map[key] then
-				return chdku.live_get_base_field(base,key)
-			end
-			if frame and chdku.live_frame_map[key] then
-				return chdku.live_get_frame_field(frame,key)
-			end
-		end
-	}
-	m.li = {}
-	setmetatable(m.li,live_info_meta)
 
 	m.container_title='Live'
 end
