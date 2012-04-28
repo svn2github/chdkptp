@@ -97,6 +97,17 @@ function gui.parsesize(size)
 	return tonumber(w),tonumber(h)
 end
 
+--[[
+wrapper that prints status
+]]
+function gui.exec(code,opts)
+	cli:print_status(con:exec(code,opts))
+end
+function gui.execquick(code,opts)
+	opts = util.extend_table({nodefaultlibs=true},opts)
+	gui.exec(code,opts)
+end
+
 local function update_mode_dropdown(cur)
 	printf('update mode dropdown %s\n',tostring(cur))
 	gui.mode_dropdown["1"] = nil -- empty the list
@@ -232,7 +243,7 @@ switch play / rec mode, update capture mode dropdown
 function switch_mode(m)
 	local capmode
 	if m == 0 then
-		add_status(con:execlua('switch_mode_usb(0)'))
+		gui.execquick('switch_mode_usb(0)')
 	else
 		local status
 		-- switch mode, wait for complete, return current mode
@@ -265,7 +276,7 @@ function cam_btn(name,title)
 		title=title,
 		size='31x15', -- couldn't get normalizer to work for some reason
 		action=function(self)
-			add_status(con:execlua('click("' .. name .. '")'))
+			gui.execquick('click("' .. name .. '")')
 		end,
 	}
 end
@@ -290,7 +301,7 @@ function gui.mode_dropdown:valuechanged_cb()
 		printf('tried to set invalid mode %s',tostring(v))
 		return
 	end
-	add_status(con:execlua(string.format('set_capture_mode(%d)',gui.mode_map[v])))
+	gui.execquick(string.format('set_capture_mode(%d)',gui.mode_map[v]))
 end
 
 cam_btn_frame = iup.vbox{
@@ -316,7 +327,7 @@ cam_btn_frame = iup.vbox{
 			title='zoom+',
 			size='45x15',
 			action=function(self)
-				add_status(con:execlua('click("zoom_in")'))
+				gui.execquick('click("zoom_in")')
 			end,
 		},
 		iup.fill{
@@ -325,7 +336,7 @@ cam_btn_frame = iup.vbox{
 			title='zoom-',
 			size='45x15',
 			action=function(self)
-				add_status(con:execlua('click("zoom_out")'))
+				gui.execquick('click("zoom_out")')
 			end,
 		},
 		expand="HORIZONTAL",
@@ -336,7 +347,7 @@ cam_btn_frame = iup.vbox{
 			title='wheel l',
 			size='45x15',
 			action=function(self)
-				add_status(con:execlua('post_levent_to_ui("RotateJogDialLeft",1)'))
+				gui.execquick('post_levent_to_ui("RotateJogDialLeft",1)')
 			end,
 		},
 		iup.fill{
@@ -345,7 +356,7 @@ cam_btn_frame = iup.vbox{
 			title='wheel r',
 			size='45x15',
 			action=function(self)
-				add_status(con:execlua('post_levent_to_ui("RotateJogDialRight",1)'))
+				gui.execquick('post_levent_to_ui("RotateJogDialRight",1)')
 			end,
 		},
 		expand="HORIZONTAL",
@@ -360,7 +371,7 @@ cam_btn_frame = iup.vbox{
 			title='shoot half',
 			size='45x15',
 			action=function(self)
-				add_status(con:execlua('press("shoot_half") repeat sleep(10) until get_shooting() == true release("shoot_half")'))
+				gui.execquick('press("shoot_half") repeat sleep(10) until get_shooting() == true release("shoot_half")')
 			end,
 		},
 		iup.fill{
@@ -369,7 +380,7 @@ cam_btn_frame = iup.vbox{
 			title='video',
 			size='45x15',
 			action=function(self)
-				add_status(con:execlua('click("video")'))
+				gui.execquick('click("video")')
 			end,
 		},
 		expand="HORIZONTAL",
@@ -379,7 +390,7 @@ cam_btn_frame = iup.vbox{
 		title='shoot',
 		size='94x15',
 		action=function(self)
-			add_status(con:execlua('shoot()'))
+			gui.execquick('shoot()')
 		end,
 	},
 	iup.label{separator="HORIZONTAL"},
@@ -389,7 +400,6 @@ cam_btn_frame = iup.vbox{
 			size='45x15',
 			action=function(self)
 				switch_mode(1)
-				--add_status(con:execlua('switch_mode_usb(1)'))
 			end,
 		},
 		iup.fill{},
@@ -398,7 +408,6 @@ cam_btn_frame = iup.vbox{
 			size='45x15',
 			action=function(self)
 				switch_mode(0)
-				--add_status(con:execlua('switch_mode_usb(0)'))
 			end,
 		},
 		expand="HORIZONTAL",
@@ -413,7 +422,7 @@ cam_btn_frame = iup.vbox{
 			title='shutdown',
 			size='45x15',
 			action=function(self)
-				add_status(con:execlua('shut_down()'))
+				gui.execquick('shut_down()')
 			end,
 		},
 		iup.fill{},
@@ -421,7 +430,7 @@ cam_btn_frame = iup.vbox{
 			title='reboot',
 			size='45x15',
 			action=function(self)
-				add_status(con:execlua('reboot()'))
+				gui.execquick('reboot()')
 			end,
 		},
 		expand="HORIZONTAL",
