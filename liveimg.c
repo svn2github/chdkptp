@@ -361,10 +361,6 @@ check framebuffer desc values, and return a descriptive error or NULL
 TODO can't check total size without bpp
 */
 static const char * check_fb_desc(lv_framebuffer_desc *desc) {
-	if(desc->visible_height > desc->buffer_height) {
-		return "height > buffer_height";
-	}
-
 	if(desc->visible_width > desc->buffer_width) {
 		return "width  > buffer_width";
 	}
@@ -406,8 +402,8 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 	unsigned dispsize = vwidth*frame->vp.visible_height;
 
 	// sanity check size - depends on type
-	if(frame->vp.data_start + (frame->vp.buffer_width*frame->vp.buffer_height*12)/8 > frame_lb->len) {
-		return luaL_error(L,"data < buffer_width*buffer_height");
+	if(frame->vp.data_start + (frame->vp.buffer_width*frame->vp.visible_height*12)/8 > frame_lb->len) {
+		return luaL_error(L,"data < buffer_width*height");
 	}
 	const char *fb_desc_err = check_fb_desc(&frame->vp);
 	if(fb_desc_err) {
@@ -433,7 +429,7 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 
 	yuv_live_to_cd_rgb(frame_lb->bytes+frame->vp.data_start,
 						frame->vp.buffer_width,
-						frame->vp.buffer_height,
+						frame->vp.visible_height,
 						0,
 						0,
 						frame->vp.visible_width,
@@ -485,8 +481,8 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 	}
 
 	// sanity check size - depends on type
-	if(frame->bm.data_start + frame->bm.buffer_width*frame->bm.buffer_height > frame_lb->len) {
-		return luaL_error(L,"data < buffer_width*buffer_height");
+	if(frame->bm.data_start + frame->bm.buffer_width*frame->bm.visible_height > frame_lb->len) {
+		return luaL_error(L,"data < buffer_width*height");
 	}
 
 	const char *fb_desc_err = check_fb_desc(&frame->bm);

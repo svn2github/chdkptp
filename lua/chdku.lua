@@ -867,7 +867,6 @@ chdku.live_fb_desc_fields={
 	'logical_height',
 
 	'buffer_width',
-	'buffer_height',
 
 	'buffer_logical_xoffset',
 	'buffer_logical_yoffset',
