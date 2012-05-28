@@ -91,14 +91,14 @@ local function update_canvas_size()
 	if not lv then
 		return
 	end
-	local vp_w = lv.vp_logical_width/m.vp_par
+	local vp_w = lv:vp_get_screen_width()/m.vp_par
 	local vp_h
 	if aspect_toggle.value == 'ON' then
 		vp_h = vp_w/screen_aspects[lv.lcd_aspect_ratio]
-		m.vp_aspect_factor = vp_h/lv.vp_logical_height
+		m.vp_aspect_factor = vp_h/lv:vp_get_screen_height()
 	else
 		m.vp_aspect_factor = 1
-		vp_h = lv.vp_logical_height
+		vp_h = lv:vp_get_screen_height()
 	end
 
 	local w,h = gui.parsesize(m.icnv.rastersize)
@@ -418,24 +418,25 @@ local function redraw_canvas(self)
 			if m.vp_img then
 				if aspect_toggle.value == "ON" then
 					m.vp_img:put_to_cd_canvas(ccnv,
-						lv.vp_buffer_logical_xoffset/m.vp_par,
-						(lv.vp_logical_height - lv.vp_visible_height - lv.vp_buffer_logical_yoffset)*m.vp_aspect_factor,
+						lv.vp_margin_left/m.vp_par,
+						lv.vp_margin_bot*m.vp_aspect_factor,
 						m.vp_img:width(),
 						m.vp_img:height()*m.vp_aspect_factor)
 				else
 					m.vp_img:put_to_cd_canvas(ccnv,
-						lv.vp_buffer_logical_xoffset/m.vp_par,
-						lv.vp_logical_height - lv.vp_visible_height - lv.vp_buffer_logical_yoffset)
+						lv.vp_margin_left/m.vp_par,
+						lv.vp_margin_bot)
 				end
 			end
 		end
 		if m.bm_active then
 			m.bm_img = liveimg.get_bitmap_pimg(m.bm_img,lv._frame,m.bm_par == 2)
 			if m.bm_img then
+				-- NOTE bitmap assumed fullscreen, margins ignored
 				if bm_fit_toggle.value == "ON" then
-					m.bm_img:blend_to_cd_canvas(ccnv, 0, 0, lv.vp_logical_width/m.vp_par, lv.vp_logical_height*m.vp_aspect_factor)
+					m.bm_img:blend_to_cd_canvas(ccnv, 0, 0, lv:vp_get_screen_width()/m.vp_par, lv:vp_get_screen_height()*m.vp_aspect_factor)
 				else
-					m.bm_img:blend_to_cd_canvas(ccnv, 0, lv.vp_logical_height - lv.bm_visible_height)
+					m.bm_img:blend_to_cd_canvas(ccnv, 0, lv:vp_get_screen_height() - lv.bm_visible_height)
 				end
 			else
 				print('no bm')

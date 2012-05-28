@@ -364,13 +364,6 @@ static const char * check_fb_desc(lv_framebuffer_desc *desc) {
 	if(desc->visible_width > desc->buffer_width) {
 		return "width  > buffer_width";
 	}
-	// sanity check, this should actually be harmless 
-	if(desc->visible_width > desc->logical_width) {
-		return "visible_width > logical_width";
-	}
-	if(desc->visible_height > desc->logical_height) {
-		return "visible_height > logical_height";
-	}
 	return NULL;
 }
 
@@ -427,6 +420,7 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 		}
 	}
 
+	// TODO offsets can go away
 	yuv_live_to_cd_rgb(frame_lb->bytes+frame->vp.data_start,
 						frame->vp.buffer_width,
 						frame->vp.visible_height,
@@ -526,7 +520,6 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 	uint8_t *b = im->b;
 	uint8_t *a = im->a;
 
-	// TODO we don't actually check the various offsets
 	for(y=0;y<height;y++,p-=y_inc) {
 		for(x=0;x<frame->bm.visible_width;x+=x_inc) {
 			palette_entry_rgba_t *c =&pal_rgba[*(p+x)];

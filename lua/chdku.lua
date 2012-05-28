@@ -863,18 +863,16 @@ chdku.live_fields={
 }
 
 chdku.live_fb_desc_fields={
-	'logical_width',
-	'logical_height',
-
+	'data_start',
 	'buffer_width',
-
-	'buffer_logical_xoffset',
-	'buffer_logical_yoffset',
 
 	'visible_width',
 	'visible_height',
 
-	'data_start',
+	'margin_left',
+	'margin_top',
+	'margin_right',
+	'margin_bot',
 }
 
 chdku.live_frame_map={}
@@ -914,7 +912,17 @@ local live_info_meta={
 	end
 }
 function chdku.live_wrap(frame)
-	local t={ _frame = frame}
+	local t={
+		_frame = frame,
+		-- TODO quick hack, should have bindings fb descs
+		-- bitmap assumed fullscreen
+		vp_get_screen_width = function(self) 
+			return self.vp_margin_left + self.vp_visible_width + self.vp_margin_right;
+		end,
+		vp_get_screen_height = function(self) 
+			return self.vp_margin_top + self.vp_visible_height + self.vp_margin_bot;
+		end,
+	}
 	setmetatable(t,live_info_meta)
 	return t
 end
@@ -939,9 +947,6 @@ function con_methods:live_get_frame(what)
 	return false, err
 end
 
---[[ 
-TODO convert to new protocol
-]]
 function con_methods:live_dump_start(filename)
 	if not self:is_connected() then
 		return false,'not connected'
