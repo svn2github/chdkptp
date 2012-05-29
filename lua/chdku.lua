@@ -947,7 +947,7 @@ end
 
 function con_methods:live_is_api_compatible()
 	-- normally larger minor would be ok, but want to only work with dev version for now
-	if con.apiver.major == 2 and con.apiver.minor == 2 then
+	if con.apiver.major == 2 and con.apiver.minor == 3 then
 		return true
 	end
 end
@@ -988,11 +988,12 @@ function con_methods:live_dump_start(filename)
 	-- used to write the size field of each frame
 	self.live.dump_sz_buf = lbuf.new(4)
 
-	-- TODO header (magic, size of following data, version major, version minor)
+	-- header (magic, size of following data, version major, version minor)
+	-- TODO this is ugly
 	self.live.dump_fh:write('chlv') -- magic
 	self.live.dump_sz_buf:set_u32(0,8) -- header size (version major, minor)
 	self.live.dump_sz_buf:fwrite(self.live.dump_fh)
-	self.live.dump_sz_buf:set_u32(0,0) -- version major
+	self.live.dump_sz_buf:set_u32(0,1) -- version major
 	self.live.dump_sz_buf:fwrite(self.live.dump_fh)
 	self.live.dump_sz_buf:set_u32(0,0) -- version minor
 	self.live.dump_sz_buf:fwrite(self.live.dump_fh)

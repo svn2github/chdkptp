@@ -581,8 +581,12 @@ function m.get_container_title()
 end
 function m.on_connect_change(lcon)
 	m.live_con_valid = false
-	if con:is_connected() and con:live_is_api_compatible() then
-		m.live_con_valid = true
+	if con:is_connected() then
+		if con:live_is_api_compatible() then
+			m.live_con_valid = true
+		else
+			warnf('camera live view protocol not supported by this client, live view disabled')
+		end
 	end
 end
 -- check whether we should be running, update timer
