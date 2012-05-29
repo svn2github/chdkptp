@@ -83,8 +83,7 @@ void palette_type2_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgb
 void palette_type3_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
 
 void yuv_live_to_cd_rgb(const char *p_yuv,
-						unsigned buf_width, unsigned buf_height,
-						unsigned x_offset, unsigned y_offset,
+						unsigned buf_width,
 						unsigned width,unsigned height,
 						int skip,
 						uint8_t *r,uint8_t *g,uint8_t *b);
@@ -209,8 +208,7 @@ void palette_type3_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba
 }
 
 void yuv_live_to_cd_rgb(const char *p_yuv,
-						unsigned buf_width, unsigned buf_height,
-						unsigned x_offset, unsigned y_offset,
+						unsigned buf_width,
 						unsigned width,unsigned height,
 						int skip,
 						uint8_t *r,uint8_t *g,uint8_t *b) {
@@ -218,7 +216,7 @@ void yuv_live_to_cd_rgb(const char *p_yuv,
 	unsigned row_inc = (buf_width*12)/8;
 	const char *p;
 	// start at end to flip for CD
-	const char *p_row = p_yuv + (height + y_offset - 1) * row_inc + (x_offset*12)/8;
+	const char *p_row = p_yuv + (height - 1) * row_inc;
 	for(row=0;row<height;row++,p_row -= row_inc) {
 		for(x=0,p=p_row;x<width;x+=4,p+=6) {
 			*r++ = yuv_to_r(p[1],p[2]);
@@ -447,12 +445,8 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 		}
 	}
 
-	// TODO offsets can go away
 	yuv_live_to_cd_rgb(frame_lb->bytes+vp->data_start,
 						vp->buffer_width,
-						vp->visible_height,
-						0,
-						0,
 						vp->visible_width,
 						vp->visible_height,
 						skip,
