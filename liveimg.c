@@ -358,12 +358,42 @@ liveimg_pimg_t * pimg_get(lua_State *L,int i) {
 
 /*
 check framebuffer desc values, and return a descriptive error or NULL
-TODO can't check total size without bpp
 */
-static const char * check_fb_desc(lv_framebuffer_desc *desc) {
+static const char * check_fb_desc(lv_framebuffer_desc **desc_out,lv_data_header *frame, int expect_type,int data_len) {
+	int bpp;
+	int start;
+	lv_framebuffer_desc *desc;
+	// note, if there's ever more than on possible type for viewport or bitmap, this will need to change
+	switch(expect_type) {
+		case LV_FB_YUV8:
+			bpp = 12;
+			start = frame->vp_desc_start;
+			break;
+		case LV_FB_PAL8:
+			bpp = 8;
+			start = frame->bm_desc_start;
+			break;
+		default:
+			return "invalid type";
+	}
+		
+	if( start + sizeof(lv_framebuffer_desc) > data_len) {
+		return "data < fb_desc";
+	}
+
+	desc = (lv_framebuffer_desc *)((char *)frame + start);
+	if(desc->fb_type != expect_type) {
+		return "incorrect type";
+	}
+
+	if(desc->data_start + (desc->buffer_width*desc->visible_height*bpp)/8 > data_len) {
+		return "data < buffer_width*height";
+	}
+
 	if(desc->visible_width > desc->buffer_width) {
 		return "width  > buffer_width";
 	}
+	*desc_out = desc;
 	return NULL;
 }
 
@@ -377,6 +407,8 @@ returns nil if info does not contain a live view
 */
 static int liveimg_get_viewport_pimg(lua_State *L) {
 	lv_data_header *frame;
+	lv_framebuffer_desc *vp;
+
 	liveimg_pimg_t *im = pimg_get(L,1);
 	lBuf_t *frame_lb = luaL_checkudata(L,2,LBUF_META);
 	int skip = lua_toboolean(L,3);
@@ -384,24 +416,19 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 	int par = (skip == 1)?2:1;
 
 	frame = (lv_data_header *)frame_lb->bytes;
+	const char *fb_desc_err = check_fb_desc(&vp,frame,LV_FB_YUV8,frame_lb->len);
+	if(fb_desc_err) {
+		return luaL_error(L,fb_desc_err);
+	}
 
 	// this is not currently an error, if sent live data without viewport selected, just return nil image
-	if(!frame->vp.data_start) {
+	if(!vp->data_start) {
 		lua_pushnil(L);
 		return 1;
 	}
 
-	unsigned vwidth = frame->vp.visible_width/par;
-	unsigned dispsize = vwidth*frame->vp.visible_height;
-
-	// sanity check size - depends on type
-	if(frame->vp.data_start + (frame->vp.buffer_width*frame->vp.visible_height*12)/8 > frame_lb->len) {
-		return luaL_error(L,"data < buffer_width*height");
-	}
-	const char *fb_desc_err = check_fb_desc(&frame->vp);
-	if(fb_desc_err) {
-		return luaL_error(L,fb_desc_err);
-	}
+	unsigned vwidth = vp->visible_width/par;
+	unsigned dispsize = vwidth*vp->visible_height;
 
 	if(im && dispsize != im->width*im->height) {
 		pimg_destroy(im);
@@ -411,23 +438,23 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 		lua_pushvalue(L, 1); // copy im onto top for return
 		// set width and height, could have changed without changing byte count
 		im->width = vwidth;
-		im->height = frame->vp.visible_height;
+		im->height = vp->visible_height;
 	} else { // create an new im 
 		pimg_create(L);
 		im = luaL_checkudata(L,-1,LIVEIMG_PIMG_META);
-		if(!pimg_init_rgb(im,vwidth,frame->vp.visible_height)) {
+		if(!pimg_init_rgb(im,vwidth,vp->visible_height)) {
 			return luaL_error(L,"failed to create image");
 		}
 	}
 
 	// TODO offsets can go away
-	yuv_live_to_cd_rgb(frame_lb->bytes+frame->vp.data_start,
-						frame->vp.buffer_width,
-						frame->vp.visible_height,
+	yuv_live_to_cd_rgb(frame_lb->bytes+vp->data_start,
+						vp->buffer_width,
+						vp->visible_height,
 						0,
 						0,
-						frame->vp.visible_width,
-						frame->vp.visible_height,
+						vp->visible_width,
+						vp->visible_height,
 						skip,
 						im->r,im->g,im->b);
 	return 1;
@@ -461,6 +488,8 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 	palette_entry_rgba_t pal_rgba[256];
 
 	lv_data_header *frame;
+	lv_framebuffer_desc *bm;
+
 	liveimg_pimg_t *im = pimg_get(L,1);
 	lBuf_t *frame_lb = luaL_checkudata(L,2,LBUF_META);
 	int skip = lua_toboolean(L,3);
@@ -468,20 +497,14 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 	int par = (skip == 1)?2:1;
 
 	frame = (lv_data_header *)frame_lb->bytes;
-
-	if(!frame->bm.data_start) {
-		lua_pushnil(L);
-		return 1;
-	}
-
-	// sanity check size - depends on type
-	if(frame->bm.data_start + frame->bm.buffer_width*frame->bm.visible_height > frame_lb->len) {
-		return luaL_error(L,"data < buffer_width*height");
-	}
-
-	const char *fb_desc_err = check_fb_desc(&frame->bm);
+	const char *fb_desc_err = check_fb_desc(&bm,frame,LV_FB_PAL8,frame_lb->len);
 	if(fb_desc_err) {
 		return luaL_error(L,fb_desc_err);
+	}
+
+	if(!bm->data_start) {
+		lua_pushnil(L);
+		return 1;
 	}
 
 	if(get_palette_size(frame->palette_type) + frame->palette_data_start > frame_lb->len) {
@@ -490,8 +513,8 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 
 	convert_palette(pal_rgba,frame);
 
-	unsigned vwidth = frame->bm.visible_width/par;
-	unsigned dispsize = vwidth*frame->bm.visible_height;
+	unsigned vwidth = bm->visible_width/par;
+	unsigned dispsize = vwidth*bm->visible_height;
 
 
 	if(im && dispsize != im->width*im->height) {
@@ -503,17 +526,17 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 	} else { // create an new im 
 		pimg_create(L);
 		im = luaL_checkudata(L,-1,LIVEIMG_PIMG_META);
-		if(!pimg_init_rgba(im,vwidth,frame->bm.visible_height)) {
+		if(!pimg_init_rgba(im,vwidth,bm->visible_height)) {
 			return luaL_error(L,"failed to create image");
 		}
 	}
 
-	int y_inc = frame->bm.buffer_width;
+	int y_inc = bm->buffer_width;
 	int x_inc = par;
 	int x,y;
-	int height = frame->bm.visible_height;
+	int height = bm->visible_height;
 
-	uint8_t *p=((uint8_t *)frame_lb->bytes + frame->bm.data_start) + (height-1)*y_inc;
+	uint8_t *p=((uint8_t *)frame_lb->bytes + bm->data_start) + (height-1)*y_inc;
 
 	uint8_t *r = im->r;
 	uint8_t *g = im->g;
@@ -521,7 +544,7 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 	uint8_t *a = im->a;
 
 	for(y=0;y<height;y++,p-=y_inc) {
-		for(x=0;x<frame->bm.visible_width;x+=x_inc) {
+		for(x=0;x<bm->visible_width;x+=x_inc) {
 			palette_entry_rgba_t *c =&pal_rgba[*(p+x)];
 			*r++ = c->r;
 			*g++ = c->g;

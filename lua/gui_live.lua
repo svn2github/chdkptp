@@ -91,14 +91,14 @@ local function update_canvas_size()
 	if not lv then
 		return
 	end
-	local vp_w = lv:vp_get_screen_width()/m.vp_par
+	local vp_w = lv.vp:get_screen_width()/m.vp_par
 	local vp_h
 	if aspect_toggle.value == 'ON' then
 		vp_h = vp_w/screen_aspects[lv.lcd_aspect_ratio]
-		m.vp_aspect_factor = vp_h/lv:vp_get_screen_height()
+		m.vp_aspect_factor = vp_h/lv.vp:get_screen_height()
 	else
 		m.vp_aspect_factor = 1
-		vp_h = lv:vp_get_screen_height()
+		vp_h = lv.vp:get_screen_height()
 	end
 
 	local w,h = gui.parsesize(m.icnv.rastersize)
@@ -155,6 +155,12 @@ local function update_should_run()
 end
 
 local last_frame_fields = {}
+local last_fb_fields = {
+	vp={},
+	bm={}
+}
+local last_bm_fields = {}
+
 local palette_size_for_type={
 	16*4,
 	16*4,
@@ -162,26 +168,43 @@ local palette_size_for_type={
 }
 local function update_frame_data(frame)
 	local dirty
-	for i,f in ipairs(chdku.live_field_names) do
-		local v = chdku.live_get_frame_field(frame,f)
+	for i,f in ipairs(chdku.live_fields) do
+		local v = frame[f]
 		if v ~= last_frame_fields[f] then
 			dirty = true
 		end
 	end
+	for j,fb in ipairs({'vp','bm'}) do
+		for i,f in ipairs(chdku.live_fb_desc_fields) do
+			local v = frame[fb][f]
+			if v ~= last_fb_fields[fb][f] then
+				dirty = true
+			end
+		end
+	end
+
 	if dirty then
 		printf('update_frame_data: changed\n')
-		for i,f in ipairs(chdku.live_field_names) do
-			local v = chdku.live_get_frame_field(frame,f)
+		for i,f in ipairs(chdku.live_fields) do
+			local v = frame[f]
 			printf("%s:%s->%s\n",f,tostring(last_frame_fields[f]),v)
 			last_frame_fields[f]=v
 		end
+		for j,fb in ipairs({'vp','bm'}) do
+			for i,f in ipairs(chdku.live_fb_desc_fields) do
+				local v = frame[fb][f]
+				printf("%s.%s:%s->%s\n",fb,f,tostring(last_fb_fields[fb][f]),v)
+				last_fb_fields[fb][f]=v
+			end
+		end
+
 		-- for big palettes this lags, should be an otpion
 		--[[
 		if last_frame_fields.palette_data_start > 0 then
 			printf('palette:\n')
 			local c=0
 
-			local bytes = {frame:byte(last_frame_fields.palette_data_start+1,
+			local bytes = {frame._frame:byte(last_frame_fields.palette_data_start+1,
 										last_frame_fields.palette_data_start+palette_size_for_type[last_frame_fields.palette_type])}
 			for i,v in ipairs(bytes) do
 				printf("0x%02x,",v)
@@ -194,7 +217,7 @@ local function update_frame_data(frame)
 				end
 			end
 		end
-		]]
+		--]]
 	end
 end
 
@@ -271,7 +294,7 @@ local function read_dump_frame()
 		data = read_dump_rec(m.dump_replay_frame._frame,m.dump_replay_file)
 	end
 	m.dump_replay_frame._frame = data
-	update_frame_data(m.dump_replay_frame._frame)
+	update_frame_data(m.dump_replay_frame)
 	stats:end_xfer(m.dump_replay_frame._frame:len())
 	-- TODO
 	update_canvas_size()
@@ -355,7 +378,7 @@ local function timer_action(self)
 			stats:stop()
 		else
 			stats:end_xfer(con.live._frame:len())
-			update_frame_data(con.live._frame)
+			update_frame_data(con.live)
 			record_dump()
 			update_canvas_size()
 		end
@@ -418,14 +441,14 @@ local function redraw_canvas(self)
 			if m.vp_img then
 				if aspect_toggle.value == "ON" then
 					m.vp_img:put_to_cd_canvas(ccnv,
-						lv.vp_margin_left/m.vp_par,
-						lv.vp_margin_bot*m.vp_aspect_factor,
+						lv.vp.margin_left/m.vp_par,
+						lv.vp.margin_bot*m.vp_aspect_factor,
 						m.vp_img:width(),
 						m.vp_img:height()*m.vp_aspect_factor)
 				else
 					m.vp_img:put_to_cd_canvas(ccnv,
-						lv.vp_margin_left/m.vp_par,
-						lv.vp_margin_bot)
+						lv.vp.margin_left/m.vp_par,
+						lv.vp.margin_bot)
 				end
 			end
 		end
@@ -434,9 +457,9 @@ local function redraw_canvas(self)
 			if m.bm_img then
 				-- NOTE bitmap assumed fullscreen, margins ignored
 				if bm_fit_toggle.value == "ON" then
-					m.bm_img:blend_to_cd_canvas(ccnv, 0, 0, lv:vp_get_screen_width()/m.vp_par, lv:vp_get_screen_height()*m.vp_aspect_factor)
+					m.bm_img:blend_to_cd_canvas(ccnv, 0, 0, lv.vp:get_screen_width()/m.vp_par, lv.vp:get_screen_height()*m.vp_aspect_factor)
 				else
-					m.bm_img:blend_to_cd_canvas(ccnv, 0, lv:vp_get_screen_height() - lv.bm_visible_height)
+					m.bm_img:blend_to_cd_canvas(ccnv, 0, lv.vp:get_screen_height() - lv.bm.visible_height)
 				end
 			else
 				print('no bm')

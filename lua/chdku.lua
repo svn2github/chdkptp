@@ -860,9 +860,12 @@ chdku.live_fields={
 	'lcd_aspect_ratio',
 	'palette_type',
 	'palette_data_start',
+	'vp_desc_start',
+	'bm_desc_start',
 }
 
 chdku.live_fb_desc_fields={
+	'fb_type',
 	'data_start',
 	'buffer_width',
 
@@ -876,7 +879,7 @@ chdku.live_fb_desc_fields={
 }
 
 chdku.live_frame_map={}
-chdku.live_field_names={}
+chdku.live_fb_desc_map={}
 
 --[[
 init name->offset mapping
@@ -884,15 +887,9 @@ init name->offset mapping
 local function live_init_maps()
 	for i,name in ipairs(chdku.live_fields) do
 		chdku.live_frame_map[name] = (i-1)*4
-		table.insert(chdku.live_field_names,name)
 	end
-	local off = #chdku.live_fields * 4
-	for i,pfx in ipairs({'vp','bm'}) do
-		for j,name in ipairs(chdku.live_fb_desc_fields) do
-			chdku.live_frame_map[pfx .. '_' .. name] = off
-			table.insert(chdku.live_field_names,pfx .. '_' .. name)
-			off = off + 4;
-		end
+	for i,name in ipairs(chdku.live_fb_desc_fields) do
+		chdku.live_fb_desc_map[name] = (i-1)*4
 	end
 end
 live_init_maps()
@@ -911,18 +908,39 @@ local live_info_meta={
 		end
 	end
 }
+local live_fb_desc_meta={
+	__index=function(t,key)
+		local frame = t._lv._frame
+		if frame and chdku.live_fb_desc_map[key] then
+			return frame:get_i32(t:offset()+chdku.live_fb_desc_map[key])
+		end
+	end
+}
+
+local live_fb_desc_methods={
+	get_screen_width = function(self) 
+		return self.margin_left + self.visible_width + self.margin_right;
+	end,
+	get_screen_height = function(self) 
+		return self.margin_top + self.visible_height + self.margin_bot;
+	end,
+	offset = function(self) 
+		return chdku.live_get_frame_field(self._lv._frame,self._offset_name)
+	end,
+}
+function chdku.live_fb_desc_wrap(lv,fb_pfx)
+	local t=util.extend_table({
+		_offset_name = fb_pfx .. '_desc_start',
+		_lv = lv,
+	},live_fb_desc_methods);
+	setmetatable(t,live_fb_desc_meta)
+	return t
+end
+
 function chdku.live_wrap(frame)
-	local t={
-		_frame = frame,
-		-- TODO quick hack, should have bindings fb descs
-		-- bitmap assumed fullscreen
-		vp_get_screen_width = function(self) 
-			return self.vp_margin_left + self.vp_visible_width + self.vp_margin_right;
-		end,
-		vp_get_screen_height = function(self) 
-			return self.vp_margin_top + self.vp_visible_height + self.vp_margin_bot;
-		end,
-	}
+	local t={_frame = frame}
+	t.vp = chdku.live_fb_desc_wrap(t,'vp')
+	t.bm = chdku.live_fb_desc_wrap(t,'bm')
 	setmetatable(t,live_info_meta)
 	return t
 end
