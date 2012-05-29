@@ -263,7 +263,7 @@ local function init_dump_replay()
 	end
 
 	-- TODO should be defined somewhere
-	if header:get_u32() ~= 0 then
+	if header:get_u32() ~= 1 then
 		printf("incompatible version %s\n",tostring(header:get_u32()))
 		return
 	end
