@@ -889,12 +889,12 @@ int ptp_chdk_upload(char *local_fn, char *remote_fn, PTPParams* params, PTPDevic
 int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_exec_lua(char *script, int *script_id, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_get_version(PTPParams* params, PTPDeviceInfo* deviceinfo, int *major, int *minor);
-int ptp_chdk_get_script_support(PTPParams* params, PTPDeviceInfo* deviceinfo, int *status);
-int ptp_chdk_get_script_status(PTPParams* params, PTPDeviceInfo* deviceinfo, int *status);
+int ptp_chdk_get_script_support(PTPParams* params, PTPDeviceInfo* deviceinfo, unsigned *status);
+int ptp_chdk_get_script_status(PTPParams* params, PTPDeviceInfo* deviceinfo, unsigned *status);
 int ptp_chdk_write_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo, char *data, unsigned size, int target_script_id, int *status);
 int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_chdk_script_msg **msg);
 #ifdef CHDKPTP_LIVEVIEW
-int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,int flags,char **data,int *data_size);
+int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,unsigned flags,char **data,unsigned *data_size);
 #endif
 
 #endif /* __PTP_H__ */

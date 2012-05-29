@@ -1840,7 +1840,7 @@ int ptp_chdk_get_version(PTPParams* params, PTPDeviceInfo* deviceinfo, int *majo
   *minor = ptp.Param2;
   return 1;
 }
-int ptp_chdk_get_script_status(PTPParams* params, PTPDeviceInfo* deviceinfo, int *status)
+int ptp_chdk_get_script_status(PTPParams* params, PTPDeviceInfo* deviceinfo, unsigned *status)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -1858,7 +1858,7 @@ int ptp_chdk_get_script_status(PTPParams* params, PTPDeviceInfo* deviceinfo, int
   *status = ptp.Param1;
   return 1;
 }
-int ptp_chdk_get_script_support(PTPParams* params, PTPDeviceInfo* deviceinfo, int *status)
+int ptp_chdk_get_script_support(PTPParams* params, PTPDeviceInfo* deviceinfo, unsigned *status)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -1935,7 +1935,7 @@ int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_ch
 }
 
 #ifdef CHDKPTP_LIVEVIEW
-int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,int flags,char **data,int *data_size) {
+int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,unsigned flags,char **data,unsigned *data_size) {
   uint16_t r;
   PTPContainer ptp;
 

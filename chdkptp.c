@@ -1047,7 +1047,7 @@ lbuf - lbuf to re-use, will be created if nil
 static int chdk_get_live_data(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	lBuf_t *buf = lbuf_getlbuf(L,2);
-	int flags=lua_tonumber(L,3);
+	unsigned flags=lua_tonumber(L,3);
 	char *data=NULL;
 	unsigned data_size = 0;
 	if ( !ptp_usb->connected ) {
