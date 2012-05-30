@@ -390,7 +390,14 @@ cam_btn_frame = iup.vbox{
 		title='shoot',
 		size='94x15',
 		action=function(self)
-			gui.execquick('shoot()')
+			gui.execquick([[
+local rec,vid = get_mode()
+if rec and not vid then
+	shoot()
+else
+	click('shoot_full')
+end
+]])
 		end,
 	},
 	iup.label{separator="HORIZONTAL"},
