@@ -384,7 +384,8 @@ static const char * check_fb_desc(lv_framebuffer_desc **desc_out,lv_data_header 
 		return "incorrect type";
 	}
 
-	if(desc->data_start + (desc->buffer_width*desc->visible_height*bpp)/8 > data_len) {
+	// note, we can get a frame with no FB data
+	if(desc->data_start && desc->data_start + (desc->buffer_width*desc->visible_height*bpp)/8 > data_len) {
 		return "data < buffer_width*height";
 	}
 
