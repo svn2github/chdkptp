@@ -17,6 +17,7 @@
 --[[
 utilities for working with microsecond time provided by sys.gettimeofday
 depends on chdkpt sys
+in some windows variants, sys.gettimeofday will return much lower precision, ~15ms
 ]]
 
 local proto={}
@@ -62,11 +63,48 @@ function ustime.diffms(t1,t0)
 	return ustime.diff(t1,t0)/1000
 end
 
+--[[
+formate with os.date with additional formats
+%_m = milliseconds part
+%_u = microseconds part
+]]
+function ustime.format(t,fmt)
+	if fmt then
+		fmt = fmt:gsub('%%_([um])',function(c)
+			if c == 'u' then
+				return string.format('%06d',t.usec)
+			end
+			if c == 'm' then
+				return string.format('%03d',t.usec/1000)
+			end
+		end)
+	end
+	return os.date(fmt,t.sec)
+end
+
 function proto:get()
 	self.sec,self.usec = sys.gettimeofday()
 end
 
+-- assumes number is double
+-- TODO why didn't I just do the whole thing in floating point ?
+function proto:normalize()
+	local v = (self.sec + self.usec/1000000)
+	self.sec = math.floor(v)
+	self.usec = (v - self.sec)*1000000
+end
+
+function proto:addus(us)
+	self.usec = self.usec + us
+	self:normalize()
+end
+
+function proto:addms(ms)
+	self:addus(1000*ms)
+end
+
 proto.diff = ustime.diff
 proto.diffms = ustime.diffms
+proto.format = ustime.format
 
 return ustime
