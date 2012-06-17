@@ -1942,7 +1942,7 @@ int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,unsigned
   PTP_CNT_INIT(ptp);
   ptp.Code=PTP_OC_CHDK;
   ptp.Nparam=2;
-  ptp.Param1=PTP_CHDK_GetLiveData;
+  ptp.Param1=PTP_CHDK_GetDisplayData;
   ptp.Param2=flags;
   *data = NULL;
   *data_size = 0;
