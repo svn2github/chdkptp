@@ -565,7 +565,6 @@ function m.init()
 		print("Resize: Width="..w.."   Height="..h)
 	end
 	--]]
-	-- TODO - convenience meta table to access base and frame info. This should be bound to the lbuf somehow
 
 	m.container_title='Live'
 end

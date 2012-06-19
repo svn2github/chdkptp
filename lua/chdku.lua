@@ -945,9 +945,12 @@ function chdku.live_wrap(frame)
 	return t
 end
 
+--[[
+NOTE this only tells if the CHDK protocol supports live view
+the live sub-protocol might not be fully compatible
+]]
 function con_methods:live_is_api_compatible()
-	-- normally larger minor would be ok, but want to only work with dev version for now
-	if con.apiver.major == 2 and con.apiver.minor == 3 then
+	if con.apiver.major == 2 and con.apiver.minor >= 3 then
 		return true
 	end
 end
