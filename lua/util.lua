@@ -227,19 +227,29 @@ function util.hexdump(str,offset)
 end
 
 local serialize_r
-serialize_r = function(v,opts,seen,depth)
+serialize_r = function(v,opts,r,seen,depth)
 	local vt = type(v)
-	if vt == 'nil' or  vt == 'boolean' then
-		return tostring(v)
- 	elseif vt == 'number' then
+	if vt == 'nil' or  vt == 'boolean' then 
+		table.insert(r,tostring(v))
+		return
+	end
+	if vt == 'number' then
 		-- camera has problems with decimal constants that would be negative
 		if opts.fix_bignum and v > 0x7FFFFFFF then
-			return string.format("0x%x",v)
+			table.insert(r,string.format("0x%x",v))
+		-- camera numbers are ints
+		elseif opts.forceint then
+			table.insert(r,string.format("%d",v))
+		else
+			table.insert(r,tostring(v))
 		end
-		return tostring(v)
-	elseif vt == 'string' then
-		return string.format('%q',v)
-	elseif vt == 'table' then
+		return
+	end
+	if vt == 'string' then
+		table.insert(r,string.format('%q',v))
+		return 
+	end
+	if vt == 'table' then
 		if not depth then
 			depth = 1
 		end
@@ -252,34 +262,40 @@ serialize_r = function(v,opts,seen,depth)
 			if opts.err_cycle then
 				error('serialize: cycle')
 			else
-				return '"cycle:'..tostring(v)..'"'
+				table.insert(r,'"cycle:'..tostring(v)..'"')
+				return 
 			end
 		end
 		-- TODO this is restrictive, t={}, t2={t,t} will be treated as cycle
 		seen[v] = true;
-		local r='{'
+		table.insert(r,'{')
 		for k,v1 in pairs(v) do
 			if opts.pretty then
-				r = r .. '\n' ..  string.rep(' ',depth)
+				table.insert(r,'\n'..string.rep(' ',depth))
 			end
 			-- more compact/friendly format simple string keys
 			-- TODO we could make integers more compact by doing array part first
 			if type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$') then
-				r = r .. tostring(k)
+				table.insert(r,k)
 			else
-				r = r .. '[' .. serialize_r(k,opts,seen,depth+1) .. ']'
+				table.insert(r,'[')
+				serialize_r(k,opts,r,seen,depth+1)
+				table.insert(r,']')
 			end
-			r = r .. '=' .. serialize_r(v1,opts,seen,depth+1) .. ','
+			table.insert(r,'=')
+			serialize_r(v1,opts,r,seen,depth+1)
+			table.insert(r,',')
 		end
 		if opts.pretty then
-			r = r .. '\n' .. string.rep(' ',depth-1)
+			table.insert(r,'\n'..string.rep(' ',depth-1))
 		end
-		r = r .. '}'
-		return r
-	elseif opts.err_type then
+		table.insert(r,'}')
+		return
+	end
+	if opts.err_type then
 		error('serialize: unsupported type ' .. vt, 2)
 	else
-		return '"'..tostring(v)..'"'
+		table.insert(r,'"'..tostring(v)..'"')
 	end
 end
 
@@ -291,7 +307,7 @@ util.serialize_defaults = {
 	err_cycle=true, -- cyclic references
 	pretty=true, -- indents and newlines
 	fix_bignum=true, -- send values > 2^31 as hex, to avoid problems with camera conversion from decimal
---	forceint=false, -- TODO convert numbers to integer
+	forceint=true, -- convert numbers to integer
 }
 
 --[[
@@ -299,7 +315,9 @@ serialize lua values
 options as documented above
 ]]
 function util.serialize(v,opts)
-	return serialize_r(v,util.extend_table(util.extend_table({},util.serialize_defaults),opts))
+	local r={}
+	serialize_r(v,util.extend_table(util.extend_table({},util.serialize_defaults),opts),r)
+	return table.concat(r)
 end
 
 --[[

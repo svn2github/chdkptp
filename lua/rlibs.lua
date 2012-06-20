@@ -135,13 +135,17 @@ global defaults can be changed from code
 {
 	name='serialize',
 	code=[[
-serialize_r = function(v,opts,seen,depth)
+serialize_r = function(v,opts,r,seen,depth)
 	local vt = type(v)
 	if vt == 'nil' or  vt == 'boolean' or vt == 'number' then
-		return tostring(v)
-	elseif vt == 'string' then
-		return string.format('%q',v)
-	elseif vt == 'table' then
+		table.insert(r,tostring(v))
+		return
+	end
+	if vt == 'string' then
+		table.insert(r,string.format('%q',v))
+		return 
+	end
+	if vt == 'table' then
 		if not depth then
 			depth = 1
 		end
@@ -154,31 +158,37 @@ serialize_r = function(v,opts,seen,depth)
 			if opts.err_cycle then
 				error('serialize: cycle')
 			else
-				return '"cycle:'..tostring(v)..'"'
+				table.insert(r,'"cycle:'..tostring(v)..'"')
+				return 
 			end
 		end
 		seen[v] = true;
-		local r='{'
+		table.insert(r,'{')
 		for k,v1 in pairs(v) do
 			if opts.pretty then
-				r = r .. '\n' ..  string.rep(' ',depth)
+				table.insert(r,'\n'..string.rep(' ',depth))
 			end
 			if type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$') then
-				r = r .. tostring(k)
+				table.insert(r,k)
 			else
-				r = r .. '[' .. serialize_r(k,opts,seen,depth+1) .. ']'
+				table.insert(r,'[')
+				serialize_r(k,opts,r,seen,depth+1)
+				table.insert(r,']')
 			end
-			r = r .. '=' .. serialize_r(v1,opts,seen,depth+1) .. ','
+			table.insert(r,'=')
+			serialize_r(v1,opts,r,seen,depth+1)
+			table.insert(r,',')
 		end
 		if opts.pretty then
-			r = r .. '\n' .. string.rep(' ',depth-1)
+			table.insert(r,'\n'..string.rep(' ',depth-1))
 		end
-		r = r .. '}'
-		return r
-	elseif opts.err_type then
+		table.insert(r,'}')
+		return
+	end
+	if opts.err_type then
 		error('serialize: unsupported type ' .. vt, 2)
 	else
-		return '"'..tostring(v)..'"'
+		table.insert(r,'"'..tostring(v)..'"')
 	end
 end
 serialize_defaults = {
@@ -197,7 +207,9 @@ function serialize(v,opts)
 	else
 		opts=serialize_defaults
 	end
-	return serialize_r(v,opts)
+	local r={}
+	serialize_r(v,opts,r)
+	return table.concat(r)
 end
 ]],
 },
@@ -297,6 +309,39 @@ end
 	usb_msg_table_to_string=serialize
 ]],
 },
+--[[
+serialize mem use testing
+]]
+--!return con:execwait([[return sertest({a='a',b='b',t={1,2,3,{test='the quick brown fox',1,2,3,4,5,6,7,8,9,10,11,1 2,13,14,14},{}}},serialize)]],{libs={'serialize_msgs','sertest'}})
+{
+	name='sertest',
+	depend='serialize_msgs',
+	code=[[
+function memstats(name)
+	local t={
+		name=name,
+		count=collectgarbage('count')
+	}
+	local m=get_meminfo()
+	t.free_size=m.free_size
+	t.free_block_max_size=m.free_block_max_size
+	return t
+end
+
+function sertest(data,func)
+	collectgarbage('collect')
+	local t={
+		memstats('before')
+	}
+	t.r=func(data)
+	table.insert(t,memstats('after'))
+	collectgarbage('collect')
+	table.insert(t,memstats('collect'))
+	return t
+end
+]],
+},
+
 --[[
 join a path with / as needed
 ]]
