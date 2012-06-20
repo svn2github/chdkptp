@@ -212,6 +212,27 @@ t.lbuff = function()
 	assert(l:string()==l2:string())
 end
 
+t.compare = function()
+	assert(util.compare_values_subset({1,2,3},{1}))
+	assert(util.compare_values_subset({1},{1,2,3})==false)
+	local t1={1,2,3,t={a='a',b='b',c='c'}}
+	local t2=util.extend_table({},t1)
+	assert(util.compare_values(t1,t2))
+	assert(util.compare_values(true,true))
+	assert(util.compare_values(true,1)==false)
+	-- TODO test error conditions
+end
+
+t.serialize = function()
+	local s="this \n is '\" a test"
+	local t1={1,2,3,t={a='a',b='b',c='c'},s=s}
+	assert(util.compare_values(t1,util.unserialize(util.serialize(t1))))
+	assert(s == util.unserialize(util.serialize(s)))
+	assert(true == util.unserialize(util.serialize(true)))
+	assert(nil == util.unserialize(util.serialize(nil)))
+	-- TODO test error conditions
+end
+
 function m:run(name)
 	-- TODO side affects galore
 	printf('%s:start\n',name)

@@ -112,6 +112,55 @@ function util.extend_table(target,source,deep)
 end
 
 --[[
+compare v1 and v2
+table values are compared recursively, returning true if all key/values in v2 exist in v1
+]]
+util.compare_values_subset_defaults = {
+	maxdepth=10
+}
+function util.compare_values_subset(v1,v2,opts,seen,depth)
+	if not depth then
+		depth=1
+		opts = util.extend_table(util.extend_table({},util.compare_values_subset_defaults),opts)
+	elseif depth > opts.maxdepth then
+		error('compare_values_subset: maxdepth exceeded')
+	end
+
+	if v1 == v2 then
+		return true
+	end
+	-- if not exactly equal, check table
+	if type(v2) ~= 'table' or type(v1) ~= 'table' then
+		return false
+	end
+
+	if not seen then
+		seen={}
+	elseif seen[v2] then
+		error('compare_values_subset: cycle')
+	end
+	-- TODO this is restrictive, t={}, t2={t,t} will be treated as cycle
+	seen[v2] = true
+
+	for k,v in pairs(v2) do
+		if not util.compare_values_subset(v,v1[k],opts,seen,depth+1) then
+			return false
+		end
+	end
+	return true
+end
+--[[
+compare v1 and v2
+tables are recursively checked for identical keys and values
+]]
+function util.compare_values(v1,v2,opts)
+	if util.compare_values_subset(v1,v2,opts) then
+		return util.compare_values_subset(v2,v1,opts)
+	end
+	return false
+end
+
+--[[
 does table have value in it ?
 ]]
 function util.in_table(table,value)
@@ -206,6 +255,7 @@ serialize_r = function(v,opts,seen,depth)
 				return '"cycle:'..tostring(v)..'"'
 			end
 		end
+		-- TODO this is restrictive, t={}, t2={t,t} will be treated as cycle
 		seen[v] = true;
 		local r='{'
 		for k,v1 in pairs(v) do
