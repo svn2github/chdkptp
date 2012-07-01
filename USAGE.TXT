@@ -59,7 +59,11 @@ luar (=)     <lua code>  : - execute remote lua, wait for result
  Execute Lua code on the camera, waiting for the script to end.
  Return values or error messages are printed after the script completes.
 
-rmem         <address> [count]: - read memory
+rmem         <address> [count] [-i32[=fmt]]: - read memory
+ Dump <count> bytes or words starting at <address>
+  -i32 display as 32 bit words rather than byte oriented hex dump
+  -i32=<fmt> use printf format string fmt to display
+
 list                     : - list devices
  Lists all recognized PTP devices in the following format on success
   <status><num>:<modelname> b=<bus> d=<device> v=<usb vendor> p=<usb pid> s=<serial number>

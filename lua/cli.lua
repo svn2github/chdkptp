@@ -416,8 +416,13 @@ cli:add_commands{
 		-- TODO support display as words
 		names={'rmem'},
 		help='read memory',
-		args=argparser.create(), -- only word args
-		arghelp='<address> [count]',
+		args=argparser.create{i32=false}, -- word
+		arghelp='<address> [count] [-i32[=fmt]]',
+		help_detail=[[
+ Dump <count> bytes or words starting at <address>
+  -i32 display as 32 bit words rather than byte oriented hex dump
+  -i32=<fmt> use printf format string fmt to display
+]],
 		func=function(self,args) 
 			local addr = tonumber(args[1])
 			local count = tonumber(args[2])
@@ -427,12 +432,36 @@ cli:add_commands{
 			if not count then
 				count = 1
 			end
+			if args.i32 then
+				count = count * 4
+			end
 
-			r,msg = con:getmem(addr,count)
+			local r,msg = con:getmem(addr,count)
 			if not r then
 				return false,msg
 			end
-			return true,string.format("0x%x %u\n",addr,count)..hexdump(r,addr)
+
+			if args.i32 then
+				local fmt = '0x%08x'
+				if type(args.i32) == 'string' then
+					fmt = args.i32
+				end
+				local lb = lbuf.new(r)
+				local s = ''
+				for i=0,count-4,4 do 
+					if i%16 == 0 then
+						if i > 1 then
+							s = s .. '\n'
+						end
+						s = s .. string.format('0x%08x:',addr+i)
+					end
+					s = s..string.format(' '..fmt,lb:get_u32(i))
+				end
+				r = s..'\n'
+			else
+				r=util.hexdump(r,addr)
+			end
+			return true, string.format("0x%08x %u\n",addr,count)..r
 		end,
 	},
 	{
