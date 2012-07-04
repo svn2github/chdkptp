@@ -750,6 +750,9 @@ struct _PTPParams {
 	PTPObjectHandles handles;
 	PTPObjectInfo * objectinfo;
 	PTPDeviceInfo deviceinfo;
+
+	/* Max endpoint packet size (for bulk transfer fix) */
+	uint32_t max_packet_size;
 };
 
 /* last, but not least - ptp functions */

@@ -281,6 +281,10 @@ init_ptp_usb (PTPParams* params, PTP_USB* ptp_usb, struct usb_device* dev)
 		usb_set_configuration(device_handle, dev->config->bConfigurationValue);
 		usb_claim_interface(device_handle,
 			dev->config->interface->altsetting->bInterfaceNumber);
+		// Get max endpoint packet size for bulk transfer fix
+		params->max_packet_size = dev->config->interface->altsetting->endpoint->wMaxPacketSize;
+		fprintf(stderr,"max endpoint size = %d\n",params->max_packet_size);
+		if (params->max_packet_size == 0) params->max_packet_size = 512;    // safety net ?
 	}
 //	globalparams=params;
 }

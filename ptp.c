@@ -143,23 +143,34 @@ ptp_usb_senddata (PTPParams* params, PTPContainer* ptp,
 	ret=params->write_func((unsigned char *)&usbdata, PTP_USB_BULK_HDR_LEN+
 		((size<PTP_USB_BULK_PAYLOAD_LEN)?size:PTP_USB_BULK_PAYLOAD_LEN),
 		params->data);
-	if (ret!=PTP_RC_OK) {
+	if (ret!=PTP_RC_OK)
+	{
 		ret = PTP_ERROR_IO;
-/*		ptp_error (params,
-		"PTP: request code 0x%04x sending data error 0x%04x",
-			ptp->Code,ret);*/
+		/*
+		ptp_error (params,
+			"PTP: request code 0x%04x sending data error 0x%04x", ptp->Code,ret);
+		*/
 		return ret;
 	}
-	if (size<=PTP_USB_BULK_PAYLOAD_LEN) return ret;
-	/* if everything OK send the rest */
-	ret=params->write_func (data+PTP_USB_BULK_PAYLOAD_LEN,
-				size-PTP_USB_BULK_PAYLOAD_LEN, params->data);
-	if (ret!=PTP_RC_OK) {
-		ret = PTP_ERROR_IO;
-/*		ptp_error (params,
-		"PTP: request code 0x%04x sending data error 0x%04x",
-			ptp->Code,ret); */
+	if (size > PTP_USB_BULK_PAYLOAD_LEN)
+	{
+		/* if everything OK send the rest */
+		ret=params->write_func (data+PTP_USB_BULK_PAYLOAD_LEN,
+					size-PTP_USB_BULK_PAYLOAD_LEN, params->data);
+		if (ret!=PTP_RC_OK)
+		{
+			ret = PTP_ERROR_IO;
+			/*
+			ptp_error (params,
+				"PTP: request code 0x%04x sending data error 0x%04x", ptp->Code,ret);
+			*/
+			return ret;
+		}
 	}
+	// If data size is a multiple of the bulk transfer max endpoint size
+	// then send a dummy 0 length packet to tell the camera the transfer is complete
+	if ((usbdata.length & (params->max_packet_size-1)) == 0)
+		params->write_func(data, 0, params->data);
 	return ret;
 }
 
