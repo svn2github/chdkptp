@@ -21,6 +21,9 @@ usage:
 !m=require'msgtest'
 !m.load()
 !m.test(<start lenght>,<optional max length>,<optional increment>)
+
+set m.checkmem to report memory usage
+use m.gc(<collect garbage arg>) to perform garbage collection on each iteration, either 'step', 'collect' or nil
 ]]
 local m={}
 
@@ -31,21 +34,25 @@ function m.load()
 	end
 	return con:write_msg([[exec
 msg_shell.default_cmd=function(msg)
-	collectgarbage('step')
-	write_usb_msg(msg,1000)
-	sleep(10)
+	if msgtest_gc then
+		collectgarbage(msgtest_gc)
+	end
+	write_usb_msg(msg)
+end
+msg_shell.cmds.memstats=function()
+	write_usb_msg(string.format('mem:%8d lmem:%8d',get_meminfo().free_size,collectgarbage('count')))
 end
 ]])
 end
 
-function m.test(m,n,inc)
+function m.test(s,n,inc)
 	if not n then 
-		n=m
+		n=s
 	end
 	if not inc then
 		inc=1
 	end
-	for i=m,n,inc do 
+	for i=s,n,inc do 
 		local s=string.rep('x',i)
 		printf("sending %d (0x%x)...",i,i)
 		local status,err=con:write_msg(s)
@@ -62,6 +69,31 @@ function m.test(m,n,inc)
 		else
 			printf('not equal\n')
 		end
+		if m.checkmem then
+			local status,err=con:write_msg('memstats')
+			if not status then
+				printf('send failed\n')
+				return
+			end
+			status,r = con:wait_msg({mtype='user'})
+			if not status then
+				printf('read failed %s\n',r) 
+			else
+				printf(r.value..'\n')
+			end
+		end
 	 end
+end
+function m.gc(mode)
+	if not mode then
+		mode='nil'
+	else
+		mode = '"'..mode..'"'
+	end
+	local status,err=con:write_msg('exec msgtest_gc='..mode)
+	if not status then
+		printf('send failed\n')
+		return
+	end
 end
 return m
