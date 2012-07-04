@@ -675,12 +675,15 @@ function con_methods:read_msg_strict(opts)
 	if msg.script_id ~= self:get_script_id() then
 		return false,'msg from unexpected script id'
 	end
-	-- TODO this discards error messages if mtype isn't error
 	if msg.type ~= opts.mtype then
-		return false,'unexpected msg type'
+		if msg.type == 'error' then
+			return false,'unexpected error: '..msg.value
+		end
+		return false,'unexpected msg type: '..msg.type
+
 	end
 	if opts.msubtype and msg.subtype ~= opts.msubtype then
-		return false,'wrong message subtype'
+		return false,'wrong message subtype: ' ..msg.subtype
 	end
 	if opts.munserialize then
 		local v = util.unserialize(msg.value)
