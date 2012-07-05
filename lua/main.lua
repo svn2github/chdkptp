@@ -18,6 +18,7 @@ util=require('util')
 util:import()
 ustime=require('ustime')
 fsutil=require('fsutil')
+prefs=require('prefs')
 chdku=require('chdku')
 cli=require('cli')
 --[[

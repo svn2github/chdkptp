@@ -20,6 +20,11 @@ local cli = {
 	names={},
 	finished = false,
 }
+--[[
+info printf - message to be printed at normal verbosity
+]]
+cli.infomsg = util.make_msgf( function() return prefs.cli_verbose end, 1)
+cli.dbgmsg = util.make_msgf( function() return prefs.cli_verbose end, 2)
 
 --[[
 get command args of the form -a[=value] -bar[=value] .. [wordarg1] [wordarg2] [wordarg...]
@@ -234,7 +239,7 @@ function cli:execute(line)
 					return self.names[cmd](args)
 				end,
 				util.err_traceback)
-			if cli.showtime then
+			if prefs.cli_time then
 				printf("time %.4f\n",ustime.diff(t0)/1000000)
 			end
 			if not cstatus then
@@ -341,6 +346,48 @@ cli:add_commands{
 		end,
 	},
 	{
+		names={'set'},
+		help='show or set option',
+		arghelp='[-v|-c] [option[=value]]',
+		args=argparser.create{
+			v=false,
+			c=false,
+		},
+
+		help_detail=[[
+ Use set with no options to see a list
+  -v show desciption when showing value
+  -c output as set command
+]],
+		func=function(self,args) 
+			local mode
+			if args.v then
+				mode='full'
+			end
+			if args.c then
+				mode='cmd'
+			end
+			if #args == 0 then	
+				local r={}
+				for name,pref in prefs._each() do
+					local status, desc = prefs._describe(name,mode)
+					-- desc will be error if we somehow get invalid in here
+					table.insert(r,desc)
+				end
+				return true,table.concat(r,'\n')
+			end
+			if #args > 1 then
+				return false, 'unexpected args'
+			end
+			local name,value = string.match(args[1],'^([%a_][%w%a_]+)=(.*)$')
+			if not name then
+				return prefs._describe(args[1],mode)
+			end
+			return prefs._set(name,value)
+		end,
+	},
+
+	{
 		names={'quit','q'},
 		help='quit program',
 		func=function() 
@@ -413,7 +460,6 @@ cli:add_commands{
 		end,
 	},
 	{
-		-- TODO support display as words
 		names={'rmem'},
 		help='read memory',
 		args=argparser.create{i32=false}, -- word
@@ -786,6 +832,7 @@ cli:add_commands{
 				return false,err
 			end
 			for i,v in ipairs(results) do
+				-- TODO success should not be displayed at low verbosity
 				printf("%s: ",v.file)
 				if v.status then
 					printf('OK')
@@ -883,7 +930,7 @@ cli:add_commands{
 					-- if we are looking for model or serial, need to connect to the dev to check
 					if match.model or match.serial_number then
 						local tempcon = false
---						printf('model check %s %s\n',tostring(match.model),tostring(match.serial_number))
+						cli.dbgmsg('model check %s %s\n',tostring(match.model),tostring(match.serial_number))
 						if not lcon:is_connected() then
 							lcon:connect()
 							tempcon = true
@@ -961,7 +1008,6 @@ cli:add_commands{
 							size = '<dir>'
 						else
 						end
-						-- print(i,name,chdku.ts_cam2pc(st.mtime))
 						r = r .. string.format("%s %10s %s\n",os.date('%c',chdku.ts_cam2pc(st.mtime)),tostring(size),name)
 					end
 				else
@@ -1080,5 +1126,6 @@ cli:add_commands{
 		end,
 	},
 };
-
-return cli;
+prefs._add('cli_time','boolean','show cli execution times')
+prefs._add('cli_verbose','number','control verbosity of cli',1)
+return cli

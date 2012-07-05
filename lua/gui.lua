@@ -91,6 +91,12 @@ btn_connect = iup.button{
 	size = "48x"
 }
 
+--[[
+info printf - message to be printed at normal verbosity
+]]
+gui.infomsg = util.make_msgf( function() return prefs.gui_verbose end, 1)
+gui.dbgmsg = util.make_msgf( function() return prefs.gui_verbose end, 2)
+
 -- parse a NxM attribute and return as numbers
 function gui.parsesize(size)
 	local w,h=string.match(size,'(%d+)x(%d+)')
@@ -109,7 +115,7 @@ function gui.execquick(code,opts)
 end
 
 local function update_mode_dropdown(cur)
-	printf('update mode dropdown %s\n',tostring(cur))
+	gui.dbgmsg('update mode dropdown %s\n',tostring(cur))
 	gui.mode_dropdown["1"] = nil -- empty the list
 	if not gui.mode_list or not cur or cur == 0 then
 		return
@@ -125,7 +131,7 @@ local function update_mode_dropdown(cur)
 		end
 	end
 	gui.mode_dropdown.value = curid
-	printf('new value %s\n',tostring(gui.mode_map[curid]))
+	gui.dbgmsg('new value %s\n',tostring(gui.mode_map[curid]))
 end
 
 local function clear_mode_list()
@@ -295,10 +301,10 @@ gui.mode_dropdown = iup.list{
 	DROPDOWN="YES",
 }
 function gui.mode_dropdown:valuechanged_cb()
-	print('mode_dropdown',self.value)
+	gui.dbgmsg('mode_dropdown',self.value)
 	local v = tonumber(self.value)
 	if not gui.mode_map or not gui.mode_map[v] then
-		printf('tried to set invalid mode %s',tostring(v))
+		gui.infomsg('tried to set invalid mode %s',tostring(v))
 		return
 	end
 	gui.execquick(string.format('set_capture_mode(%d)',gui.mode_map[v]))
@@ -651,5 +657,5 @@ function gui:run()
 	  iup.MainLoop()
 	end
 end
-
+prefs._add('gui_verbose','number','control verbosity of gui',1)
 return gui

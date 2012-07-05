@@ -74,7 +74,7 @@ local function do_download_dialog(data)
 	} 
 
 -- Shows file dialog in the center of the screen
-	statusprint('download dialog ' .. remotepath)
+	gui.dbgmsg('download dialog %s\n',remotepath)
 	filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
 
 -- Gets file dialog status
@@ -82,7 +82,7 @@ local function do_download_dialog(data)
 
 -- new or overwrite (windows native dialog already prompts for overwrite)
 	if status == "1" or status == "0" then 
-		statusprint("d "..remotepath.."->"..filedlg.value)
+		gui.dbgmsg("d %s->%s\n",remotepath,filedlg.value)
 		-- can't use mdownload here because local name might be different than remote basename
 		add_status(con:download(remotepath,filedlg.value))
 		add_status(lfs.touch(filedlg.value,chdku.ts_cam2pc(data.stat.mtime)))
@@ -99,14 +99,14 @@ local function do_dir_download_dialog(data)
 	} 
 
 -- Shows dialog in the center of the screen
-	statusprint('dir download dialog ' .. remotepath)
+	gui.dbgmsg('dir download dialog %s\n',remotepath)
 	filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
 
 -- Gets dialog status
 	local status = filedlg.status
 
 	if status == "0" then 
-		statusprint("d "..remotepath.."->"..filedlg.value)
+		gui.dbgmsg("d %s->%s",remotepath,filedlg.value)
 		add_status(con:mdownload({remotepath},filedlg.value))
 	end
 end
@@ -118,14 +118,14 @@ local function do_dir_upload_dialog(data)
 		title = "Upload contents to "..remotepath, 
 	} 
 -- Shows dialog in the center of the screen
-	statusprint('dir upload dialog ' .. remotepath)
+	gui.dbgmsg('dir upload dialog %s\n',remotepath)
 	filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
 
 -- Gets dialog status
 	local status = filedlg.status
 
 	if status == "0" then 
-		statusprint("d "..remotepath.."->"..filedlg.value)
+		gui.dbgmsg("d %s->%s\n",remotepath,filedlg.value)
 		add_status(con:mupload({filedlg.value},remotepath))
 		itree:refresh_tree_by_path(remotepath)
 	end
@@ -140,7 +140,7 @@ local function do_upload_dialog(remotepath)
 		filterinfo = "all files",
 		multiplefiles = "yes",
 	} 
-	statusprint('upload dialog ' .. remotepath)
+	gui.dbgmsg('upload dialog %s\n',remotepath)
 	filedlg:popup (iup.ANYWHERE, iup.ANYWHERE)
 
 -- Gets file dialog status
@@ -148,10 +148,10 @@ local function do_upload_dialog(remotepath)
 	local value = filedlg.value
 -- new or overwrite (windows native dialog already prompts for overwrite
 	if status ~= "0" then
-		statusprint('upload canceled status ' .. status)
+		gui.dbgmsg('upload canceled status %s\n',status)
 		return
 	end
-	statusprint('upload value ' .. tostring(value))
+	gui.dbgmsg('upload value %s\n',tostring(value))
 	local paths = {}
 	local e=1
 	local dir
@@ -184,11 +184,11 @@ local function do_mkdir_dialog(data)
 	local remotepath = data:fullpath()
 	local dirname = iup.Scanf("Create directory\n"..remotepath.."%64.11%s\n",'');
 	if dirname then
-		printf('mkdir: %s',dirname)
+		gui.dbgmsg('mkdir: %s\n',dirname)
 		add_status(con:mkdir_m(fsutil.joinpath_cam(remotepath,dirname)))
 		itree:refresh_tree_by_path(remotepath)
 	else
-		printf('mkdir canceled')
+		gui.dbgmsg('mkdir canceled\n')
 	end
 end
 
@@ -208,12 +208,12 @@ end
 
 function itree:refresh_tree_by_id(id)
 	if not id then
-		printf('refresh_tree_by_id: nil id')
+		printf('refresh_tree_by_id: nil id\n')
 		return
 	end
 	local oldstate=self['state'..id]
 	local data=self:get_data(id)
-	statusprint('old state', oldstate)
+	gui.dbgmsg('old state %s\n', oldstate)
 	self:populate_branch(id,data:fullpath())
 	if oldstate and oldstate ~= self['state'..id] then
 		self['state'..id]=oldstate
@@ -221,13 +221,13 @@ function itree:refresh_tree_by_id(id)
 end
 
 function itree:refresh_tree_by_path(path)
-	printf('refresh_tree_by_path: %s',tostring(path))
+	gui.dbgmsg('refresh_tree_by_path: %s\n',tostring(path))
 	local id = self:get_id_from_path(path)
 	if id then
-		printf('refresh_tree_by_path: found %s',tostring(id))
+		gui.dbgmsg('refresh_tree_by_path: found %s\n',tostring(id))
 		self:refresh_tree_by_id(id)
 	else
-		printf('refresh_tree_by_path: failed to find %s',tostring(path))
+		gui.dbgmsg('refresh_tree_by_path: failed to find %s\n',tostring(path))
 	end
 end
 --[[
@@ -244,7 +244,7 @@ function itree:rightclick_cb(id)
 		return
 	end
 	if data.fullpath then
-		statusprint('tree right click: fullpath ' .. data:fullpath())
+		gui.dbgmsg('tree right click: fullpath %s\n',data:fullpath())
 	end
 	if data.stat.is_dir then
 		iup.menu{
@@ -306,7 +306,7 @@ end
 
 function itree:populate_branch(id,path)
 	self['delnode'..id] = "CHILDREN"
-	statusprint('populate branch '..id..' '..path)
+	gui.dbgmsg('populate branch %s %s\n',id,path)
 	if id == 0 then
 		itree.state="collapsed"
 	end		
@@ -331,9 +331,9 @@ function itree:populate_branch(id,path)
 end
 
 function itree:branchopen_cb(id)
-	statusprint('branchopen_cb ' .. id)
+	gui.dbgmsg('branchopen_cb %s\n',id)
 	if not con:is_connected() then
-		statusprint('branchopen_cb not connected')
+		gui.dbgmsg('branchopen_cb not connected\n')
 		return iup.IGNORE
 	end
 	local path

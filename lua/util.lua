@@ -46,6 +46,35 @@ function util.errf(format,...)
 	fprintf(util.util_stderr,"ERROR: " .. format,...)
 end
 
+--[[
+return a function that prints if result of curlevel_fn is greater than vlevel
+for making different areas of code have different verbosity
+]]
+function util.make_msgf(curlevel_fn,fixed_level)
+	if type(curlevel_fn) ~= 'function' then
+		error('expected function')
+	end
+	if type(fixed_level) == 'nil' then
+		-- return a function that expects a verbosity level as the first arg, e.g.
+		-- myprint(1,"foo")
+		return function(vlevel,format,...)
+			if curlevel_fn() >= vlevel then
+				util.printf(format,...)
+			end
+		end
+	elseif tonumber(fixed_level) then
+		-- return a function that only prints at fixed level, e.g
+		-- myprint("foo")
+		return function(format,...)
+			if curlevel_fn() >= fixed_level then
+				util.printf(format,...)
+			end
+		end
+	else
+		error('invalid type')
+	end
+end
+
 function util.err_traceback(err)
 	return debug.traceback(err,2)
 end

@@ -1437,8 +1437,8 @@ static int syslib_gettimeofday(lua_State *L) {
 /*
 global copies of argc, argv for lua
 */
-int g_argc;
-char **g_argv;
+static int g_argc;
+static char **g_argv;
 
 /*
 get argv[0]

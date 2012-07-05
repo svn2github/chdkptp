@@ -184,23 +184,22 @@ local function update_frame_data(frame)
 	end
 
 	if dirty then
-		printf('update_frame_data: changed\n')
+		gui.dbgmsg('update_frame_data: changed\n')
 		for i,f in ipairs(chdku.live_fields) do
 			local v = frame[f]
-			printf("%s:%s->%s\n",f,tostring(last_frame_fields[f]),v)
+			gui.dbgmsg("%s:%s->%s\n",f,tostring(last_frame_fields[f]),v)
 			last_frame_fields[f]=v
 		end
 		for j,fb in ipairs({'vp','bm'}) do
 			for i,f in ipairs(chdku.live_fb_desc_fields) do
 				local v = frame[fb][f]
-				printf("%s.%s:%s->%s\n",fb,f,tostring(last_fb_fields[fb][f]),v)
+				gui.dbgmsg("%s.%s:%s->%s\n",fb,f,tostring(last_fb_fields[fb][f]),v)
 				last_fb_fields[fb][f]=v
 			end
 		end
 
-		-- for big palettes this lags, should be an otpion
-		--[[
-		if last_frame_fields.palette_data_start > 0 then
+		-- for big palettes this lags, optional
+		if prefs.gui_dump_palette and last_frame_fields.palette_data_start > 0 then
 			printf('palette:\n')
 			local c=0
 
@@ -217,7 +216,6 @@ local function update_frame_data(frame)
 				end
 			end
 		end
-		--]]
 	end
 end
 
@@ -267,7 +265,7 @@ local function init_dump_replay()
 		printf("incompatible version %s\n",tostring(header:get_u32()))
 		return
 	end
-	printf("loading dump ver %s.%s\n",tostring(header:get_u32()),tostring(header:get_u32(4)))
+	gui.infomsg("loading dump ver %s.%s\n",tostring(header:get_u32()),tostring(header:get_u32(4)))
 	m.dump_replay = true
 	if not m.dump_replay_frame then
 		m.dump_replay_frame = chdku.live_wrap()
@@ -302,7 +300,7 @@ end
 
 local function end_dump()
 	if con.live and con.live.dump_fh then
-		printf('%d bytes recorded to %s\n',tonumber(con.live.dump_size),tostring(con.live.dump_fn))
+		gui.infomsg('%d bytes recorded to %s\n',tonumber(con.live.dump_size),tostring(con.live.dump_fn))
 		con:live_dump_end()
 	end
 end
@@ -349,11 +347,11 @@ local function toggle_play_dump(self,state)
 		local status = filedlg.status
 		local value = filedlg.value
 		if status ~= "0" then
-			printf('play dump canceled\n')
+			gui.dbgmsg('play dump canceled\n')
 			self.value = "OFF"
 			return
 		end
-		printf('playing %s\n',tostring(value))
+		gui.infomsg('playing %s\n',tostring(value))
 		m.dump_replay_filename = value
 		init_dump_replay()
 	else
@@ -543,7 +541,7 @@ function m.init()
 		-- TODO UseContextPlus seems harmless if not built with plus support
 		if guisys.caps().CDPLUS then
 			cd.UseContextPlus(true)
-			printf("ContexIsPlus iup:%s cd:%s\n",tostring(cd.ContextIsPlus(cd.IUP)),tostring(cd.ContextIsPlus(cd.DBUFFER)))
+			gui.infomsg("ContexIsPlus iup:%s cd:%s\n",tostring(cd.ContextIsPlus(cd.IUP)),tostring(cd.ContextIsPlus(cd.DBUFFER)))
 		end
 		self.ccnv = cd.CreateCanvas(cd.IUP,self)
 		self.dccnv = cd.CreateCanvas(cd.DBUFFER,self.ccnv)
@@ -560,11 +558,9 @@ function m.init()
 		self.ccnv:Kill()
 	end
 
-	--[[
 	function icnv:resize_cb(w,h)
-		print("Resize: Width="..w.."   Height="..h)
+		gui.dbgmsg("Resize: Width="..w.."   Height="..h)
 	end
-	--]]
 
 	m.container_title='Live'
 end
@@ -616,5 +612,5 @@ end
 function m.on_dlg_run()
 	init_timer()
 end
-
+prefs._add('gui_dump_palette','boolean','dump live palette data on state change')
 return m
