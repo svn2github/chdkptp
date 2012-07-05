@@ -1434,11 +1434,53 @@ static int syslib_gettimeofday(lua_State *L) {
 	return 2;
 }
 
+/*
+global copies of argc, argv for lua
+*/
+int g_argc;
+char **g_argv;
+
+/*
+get argv[0]
+*/
+static int syslib_getcmd(lua_State *L) {
+	lua_pushstring(L,g_argv[0]);
+	return 1;
+}
+/*
+get command line arguments as an array
+args=sys.getargs()
+*/
+static int syslib_getargs(lua_State *L) {
+	int i;
+	lua_createtable(L,g_argc-1,0);
+// make the command line args available in lua
+	for(i = 1; i < g_argc; i++) {
+		lua_pushstring(L,g_argv[i]);
+		lua_rawseti(L, -2, i); // add to array
+	}
+	return 1;
+}
+
+/*
+val=sys.getenv("name")
+*/
+static int syslib_getenv(lua_State *L) {
+	const char *e = getenv(luaL_checkstring(L,1));
+	if(e) {
+		lua_pushstring(L,e);
+		return 1;
+	}
+	return 0;
+}
 
 static const luaL_Reg lua_syslib[] = {
   {"sleep", syslib_sleep},
   {"ostype", syslib_ostype},
   {"gettimeofday", syslib_gettimeofday},
+  {"getcmd",syslib_getcmd},
+  {"getargs",syslib_getargs},
+  {"getenv",syslib_getenv},
   {NULL, NULL}
 };
 
@@ -1554,20 +1596,11 @@ static int exec_lua_string(lua_State *L, const char *luacode) {
 }
 
 
-static void init_lua_globals (lua_State *L, int argc, char **argv) {
-	int i;
-	lua_createtable(L,argc-1,0);
-// make the command line args available in lua
-	for(i = 1; i < argc; i++) {
-		lua_pushstring(L,argv[i]);
-		lua_rawseti(L, -2, i); // add to array
-	}
-	lua_setglobal(L,"args");
-}
-
 /* main program  */
 int main(int argc, char ** argv)
 {
+	g_argc = argc;
+	g_argv = argv;
 	/* register signal handlers */
 //	signal(SIGINT, ptpcam_siginthandler);
 	usb_init();
@@ -1575,7 +1608,6 @@ int main(int argc, char ** argv)
 	luaL_openlibs(L);
 	luaopen_lfs(L);
 	lbuf_open(L);
-	init_lua_globals(L,argc,argv);
 	chdkptp_registerlibs(L);
 	exec_lua_string(L,"require('main')");
 	uninit_gui_libs(L);

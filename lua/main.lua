@@ -160,6 +160,7 @@ end
 
 con=chdku.connection()
 
+local args = sys.getargs()
 if #args > 0 then
 	process_options()
 	if options.g then
