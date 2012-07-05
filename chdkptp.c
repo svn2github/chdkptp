@@ -283,10 +283,9 @@ init_ptp_usb (PTPParams* params, PTP_USB* ptp_usb, struct usb_device* dev)
 			dev->config->interface->altsetting->bInterfaceNumber);
 		// Get max endpoint packet size for bulk transfer fix
 		params->max_packet_size = dev->config->interface->altsetting->endpoint->wMaxPacketSize;
-		fprintf(stderr,"max endpoint size = %d\n",params->max_packet_size);
+//		fprintf(stderr,"max endpoint size = %d\n",params->max_packet_size);
 		if (params->max_packet_size == 0) params->max_packet_size = 512;    // safety net ?
 	}
-//	globalparams=params;
 }
 
 void
@@ -1280,6 +1279,7 @@ ptp_dev_info = {
 	model = "model"
 	device_version = "version""
 	serial_number = "serialnum"
+	max_packet_size = <number>
 }
 more fields may be added later
 serial number may be NULL (=unset in table)
@@ -1302,6 +1302,10 @@ static int chdk_get_ptp_devinfo(lua_State *L) {
 	lua_setfield(L, -2, "device_version");
 	lua_pushstring(L, params->deviceinfo.SerialNumber);
 	lua_setfield(L, -2, "serial_number");
+	// TODO techincally this belongs to the endpoint
+	// putting it here for informational purposes anyway so we can display in lua
+	lua_pushnumber(L, params->max_packet_size);
+	lua_setfield(L, -2, "max_packet_size");
 
 	return 1;
 }

@@ -904,10 +904,15 @@ cli:add_commands{
 			end
 			if lcon then
 				con = lcon
-				if con:is_connected() then
-					return true
+				if not con:is_connected() then
+					local status,err
+					status, err = con:connect()
+					if not status then
+						return false,err
+					end
 				end
-				return con:connect()
+				-- TODO this should be verbose option
+				return true,string.format('connected: %s, max packet size %d',con.ptpdev.model,con.ptpdev.max_packet_size)
 			end
 			return false,"no matching devices found"
 		end,
