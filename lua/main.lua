@@ -90,7 +90,7 @@ end
 options = {}
 cmd_opts_map = {}
 -- defaults TODO from prefs
-function process_options()
+function process_options(args)
 	local i
 	for i=1,#cmd_opts do
 		options[cmd_opts[i].opt] = false
@@ -162,7 +162,7 @@ con=chdku.connection()
 
 local args = sys.getargs()
 if #args > 0 then
-	process_options()
+	process_options(args)
 	if options.g then
 		do_gui_startup()
 	else
