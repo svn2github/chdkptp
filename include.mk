@@ -39,6 +39,11 @@ else
 CFLAGS+=-O2
 endif
 
+# use included headers if not specified
+ifndef CHDK_SRC_DIR
+CHDK_SRC_DIR=$(TOPDIR)/chdk_headers
+endif
+
 ifeq ("$(CD_USE_PLUS)","gdiplus")
 CD_PLUS_SYS_LIBS=$(GDI_PLUS_LIBS)
 endif

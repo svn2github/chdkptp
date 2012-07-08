@@ -7,10 +7,11 @@ CD_SUPPORT=1
 # use CD "plus" context. gdiplus on windows, may have better alpha support
 #CD_USE_PLUS=gdiplus
 
-# root directories of various packages, not used to set subdirs below.
+# root directories of various packages, used to set subdirs below.
 # Not required by main makefile
 IUP_DIR=/d/devel/iup
 CD_DIR=/d/devel/cd
+
 LIBUSB_DIR=/d/devel/libusb-win32-bin-1.2.4.0
 LUA_DIR=/d/devel/lua
 
@@ -36,3 +37,10 @@ DEBUG=1
 
 # include svn revision in build number
 #USE_SVNREV=1
+
+# You don't need to set this unless you are doing protocol development
+# if not set, included copies in the chdk_headers directory will be used
+# Used to locate CHDK ptp.h and live_view.h 
+# this intentionaly uses the ROOT of the CHDK tree, to avoid header name conflicts 
+# so core/ptp.h should be found relative to this
+#CHDK_SRC_DIR=$(TOPDIR)/chdk_headers
