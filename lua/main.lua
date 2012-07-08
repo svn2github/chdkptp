@@ -69,6 +69,18 @@ cmd_opts = {
 		end,
 	},
 	{
+		opt="r",
+		help='specify startup command file, if no file given skip default startup files',
+		process=function(rest)
+			if rest and rest ~= '' then
+				options.r = rest
+			else
+				options.r = true
+			end
+			return true,options.r
+		end,
+	},
+	{
 		opt="h",
 		help="help",
 		process=bool_opt,
@@ -121,6 +133,40 @@ function process_options(args)
 	end
 end
 
+function do_rc_file(name)
+	local path
+	-- -r with no file
+	if options.r == true then
+		return
+	elseif not options.r then
+		path=sys.getenv('CHDKPTP_HOME')
+		if not path then
+			path=sys.getenv('HOME')
+			-- TODO profile dir on windows ? exe dir ?
+			if not path then
+				return false
+			end
+		end
+		-- fix . to _ on windows
+		-- TODO check for both ?
+		if sys.ostype() == 'Windows' and string.sub(name,1,1) == '.' then
+			name = '_'..string.sub(name,2,-1)
+		end
+		path=fsutil.joinpath(path,name)
+	else
+		path = options.r
+	end
+	if lfs.attributes(path,'mode') ~= 'file' then
+--		printf('rc %s not found\n',path)
+		return false
+	end
+	local status, msg=cli:execfile(path)
+	if not status then
+		warnf('rc %s failed: %s\n',path,tostring(msg))
+		return false
+	end
+	return true
+end
 
 function do_connect_option()
 	if options.c then
@@ -144,6 +190,7 @@ function do_gui_startup()
 	printf('starting gui...\n')
 	if guisys.init() then
 		gui=require('gui')
+		do_rc_file('.chdkptpguirc')
 		return gui:run()
 	else
 		printf('gui not supported')
@@ -152,6 +199,7 @@ function do_gui_startup()
 end
 
 local function do_no_gui_startup()
+	do_rc_file('.chdkptprc')
 	do_connect_option()
 	do_execute_option()
 	if options.i then

@@ -34,10 +34,11 @@ chdkptp includes software from several other projects, see THANKS.TXT for detail
   Optional, used for remote display
 - Lua version 5.1 http://www.lua.org/
 - LibUSB (libusb-win32 on windows)
-- CHDK source for PTP protocol header from the appropriate branch, e.g. http://tools.assembla.com/chdk/browser/trunk
+- CHDK source for PTP protocol header from the appropriate branch, e.g.
+  http://tools.assembla.com/chdk/browser/trunk
 
 =Windows development environment=
-Mingw with gcc 4.5+ is the primary development environment. 
+Mingw with gcc 4.6+ is the primary development environment. 
 All instructions below assume you are using this.
 Using a mingw bash shell for development is suggested.
 

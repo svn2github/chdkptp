@@ -19,6 +19,7 @@ local cli = {
 	cmds={},
 	names={},
 	finished = false,
+	source_level = 0, -- number of nested execfile calls
 }
 --[[
 info printf - message to be printed at normal verbosity
@@ -259,6 +260,36 @@ function cli:execute(line)
 	return true,""
 end
 
+function cli:execfile(filename) 
+	if cli.source_level == prefs.cli_source_max then
+		return false, 'too many nested source calls'
+	end
+	cli.source_level = cli.source_level + 1
+	local fh, err = io.open(filename,'rb')
+	if not fh then 
+		return false, 'failed to open file: '..tostring(err)
+	end
+	-- empty file is OK
+	local status = true
+	local lnum = 1
+	for line in fh:lines() do
+		local msg
+		status, msg = self:execute(line)
+		self:print_status(status,msg)
+		-- TODO pref to continue on errors
+		if self.finished or not status then
+			break
+		end
+		lnum = lnum + 1
+	end
+	fh:close()
+	cli.source_level = cli.source_level - 1
+	if not status then
+		return false, string.format('error on line %d',lnum)
+	end
+	return true
+end
+
 function cli:print_status(status,msg) 
 	if not status then
 		errf("%s\n",tostring(msg))
@@ -386,13 +417,21 @@ cli:add_commands{
 			return prefs._set(name,value)
 		end,
 	},
-
 	{
 		names={'quit','q'},
 		help='quit program',
 		func=function() 
 			cli.finished = true
 			return true,"bye"
+		end,
+	},
+	{
+		names={'source'},
+		help='execute cli commands from file',
+		arghelp='<file>',
+		args=argparser.create{ },
+		func=function(self,args) 
+			return cli:execfile(args[1])
 		end,
 	},
 	{
@@ -488,22 +527,11 @@ cli:add_commands{
 			end
 
 			if args.i32 then
-				local fmt = '0x%08x'
+				local fmt
 				if type(args.i32) == 'string' then
 					fmt = args.i32
 				end
-				local lb = lbuf.new(r)
-				local s = ''
-				for i=0,count-4,4 do 
-					if i%16 == 0 then
-						if i > 1 then
-							s = s .. '\n'
-						end
-						s = s .. string.format('0x%08x:',addr+i)
-					end
-					s = s..string.format(' '..fmt,lb:get_u32(i))
-				end
-				r = s..'\n'
+				r=util.hexdump_words(r,addr,fmt)
 			else
 				r=util.hexdump(r,addr)
 			end
@@ -1128,4 +1156,5 @@ cli:add_commands{
 };
 prefs._add('cli_time','boolean','show cli execution times')
 prefs._add('cli_verbose','number','control verbosity of cli',1)
+prefs._add('cli_source_max','number','max nested source calls',10)
 return cli

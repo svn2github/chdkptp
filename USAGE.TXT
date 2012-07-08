@@ -1,15 +1,31 @@
 chdkptp supports console CLI, a GUI, and batch operation.
 
-The gui is still unfinished
+The GUI is still unfinished
 
-=Command line=
-The interface is selected by command line options
+=Invoking=
+The interface is selected by command line options, described below.
+
+==Running under linux==
+Under linux, the .lua files will not automatically found relative to the
+executable directory. You can set LUA_PATH on the command line to allow them
+to be located:
+$ LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp ...
+
+Similarly, if the IUP and CD shared libraries are not on the default system
+path, you must also set LD_LIBARARY_PATH
+$ LD_LIBRARY_PATH=/path/to/iup LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp -g
+
+It is suggested that you put all this in a shell script, see chdkptp-sample.sh
+for an example.
+
+==Command line==
 Usage: chdkptp [options]
 Options:
  -g  start GUI - default if GUI available and no options given
  -i  start interactive cli
  -c  connect at startup, with optional device spec e.g. -c"-d001 -bbus-0"
  -e  execute cli command, multiple allowed, e.g -e"u DISKBOOT.BIN" -ereboot
+ -r  specify startup command file, if no file given skip default startup files
  -h  help
 
 If invoked with no options, the GUI will be started if available.  Otherwise,
@@ -18,7 +34,25 @@ the CLI will be started.
 If started with options and neither -g nor -i is given, chdkptp will run in
 batch mode, exiting after performing the actions specified by in the options
 
-When using -e or -c, you must quote any arguments that include spaces
+When using -e, -c or r, you must quote any arguments that include spaces
+
+==Startup files==
+Startup files can be used to automatically execute CLI commands at startup.
+Using the exec command, you may also execute arbitrary lua.
+
+If the -r command line option is used, it is treated as the full name of the
+file, and the default files are ignored. If -r is given without a filename,
+no startup file is used. 
+
+If -r is not used, CHDKPTP checks for startup files using the CHDKPTP_HOME
+environment variable, or if that is not set, the HOME environment variable.
+
+.chdkptprc (linux) / _chdkptprc (windows) is the default startup file in CLI
+or batch mode.
+
+.chdkptpguirc (linux) / _chdkptpguirc (windows) is the default startup file
+in GUI mode. This is run after the gui module is loaded, but before the GUI
+is started.
 
 =CLI=
 CLI commands are available from the console, gui and the command line
@@ -47,7 +81,13 @@ exec (!)     <lua code>  : - execute local lua
  The global variable con accesses the current CLI connection.
  Return values are printed in the console.
 
+set          [-v|-c] [option[=value]]: - show or set option
+ Use set with no options to see a list
+  -v show desciption when showing value
+  -c output as set command
+
 quit (q)                 : - quit program
+source       <file>      : - execute cli commands from file
 lua (.)      <lua code>  : - execute remote lua
  Execute Lua code on the camera.
  Returns immediately after the script is started.
@@ -169,7 +209,7 @@ dumpframes   [options] [file]: - dump camera display frames to file
    -quiet     don't print progress
 
 =Examples=
-start chdkptp in interactive mode and connect to the camera
+start chdkptp in interactive mode and connect to the first available camera
  chdkptp -i -c
 
 execute lua on host PC and print the result
@@ -216,15 +256,4 @@ con> list
  1:Canon PowerShot D10 b=bus-0 d=\\.\libusb0-0001--0x04a9-0x31bc v=0x4a9 p=0x31bc s=12345678123456781234567812345678
 *2:Canon PowerShot A540 b=bus-0 d=\\.\libusb0-0002--0x04a9-0x311b v=0x4a9 p=0x311b s=nil
 
-=Running under linux=
-Under linux, the .lua files will not automatically found relative to the
-executable directory You can set LUA_PATH on the command line to allow them
-to be located:
-$ LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp ...
-
-Similarly, if the IUP and CD shared libraries are not on the default system path,
-you must also set LD_LIBARARY_PATH
-$ LD_LIBRARY_PATH=/path/to/iup LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp -g
-
-This can be done in a shell script, see chdkptp-sample.sh
 

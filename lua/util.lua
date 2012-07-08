@@ -255,6 +255,28 @@ function util.hexdump(str,offset)
 	return result
 end
 
+-- requires lbuf
+function util.hexdump_words(str,offset,fmt)
+	if not offset then
+		offset = 0
+	end
+	if not fmt then
+		fmt = '0x%08x'
+	end
+	local lb = lbuf.new(str)
+	local s = ''
+	for i=0,string.len(str)-4,4 do 
+		if i%16 == 0 then
+			if i > 1 then
+				s = s .. '\n'
+			end
+			s = s .. string.format('0x%08x:',offset+i)
+		end
+		s = s..string.format(' '..fmt,lb:get_u32(i))
+	end
+	return s..'\n'
+end
+
 local serialize_r
 serialize_r = function(v,opts,r,seen,depth)
 	local vt = type(v)
