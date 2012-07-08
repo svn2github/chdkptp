@@ -34,3 +34,5 @@ LIBUSB_LIB_DIR=$(LIBUSB_DIR)/lib/gcc
 # compile with debug support 
 DEBUG=1
 
+# include svn revision in build number
+#USE_SVNREV=1

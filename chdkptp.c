@@ -85,6 +85,8 @@
 /* some defines comes here */
 
 /* CHDK additions */
+#define CHDKPTP_VERSION_MAJOR 0
+#define CHDKPTP_VERSION_MINOR 1
 
 /* lua registry indexes */
 /* meta table for connection objects */
@@ -833,11 +835,36 @@ static int chdk_camera_api_version(lua_State *L) {
 	return 2;
 }
 
-// these could be constants in the table
 static int chdk_host_api_version(lua_State *L) {
+	lua_newtable(L);
 	lua_pushnumber(L,PTP_CHDK_VERSION_MAJOR);
+	lua_setfield(L, -2, "MAJOR");
 	lua_pushnumber(L,PTP_CHDK_VERSION_MINOR);
-	return 2;
+	lua_setfield(L, -2, "MINOR");
+	return 1;
+}
+
+static int chdk_program_version(lua_State *L) {
+	lua_newtable(L);
+	lua_pushnumber(L,CHDKPTP_VERSION_MAJOR);
+	lua_setfield(L, -2, "MAJOR");
+
+	lua_pushnumber(L,CHDKPTP_VERSION_MINOR);
+	lua_setfield(L, -2, "MINOR");
+
+	lua_pushnumber(L,CHDKPTP_BUILD_NUM);
+	lua_setfield(L, -2, "BUILD");
+
+	lua_pushstring(L,__DATE__);
+	lua_setfield(L, -2, "DATE");
+
+	lua_pushstring(L,__TIME__);
+	lua_setfield(L, -2, "TIME");
+
+	lua_pushstring(L,__VERSION__);
+	lua_setfield(L, -2, "COMPILER_VERSION");
+
+	return 1;
 }
 
 /*
@@ -1359,6 +1386,7 @@ TODO many errors are still printed to the console
 static const luaL_Reg chdklib[] = {
   {"connection", chdk_connection},
   {"host_api_version", chdk_host_api_version},
+  {"program_version", chdk_program_version},
   {"list_usb_devices", chdk_list_usb_devices},
   {"get_conlist", chdk_get_conlist}, // TEMP TESTING
   {"reset_device", chdk_reset_device}, // TEMP TESTING
@@ -1562,6 +1590,7 @@ static int chdkptp_registerlibs(lua_State *L) {
 
 	/* register functions that don't require a connection */
 	luaL_register(L, "chdk", chdklib);
+
 	luaL_register(L, "sys", lua_syslib);
 	luaL_register(L, "guisys", lua_guisyslib);
 #ifdef CHDKPTP_LIVEVIEW

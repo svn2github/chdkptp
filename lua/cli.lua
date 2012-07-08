@@ -892,18 +892,34 @@ cli:add_commands{
 	},
 	{
 		names={'version','ver'},
-		help='print API versions',
+		help='print API and program versions',
+		args=argparser.create{ p=false},
+		arghelp="[-p]",
+		help_detail=[[
+ -p print program version
+]],
 		func=function(self,args) 
-			local host_ver = string.format("host:%d.%d cam:",chdk.host_api_version())
+			local host_ver = string.format("host:%d.%d cam:",chdku.apiver.MAJOR,chdku.apiver.MINOR)
+			local status = true
+			local r
 			if con:is_connected() then
+				-- TODO could just use con cached versions
 				local cam_major, cam_minor = con:camera_api_version()
-				if not cam_major then
-					return false, host_ver .. string.format("error %s",cam_minor)
-				end
-				return true, host_ver .. string.format("%d.%d",cam_major,cam_minor)
+				if cam_major then
+					r = host_ver .. string.format("%d.%d",cam_major,cam_minor)
+				else
+					status = false
+					r =  host_ver .. string.format("error %s",cam_minor)
+				end 
 			else
-				return true, host_ver .. "not connected"
+				r = host_ver .. "not connected"
 			end
+			if args.p then
+				r = string.format('chdkptp %d.%d.%d built %s %s\n%s',
+									chdku.ver.MAJOR,chdku.ver.MINOR,chdku.ver.BUILD,
+									chdku.ver.DATE,chdku.ver.TIME,r)
+			end
+			return status,r
 		end,
 	},
 	{

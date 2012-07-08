@@ -1,6 +1,15 @@
 TOPDIR=.
 include include.mk
 
+ifdef USE_SVNREV
+SVNREV=$(shell svnversion -n |sed -r -e's/^([0-9]+:)?([0-9]+)[MSP]/\2/')
+ifeq ("$(SVNREV)","")
+SVNREV=0
+endif
+else
+SVNREV=0
+endif
+
 ifeq ($(OSTYPE),Windows)
 SYS_LIBS=ws2_32 kernel32
 IUP_SYS_LIBS=comctl32 ole32 gdi32 comdlg32
@@ -67,7 +76,8 @@ LIVEVIEW_SRCS=liveimg.c
 endif
 
 INC_PATHS+=-I$(CHDK_SRC_DIR)
-CFLAGS+=$(INC_PATHS)
+
+CFLAGS+=$(INC_PATHS) -DCHDKPTP_BUILD_NUM=$(SVNREV)
 
 LDFLAGS+=$(LIB_PATHS) $(patsubst %,-l%,$(LINK_LIBS) $(SYS_LIBS)) 
 

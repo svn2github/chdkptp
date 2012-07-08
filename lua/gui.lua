@@ -82,7 +82,7 @@ connect_icon = iup.label{
 }
 
 connect_label = iup.label{
-	title = string.format("host:%d.%d cam:-.- ",chdk.host_api_version()),
+	title = string.format("host:%d.%d cam:-.- ",chdku.apiver.MAJOR,chdku.apiver.MINOR),
 }
 
 -- creates a button
@@ -166,16 +166,17 @@ return l,capmode.get()
 end
 
 function gui.update_connection_status()
-	local host_major, host_minor = chdk.host_api_version()
 	if con:is_connected() then
 		connect_icon.active = "YES"
 		btn_connect.title = "Disconnect"
-		connect_label.title = string.format("host:%d.%d cam:%d.%d",host_major,host_minor,con.apiver.major,con.apiver.minor)
+		connect_label.title = string.format("host:%d.%d cam:%d.%d",
+											chdku.apiver.MAJOR,chdku.apiver.MINOR,
+											con.apiver.MAJOR,con.apiver.MINOR)
 		update_mode_list()
 	else
 		connect_icon.active = "NO"
 		btn_connect.title = "Connect"
-		connect_label.title = string.format("host:%d.%d cam:-.-",host_major,host_minor)
+		connect_label.title = string.format("host:%d.%d cam:-.-",chdku.apiver.MAJOR,chdku.apiver.MINOR)
 		clear_mode_list()
 	end
 	live.on_connect_change(con)

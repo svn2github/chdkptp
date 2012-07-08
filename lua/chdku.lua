@@ -794,7 +794,7 @@ function con_methods:update_connection_info()
 	if not major then
 		return false,minor
 	end
-	self.apiver={major=major,minor=minor}
+	self.apiver={MAJOR=major,MINOR=minor}
 	return true
 end
 --[[
@@ -953,7 +953,7 @@ NOTE this only tells if the CHDK protocol supports live view
 the live sub-protocol might not be fully compatible
 ]]
 function con_methods:live_is_api_compatible()
-	if con.apiver.major == 2 and con.apiver.minor >= 3 then
+	if con.apiver.MAJOR == 2 and con.apiver.MINOR >= 3 then
 		return true
 	end
 end
@@ -1056,6 +1056,11 @@ local function init_connection_methods()
 end
 
 init_connection_methods()
+
+-- host api version
+chdku.apiver = chdk.host_api_version()
+-- host progam version
+chdku.ver = chdk.program_version()
 
 --[[
 bool = chdku.match_device(devinfo,match)

@@ -22,3 +22,6 @@ DEBUG=1
 #IUP_INCLUDE_DIR=/path/to/iup/include
 #CD_LIB_DIR=/path/to/cd
 #CD_INCLUDE_DIR=/path/to/cd/include
+
+# include svn revision in build number
+#USE_SVNREV=1
