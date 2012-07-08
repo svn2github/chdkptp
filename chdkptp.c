@@ -855,6 +855,9 @@ static int chdk_program_version(lua_State *L) {
 	lua_pushnumber(L,CHDKPTP_BUILD_NUM);
 	lua_setfield(L, -2, "BUILD");
 
+	lua_pushstring(L,CHDKPTP_REL_DESC);
+	lua_setfield(L, -2, "DESC");
+
 	lua_pushstring(L,__DATE__);
 	lua_setfield(L, -2, "DATE");
 

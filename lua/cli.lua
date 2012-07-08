@@ -915,8 +915,8 @@ cli:add_commands{
 				r = host_ver .. "not connected"
 			end
 			if args.p then
-				r = string.format('chdkptp %d.%d.%d built %s %s\n%s',
-									chdku.ver.MAJOR,chdku.ver.MINOR,chdku.ver.BUILD,
+				r = string.format('chdkptp %d.%d.%d-%s built %s %s\n%s',
+									chdku.ver.MAJOR,chdku.ver.MINOR,chdku.ver.BUILD,chdku.ver.DESC,
 									chdku.ver.DATE,chdku.ver.TIME,r)
 			end
 			return status,r

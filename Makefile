@@ -77,7 +77,7 @@ endif
 
 INC_PATHS+=-I$(CHDK_SRC_DIR)
 
-CFLAGS+=$(INC_PATHS) -DCHDKPTP_BUILD_NUM=$(SVNREV)
+CFLAGS+=$(INC_PATHS) -DCHDKPTP_BUILD_NUM=$(SVNREV) -DCHDKPTP_REL_DESC="\"alpha\""
 
 LDFLAGS+=$(LIB_PATHS) $(patsubst %,-l%,$(LINK_LIBS) $(SYS_LIBS)) 
 
@@ -87,7 +87,6 @@ EXES=chdkptp$(EXE)
 
 all: $(EXES)
 
-#SRCS=myusb.c properties.c ptp.c chdkptp.c lbuf.c $(LIVEVIEW_SRCS)
 SRCS=properties.c ptp.c chdkptp.c lbuf.c $(LIVEVIEW_SRCS)
 OBJS=$(SRCS:.c=.o)
 
