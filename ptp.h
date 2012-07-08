@@ -872,9 +872,10 @@ const char* ptp_prop_getvalbyname
 
 // include CHDK ptp protocol definitions from a CHDK source tree
 #include <core/ptp.h>
-#ifdef CHDKPTP_LIVEVIEW
-#include <core/live_view.h>
+#if (PTP_CHDK_VERSION_MAJOR < 2 || (PTP_CHDK_VERSION_MAJOR == 2 && PTP_CHDK_VERSION_MINOR < 3))
+#error your chdk headers are too old, unset CHDK_SRC_DIR in config.mk
 #endif
+#include <core/live_view.h>
 
 // the following happens to match what is used in CHDK, but is not part of the protocol
 typedef struct {
@@ -896,8 +897,6 @@ int ptp_chdk_get_script_support(PTPParams* params, PTPDeviceInfo* deviceinfo, un
 int ptp_chdk_get_script_status(PTPParams* params, PTPDeviceInfo* deviceinfo, unsigned *status);
 int ptp_chdk_write_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo, char *data, unsigned size, int target_script_id, int *status);
 int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_chdk_script_msg **msg);
-#ifdef CHDKPTP_LIVEVIEW
 int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,unsigned flags,char **data,unsigned *data_size);
-#endif
 
 #endif /* __PTP_H__ */

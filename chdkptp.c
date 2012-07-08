@@ -1072,7 +1072,6 @@ static int chdk_script_status(lua_State *L) {
 	lua_setfield(L, -2, "msg");
 	return 1;
 }
-#ifdef CHDKPTP_LIVEVIEW
 /*
 lbuf[,errmsg]=con:get_live_data(lbuf,flags)
 lbuf - lbuf to re-use, will be created if nil
@@ -1116,7 +1115,6 @@ static int chdk_get_live_data(lua_State *L) {
 	}
 	return 1;
 }
-#endif
 
 // TODO these assume numbers are 0 based and contiguous 
 static const char* script_msg_type_to_name(unsigned type_id) {
@@ -1431,9 +1429,7 @@ static const luaL_Reg chdkconnection[] = {
   {"dev_status", chdk_dev_status},
   {"get_ptp_devinfo", chdk_get_ptp_devinfo},
   {"get_usb_devinfo", chdk_get_usb_devinfo}, // does not need to be connected, returns bus and dev at minimum
-#ifdef CHDKPTP_LIVEVIEW
   {"get_live_data",chdk_get_live_data},
-#endif
   {NULL, NULL}
 };
 
@@ -1563,10 +1559,8 @@ static int guisys_caps(lua_State *L) {
 	lua_pushboolean(L,1);
 	lua_setfield(L,-2,"CD");
 #endif
-#ifdef CHDKPTP_LIVEVIEW
 	lua_pushboolean(L,1);
 	lua_setfield(L,-2,"LIVEVIEW");
-#endif
 #ifdef CHDKPTP_CD_PLUS
 	lua_pushboolean(L,1);
 	lua_setfield(L,-2,"CDPLUS");
@@ -1596,9 +1590,9 @@ static int chdkptp_registerlibs(lua_State *L) {
 
 	luaL_register(L, "sys", lua_syslib);
 	luaL_register(L, "guisys", lua_guisyslib);
-#ifdef CHDKPTP_LIVEVIEW
+
 	liveimg_open(L);	
-#endif
+	
 	// create a table to keep track of connections
 	lua_newtable(L);
 	// metatable for above

@@ -21,10 +21,6 @@
  *
  */
 
-#if !defined(CHDKPTP_LIVEVIEW)
-#error "live view support not enabled"
-#endif
-
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>

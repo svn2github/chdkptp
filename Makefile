@@ -70,10 +70,6 @@ LINK_LIBS=$(IUP_LUA_LIB) $(LUA_LIB) $(IUP_LIB) $(LIBUSB_LIB)
 endif
 # iup
 endif
-ifeq ("$(LIVEVIEW_SUPPORT)","1")
-CFLAGS+=-DCHDKPTP_LIVEVIEW=1
-LIVEVIEW_SRCS=liveimg.c
-endif
 
 INC_PATHS+=-I$(CHDK_SRC_DIR)
 
@@ -87,7 +83,7 @@ EXES=chdkptp$(EXE)
 
 all: $(EXES)
 
-SRCS=properties.c ptp.c chdkptp.c lbuf.c $(LIVEVIEW_SRCS)
+SRCS=properties.c ptp.c chdkptp.c lbuf.c liveimg.c
 OBJS=$(SRCS:.c=.o)
 
 chdkptp$(EXE): $(OBJS)

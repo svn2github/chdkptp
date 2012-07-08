@@ -1945,7 +1945,6 @@ int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_ch
   return 1;
 }
 
-#ifdef CHDKPTP_LIVEVIEW
 int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,unsigned flags,char **data,unsigned *data_size) {
   uint16_t r;
   PTPContainer ptp;
@@ -1970,5 +1969,3 @@ int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,unsigned
   return 1;
 
 }
-#endif
-
