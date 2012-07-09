@@ -59,4 +59,5 @@ if [ -z "$debug" ] ; then
 fi
 zip "$ZIPNAME" "$PROG" chdkptp-sample.sh \
 	lua/*.lua \
+	lua/extras/*.lua \
 	README.TXT USAGE.TXT COPYING THANKS.TXT
