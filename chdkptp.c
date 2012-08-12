@@ -255,7 +255,7 @@ ptpcam_error (void *data, const char *format, va_list args)
 
 
 
-void
+int
 init_ptp_usb (PTPParams* params, PTP_USB* ptp_usb, struct usb_device* dev)
 {
 	usb_dev_handle *device_handle;
@@ -274,20 +274,20 @@ init_ptp_usb (PTPParams* params, PTP_USB* ptp_usb, struct usb_device* dev)
 	params->transaction_id=0;
 	params->byteorder = PTP_DL_LE;
 
-	if ((device_handle=usb_open(dev))){
-		if (!device_handle) {
-			perror("usb_open()");
-			exit(0);
-		}
-		ptp_usb->handle=device_handle;
-		usb_set_configuration(device_handle, dev->config->bConfigurationValue);
-		usb_claim_interface(device_handle,
-			dev->config->interface->altsetting->bInterfaceNumber);
-		// Get max endpoint packet size for bulk transfer fix
-		params->max_packet_size = dev->config->interface->altsetting->endpoint->wMaxPacketSize;
-//		fprintf(stderr,"max endpoint size = %d\n",params->max_packet_size);
-		if (params->max_packet_size == 0) params->max_packet_size = 512;    // safety net ?
+	device_handle = usb_open(dev);
+	if (!device_handle) {
+		perror("usb_open()");
+		return 0;
 	}
+	ptp_usb->handle=device_handle;
+	usb_set_configuration(device_handle, dev->config->bConfigurationValue);
+	usb_claim_interface(device_handle,
+		dev->config->interface->altsetting->bInterfaceNumber);
+	// Get max endpoint packet size for bulk transfer fix
+	params->max_packet_size = dev->config->interface->altsetting->endpoint->wMaxPacketSize;
+//		fprintf(stderr,"max endpoint size = %d\n",params->max_packet_size);
+	if (params->max_packet_size == 0) params->max_packet_size = 512;    // safety net ?
+	return 1;
 }
 
 void
@@ -451,7 +451,10 @@ reset_device (struct usb_device *dev)
 
 	find_endpoints(dev,&ptp_usb.inep,&ptp_usb.outep,&ptp_usb.intep);
 
-	init_ptp_usb(&params, &ptp_usb, dev);
+	if(!init_ptp_usb(&params, &ptp_usb, dev)) {
+		printf("init_ptp_usb failed\n");
+		return;
+	}
 	
 	/* get device status (devices likes that regardless of its result)*/
 	usb_ptp_get_device_status(&ptp_usb,devstatus);
@@ -664,7 +667,10 @@ int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
 		return 0;
 	}
 	find_endpoints(dev,&ptp_usb->inep,&ptp_usb->outep,&ptp_usb->intep);
-	init_ptp_usb(params, ptp_usb, dev);   
+	if(!init_ptp_usb(params, ptp_usb, dev)) {
+		printf("open_camera_dev: init_ptp_usb 1 failed\n");
+		return 0;
+	}
 
 	ret = ptp_opensession(params,1);
 	if(ret!=PTP_RC_OK) {
@@ -685,7 +691,10 @@ int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
 
 		close_usb(ptp_usb, dev);
 		find_endpoints(dev,&ptp_usb->inep,&ptp_usb->outep,&ptp_usb->intep);
-		init_ptp_usb(params, ptp_usb, dev);   
+		if(!init_ptp_usb(params, ptp_usb, dev)) {
+			printf("open_camera_dev: init_ptp_usb 2 failed\n");
+			return 0;
+		}
 		ret=ptp_opensession(params,1);
 		if(ret!=PTP_RC_OK) {
 			printf("open_camera_dev: ptp_opensession 2 failed: 0x%x\n",ret);

@@ -152,7 +152,7 @@ extern short verbose;
 
 struct usb_bus* init_usb(void);
 void close_usb(PTP_USB* ptp_usb, struct usb_device* dev);
-void init_ptp_usb (PTPParams*, PTP_USB*, struct usb_device*);
+int init_ptp_usb (PTPParams*, PTP_USB*, struct usb_device*);
 void clear_stall(PTP_USB* ptp_usb);
 
 int usb_get_endpoint_status(PTP_USB* ptp_usb, int ep, uint16_t* status);
