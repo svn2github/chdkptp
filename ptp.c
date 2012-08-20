@@ -182,9 +182,7 @@ ptp_usb_getdata (PTPParams* params, PTPContainer* ptp,
 	static PTPUSBBulkContainer usbdata;
 
 	PTP_CNT_INIT(usbdata);
-#if 0
-	if (*data!=NULL) return PTP_ERROR_BADPARAM;
-#endif
+
 	do {
 		static uint32_t len;
 		/* read first(?) part of data */
@@ -206,6 +204,10 @@ ptp_usb_getdata (PTPParams* params, PTPContainer* ptp,
 		len=dtoh32(usbdata.length)-PTP_USB_BULK_HDR_LEN;
 		/* allocate memory for data if not allocated already */
 		if (*data==NULL) *data=calloc(1,len);
+		if (!*data) {
+			ret = PTP_ERROR_NOMEM;
+			break;
+		}
 		/* copy first part of data to 'data' */
 		memcpy(*data,usbdata.payload.data,
 			PTP_USB_BULK_PAYLOAD_LEN<len?
@@ -277,17 +279,6 @@ ptp_usb_getresp (PTPParams* params, PTPContainer* resp)
 #define PTP_DP_GETDATA		0x0002	/* receiving data */
 #define PTP_DP_DATA_MASK	0x00ff	/* data phase mask */
 
-/* Number of PTP Request phase parameters */
-// unused
-#if 0
-#define PTP_RQ_PARAM0		0x0000	/* zero parameters */
-#define PTP_RQ_PARAM1		0x0100	/* one parameter */
-#define PTP_RQ_PARAM2		0x0200	/* two parameters */
-#define PTP_RQ_PARAM3		0x0300	/* three parameters */
-#define PTP_RQ_PARAM4		0x0400	/* four parameters */
-#define PTP_RQ_PARAM5		0x0500	/* five parameters */
-#endif
-
 /**
  * ptp_transaction:
  * params:	PTPParams*
@@ -356,6 +347,7 @@ typedef struct PTPGetDataParams_s {
 	PTPGetDataFn fn;
 	size_t buf_size;
 	void *fn_data;
+	uint32_t data_len; // output - total length from PTP
 } PTPGetDataParams;
 
 static uint16_t ptp_getdata_transaction(PTPParams* params, PTPContainer* ptp, PTPGetDataParams *gdparams )
@@ -365,6 +357,7 @@ static uint16_t ptp_getdata_transaction(PTPParams* params, PTPContainer* ptp, PT
 	
 	size_t buf_size;
 	unsigned char *buf = NULL;
+	gdparams->data_len = 0;
 	if (gdparams->buf_size == 0) {
 		buf_size = 1024*1024*2; // TODO
 	} else if (gdparams->buf_size < params->max_packet_size) {
@@ -398,6 +391,7 @@ static uint16_t ptp_getdata_transaction(PTPParams* params, PTPContainer* ptp, PT
 		}
 		/* evaluate data length */
 		len=dtoh32(usbdata.length)-PTP_USB_BULK_HDR_LEN;
+		gdparams->data_len = len;
 		/* if it fit in the initial payload process and finish */
 		if(len+PTP_USB_BULK_HDR_LEN<=sizeof(usbdata)) {
 			ret = gdparams->fn(usbdata.payload.data,len,gdparams);
