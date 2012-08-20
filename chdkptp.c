@@ -86,7 +86,7 @@
 
 /* CHDK additions */
 #define CHDKPTP_VERSION_MAJOR 0
-#define CHDKPTP_VERSION_MINOR 1
+#define CHDKPTP_VERSION_MINOR 2
 
 /* lua registry indexes */
 /* meta table for connection objects */

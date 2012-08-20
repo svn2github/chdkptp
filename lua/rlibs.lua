@@ -487,8 +487,12 @@ function to batch stuff in groups of messages
 each batch is sent as a numeric array
 b=msg_batcher{
 	batchsize=num, -- items per batch
+	batchpause=num -- sleep after each batch, to allow client to empty queue, default=unset=none
+	batchgc=string -- 'collect' or 'step', if set, collectgarbage is called with this on each flush
 	timeout=num, -- message timeout
+	dbgmem=bool --  return memory info in data._dbg
 }
+TODO should check free memory and force collect/flush if low, but bad for cameras without firmware meminfo
 call
 b:write(value) adds items and sends when batch size is reached
 b:flush() sends any remaining items
@@ -500,10 +504,17 @@ b:flush() sends any remaining items
 function msg_batcher(opts)
 	local t = extend_table({
 		batchsize=50,
-		timeout=100000
+--		batchpause=10,
+		batchgc='step',
+		timeout=100000,
+		dbgmem=true,
 	},opts)
 	t.data={}
 	t.n=0
+	if t.dbgmem then
+		t.init_free = get_meminfo().free_block_max_size
+		t.init_count = collectgarbage('count')
+	end
 	t.write=function(self,val)
 		self.n = self.n+1
 		self.data[self.n]=val
@@ -514,11 +525,23 @@ function msg_batcher(opts)
 	end
 	t.flush = function(self)
 		if self.n > 0 then
+			if self.dbgmem then
+				local count=collectgarbage('count')
+				local free=get_meminfo().free_block_max_size
+				self.data._dbg=string.format("count %d (%d) free %d (%d)",
+					count, count - self.init_count, free, self.init_free-free)
+			end
 			if not write_usb_msg(self.data,self.timeout) then
 				return false
 			end
 			self.data={}
 			self.n=0
+			if self.batchgc then
+				collectgarbage(self.batchgc)
+			end
+			if self.batchpause then
+				sleep(self.batchpause)
+			end
 		end
 		return true
 	end

@@ -159,6 +159,13 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 		return false,'mdownload: dest must be a directory'
 	end
 	local files={}
+	if opts.dbgmem then
+		files._dbg_fn=function(self,chunk) 
+			if chunk._dbg then
+				printf("dbg: %s\n",tostring(chunk._dbg))
+			end
+		end
+	end
 	local status,rstatus,rerr = self:execwait('return ff_mdownload('..serialize(srcpaths)..','..serialize(ropts)..')',
 										{libs={'ff_mdownload'},msgs=chdku.msg_unbatcher(files)})
 
@@ -175,9 +182,13 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	end
 
 	if not dstmode then
-		local status,err=fsutil.mkdir_m(dstpath)
-		if not status then
-			return false,err
+		if opts.pretend then
+			printf('mkdir_m(%s)\n',dstpath)
+		else
+			local status,err=fsutil.mkdir_m(dstpath)
+			if not status then
+				return false,err
+			end
 		end
 	end
 
@@ -196,36 +207,41 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 		end
 		dst=fsutil.joinpath(dstpath,relpath)
 		if finfo.st.is_dir then
---			printf('fsutil.mkdir_m(%s)\n',dst)
-			local status,err = fsutil.mkdir_m(dst)
-			if not status then
-				return false,err
-			end
-		else
-			local dst_dir = fsutil.dirname(dst)
-			if dst_dir ~= '.' then
---				printf('fsutil.mkdir_m(%s)\n',dst_dir)
-				local status,err = fsutil.mkdir_m(dst_dir)
+			if not opts.pretend then
+				local status,err = fsutil.mkdir_m(dst)
 				if not status then
 					return false,err
 				end
 			end
-			printf("%s->%s\n",src,dst);
-			-- ptp download fails on zero byte files (zero size data phase, possibly other problems)
-			if finfo.st.size > 0 then
-				-- TODO check newer/older etc
-				local status,err = self:download(src,dst)
-				if not status then
-					return status,err
+		else
+			local dst_dir = fsutil.dirname(dst)
+			if dst_dir ~= '.' then
+				if not opts.pretend then
+					local status,err = fsutil.mkdir_m(dst_dir)
+					if not status then
+						return false,err
+					end
 				end
-			else
-				local f,err=io.open(dst,"wb")
-				f:close()
 			end
-			if lopts.mtime then
-				status,err = lfs.touch(dst,chdku.ts_cam2pc(finfo.st.mtime));
-				if not status then
-					return status,err
+			-- TODO this should be optional
+			printf("%s->%s\n",src,dst);
+			if not opts.pretend then
+				-- ptp download fails on zero byte files (zero size data phase, possibly other problems)
+				if finfo.st.size > 0 then
+					-- TODO check newer/older etc
+					local status,err = self:download(src,dst)
+					if not status then
+						return status,err
+					end
+				else
+					local f,err=io.open(dst,"wb")
+					f:close()
+				end
+				if lopts.mtime then
+					status,err = lfs.touch(dst,chdku.ts_cam2pc(finfo.st.mtime));
+					if not status then
+						return status,err
+					end
 				end
 			end
 		end
@@ -489,6 +505,9 @@ function chdku.msg_unbatcher(t)
 		for j,v in ipairs(chunk) do
 			t[i]=v
 			i=i+1
+		end
+		if type(t._dbg_fn) == 'function' then
+			t:_dbg_fn(chunk)
 		end
 		return true
 	end

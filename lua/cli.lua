@@ -737,7 +737,10 @@ cli:add_commands{
 			rmatch=false,
 			nodirs=false,
 			maxdepth=100,
+			pretend=false,
 			nomtime=false,
+			batchsize=20,
+			dbgmem=false,
 		},
 		help_detail=[[
  <remote...> files/directories to download
@@ -748,7 +751,10 @@ cli:add_commands{
    -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
    -nodirs           only create directories needed to download file  
    -maxdepth=n       only recurse into N levels of directory
-   -nomtime			 don't preserve modification time of remote files
+   -pretend          print actions instead of doing them
+   -nomtime          don't preserve modification time of remote files
+   -batchsize=n      lower = slower, less mememory used
+   -dbgmem           print memory usage info
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 ]],
 
@@ -768,7 +774,10 @@ cli:add_commands{
 				rmatch=args.rmatch,
 				dirs=not args.nodirs,
 				maxdepth=tonumber(args.maxdepth),
-				mtime=not args.nomtime
+				pretend=args.pretend,
+				mtime=not args.nomtime,
+				batchsize=tonumber(args.batchsize),
+				dbgmem=args.dbgmem,
 			}
 			return con:mdownload(srcs,dst,opts)
 		end,

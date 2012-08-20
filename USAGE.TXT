@@ -145,7 +145,10 @@ mdownload (mdl) [options] <remote, remote, ...> <target dir>: - download file/di
    -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
    -nodirs           only create directories needed to download file
    -maxdepth=n       only recurse into N levels of directory
-   -nomtime                      don't preserve modification time of remote files
+   -pretend          print actions instead of doing them
+   -nomtime          don't preserve modification time of remote files
+   -batchsize=n      lower = slower, less mememory used
+   -dbgmem           print memory usage info
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 
 mupload (mup) [options] <local, local, ...> <target dir>: - upload file/directories to the camera
@@ -177,7 +180,9 @@ delete (rm)  [options] <target, target,...>: - delete file/directories from the 
 mkdir        <directory> : - create directories on camera
  <directory> directory to create. Intermediate directories will be created as needed
 
-version (ver)             : - print API versions
+version (ver) [-p]        : - print API and program versions
+ -p print program version
+
 connect (c)  [-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] : - connect to device
  If no options are given, connects to the first available device.
  <pid> is the USB product ID, as a decimal or hexadecimal number.
