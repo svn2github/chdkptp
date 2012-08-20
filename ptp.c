@@ -278,12 +278,15 @@ ptp_usb_getresp (PTPParams* params, PTPContainer* resp)
 #define PTP_DP_DATA_MASK	0x00ff	/* data phase mask */
 
 /* Number of PTP Request phase parameters */
+// unused
+#if 0
 #define PTP_RQ_PARAM0		0x0000	/* zero parameters */
 #define PTP_RQ_PARAM1		0x0100	/* one parameter */
 #define PTP_RQ_PARAM2		0x0200	/* two parameters */
 #define PTP_RQ_PARAM3		0x0300	/* three parameters */
 #define PTP_RQ_PARAM4		0x0400	/* four parameters */
 #define PTP_RQ_PARAM5		0x0500	/* five parameters */
+#endif
 
 /**
  * ptp_transaction:
@@ -343,7 +346,101 @@ ptp_transaction (PTPParams* params, PTPContainer* ptp,
 	return PTP_RC_OK;
 }
 
-/* Enets handling functions */
+/*
+ * reyalp - added more flexible data transfer - read chunks and send to callback instead of buffering all
+ */
+struct PTPGetDataParams_s;
+typedef uint16_t (* PTPGetDataFn)(unsigned char *bytes, unsigned int size, struct PTPGetDataParams_s *gdparams);
+
+typedef struct PTPGetDataParams_s {
+	PTPGetDataFn fn;
+	size_t buf_size;
+	void *fn_data;
+} PTPGetDataParams;
+
+static uint16_t ptp_getdata_transaction(PTPParams* params, PTPContainer* ptp, PTPGetDataParams *gdparams )
+{
+	if ((params==NULL) || (ptp==NULL) || (gdparams==NULL)) 
+		return PTP_ERROR_BADPARAM;
+	
+	size_t buf_size;
+	unsigned char *buf = NULL;
+	if (gdparams->buf_size == 0) {
+		buf_size = 1024*1024*2; // TODO
+	} else if (gdparams->buf_size < params->max_packet_size) {
+		buf_size = params->max_packet_size;
+	} else {
+		buf_size = gdparams->buf_size;
+	}
+
+	ptp->Transaction_ID=params->transaction_id++;
+	ptp->SessionID=params->session_id;
+	/* send request */
+	CHECK_PTP_RC(params->sendreq_func (params, ptp));
+
+	uint16_t ret;
+	PTPUSBBulkContainer usbdata;
+
+	PTP_CNT_INIT(usbdata);
+	do {
+		uint32_t len;
+		/* read first(?) part of data */
+		ret=params->read_func((unsigned char *)&usbdata, sizeof(usbdata), params->data);
+		if (ret!=PTP_RC_OK) {
+			ret = PTP_ERROR_IO;
+			break;
+		} else if (dtoh16(usbdata.type)!=PTP_USB_CONTAINER_DATA) {
+			ret = PTP_ERROR_DATA_EXPECTED;
+			break;
+		} else if (dtoh16(usbdata.code)!=ptp->Code) {
+			ret = dtoh16(usbdata.code);
+			break;
+		}
+		/* evaluate data length */
+		len=dtoh32(usbdata.length)-PTP_USB_BULK_HDR_LEN;
+		/* if it fit in the initial payload process and finish */
+		if(len+PTP_USB_BULK_HDR_LEN<=sizeof(usbdata)) {
+			ret = gdparams->fn(usbdata.payload.data,len,gdparams);
+			break;
+		} else if(len < buf_size) {
+			buf_size = len;
+		}
+		/* process the first chunk of data' */
+		// TODO combining this with the first full buf_size might be more efficient
+		ret=gdparams->fn(usbdata.payload.data,PTP_USB_BULK_PAYLOAD_LEN,gdparams);
+		if (ret!=PTP_RC_OK) {
+			break;
+		}
+		buf = malloc(buf_size);
+		if(!buf) {
+			ret = PTP_ERROR_NOMEM;
+			break;
+		}
+		uint32_t remaining = len - PTP_USB_BULK_PAYLOAD_LEN;
+		/* read and process the rest of the data */
+		while(remaining>0) {
+			uint32_t rbytes = remaining < buf_size ? remaining:buf_size;
+
+			ret=params->read_func(buf, rbytes, params->data);
+			if (ret!=PTP_RC_OK) {
+				break;
+			}
+			ret=gdparams->fn(buf,rbytes,gdparams);
+			if (ret!=PTP_RC_OK) {
+				break;
+			}
+			remaining -= rbytes;
+		}
+	} while (0);
+	free(buf);
+	if(ret!=PTP_RC_OK) {
+		return ret;
+	}
+	/* get response */
+	CHECK_PTP_RC(params->getresp_func(params, ptp));
+	return PTP_RC_OK;
+}
+/* Events handling functions */
 
 /* PTP Events wait for or check mode */
 #define PTP_EVENT_CHECK			0x0000	/* waits for */
@@ -1761,12 +1858,28 @@ int ptp_chdk_upload(char *local_fn, char *remote_fn, PTPParams* params, PTPDevic
   return 1;
 }
 
+static uint16_t gd_to_file(unsigned char *bytes,unsigned len, PTPGetDataParams *gdparams) {
+	FILE *f = (FILE *)gdparams->fn_data;
+	size_t count=fwrite(bytes,1,len,f);
+	if(count != len) {
+		return PTP_ERROR_IO;
+	}
+	return PTP_RC_OK;
+}
+
 int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo)
 {
   uint16_t ret;
   PTPContainer ptp;
-  char *buf = NULL;
+  PTPGetDataParams gdparams;
   FILE *f;
+
+  f = fopen(local_fn,"wb");
+  if ( f == NULL )
+  {
+    ptp_error(params,"could not open file \'%s\'",local_fn);
+    return 0;
+  }
 
   PTP_CNT_INIT(ptp);
   ptp.Code=PTP_OC_CHDK;
@@ -1777,6 +1890,7 @@ int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDev
   if ( ret != 0x2001 )
   {
     ptp_error(params,"unexpected return code 0x%x",ret);
+	fclose(f);
     return 0;
   }
 
@@ -1785,26 +1899,17 @@ int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDev
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_DownloadFile;
 
-  ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
+  gdparams.fn = gd_to_file;
+  gdparams.buf_size = 0; // default
+  gdparams.fn_data = f;
+  ret=ptp_getdata_transaction(params, &ptp, &gdparams);
+  fclose(f);
   if ( ret != 0x2001 )
   {
     ptp_error(params,"unexpected return code 0x%x",ret);
     return 0;
   }
   
-  f = fopen(local_fn,"wb");
-  if ( f == NULL )
-  {
-    ptp_error(params,"could not open file \'%s\'",local_fn);
-    free(buf);
-    return 0;
-  }
-
-  fwrite(buf,1,ptp.Param1,f);
-  fclose(f);
-
-  free(buf);
-
   return 1;
 }
 

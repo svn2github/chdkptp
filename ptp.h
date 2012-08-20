@@ -218,11 +218,12 @@ typedef struct _PTPUSBEventContainer PTPUSBEventContainer;
 #define PTP_RC_EXTENSION_MASK		0xF000
 #define PTP_RC_EXTENSION		0xA000
 
-/* libptp2 extended ERROR codes */
+/* extended local ERROR codes */
 #define PTP_ERROR_IO			0x02FF
 #define PTP_ERROR_DATA_EXPECTED		0x02FE
 #define PTP_ERROR_RESP_EXPECTED		0x02FD
 #define PTP_ERROR_BADPARAM		0x02FC
+#define PTP_ERROR_NOMEM			0x02FB
 
 /* PTP Event Codes */
 
