@@ -181,6 +181,7 @@ ptp_read_func (unsigned char *bytes, unsigned int size, void *data)
 			result=USB_BULK_READ(ptp_usb->handle, ptp_usb->inep,(char *)bytes, toread,ptpcam_usb_timeout);
 		if (result < 0)
 			break;
+		ptp_usb->read_count += toread;
 		rbytes-=PTPCAM_USB_URB;
 	} while (rbytes>0);
 
@@ -201,10 +202,10 @@ ptp_write_func (unsigned char *bytes, unsigned int size, void *data)
 	PTP_USB *ptp_usb=(PTP_USB *)data;
 
 	result=USB_BULK_WRITE(ptp_usb->handle,ptp_usb->outep,(char *)bytes,size,ptpcam_usb_timeout);
-	if (result >= 0)
+	if (result >= 0) {
+		ptp_usb->write_count += size;
 		return (PTP_RC_OK);
-	else 
-	{
+	} else {
 		if (verbose) perror("usb_bulk_write");
 		return PTP_ERROR_IO;
 	}
@@ -280,6 +281,7 @@ init_ptp_usb (PTPParams* params, PTP_USB* ptp_usb, struct usb_device* dev)
 		return 0;
 	}
 	ptp_usb->handle=device_handle;
+	ptp_usb->write_count = ptp_usb->read_count = 0;
 	usb_set_configuration(device_handle, dev->config->bConfigurationValue);
 	usb_claim_interface(device_handle,
 		dev->config->interface->altsetting->bInterfaceNumber);
@@ -1417,6 +1419,22 @@ static int chdk_connection_gc(lua_State *L) {
 	return 0;
 }
 
+static int chdk_reset_counters(lua_State *L) {
+	CHDK_CONNECTION_METHOD;
+	ptp_usb->write_count = ptp_usb->read_count = 0;
+	return 0;
+}
+
+static int chdk_get_counters(lua_State *L) {
+	CHDK_CONNECTION_METHOD;
+	lua_createtable(L,0,2);
+	lua_pushnumber(L,ptp_usb->write_count);
+	lua_setfield(L,-2,"write");
+	lua_pushnumber(L,ptp_usb->read_count);
+	lua_setfield(L,-2,"read");
+	return 1;
+}
+
 /*
 methods for connections
 */
@@ -1439,6 +1457,8 @@ static const luaL_Reg chdkconnection[] = {
   {"get_ptp_devinfo", chdk_get_ptp_devinfo},
   {"get_usb_devinfo", chdk_get_usb_devinfo}, // does not need to be connected, returns bus and dev at minimum
   {"get_live_data",chdk_get_live_data},
+  {"reset_counters",chdk_reset_counters},
+  {"get_counters",chdk_get_counters},
   {NULL, NULL}
 };
 
