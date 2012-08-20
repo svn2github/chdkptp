@@ -235,13 +235,28 @@ function cli:execute(line)
 			end
 			local cstatus
 			local t0=ustime.new()
+			con:reset_counters()
 			cstatus,status,msg = xpcall(
 				function()
 					return self.names[cmd](args)
 				end,
 				util.err_traceback)
+			local tdiff = ustime.diff(t0)/1000000;
 			if prefs.cli_time then
-				printf("time %.4f\n",ustime.diff(t0)/1000000)
+				printf("time %.4f\n",tdiff)
+			end
+			if prefs.cli_xferstats then
+				local xferstats = con:get_counters();
+				local rbps,wbps
+				if tdiff == 0 then
+					rbps = "-"
+					wbps = "-"
+				else
+					-- note these are based on total command execution time, not just transfer
+					rbps = string.format("%d",xferstats.read/tdiff)
+					wbps = string.format("%d",xferstats.write/tdiff)
+				end
+				printf("r %d %s/s w %d %s/s\n",xferstats.read,rbps,xferstats.write,wbps)
 			end
 			if not cstatus then
 				return false,status
@@ -1171,6 +1186,7 @@ cli:add_commands{
 	},
 };
 prefs._add('cli_time','boolean','show cli execution times')
+prefs._add('cli_xferstats','boolean','show cli data transfer stats')
 prefs._add('cli_verbose','number','control verbosity of cli',1)
 prefs._add('cli_source_max','number','max nested source calls',10)
 return cli
