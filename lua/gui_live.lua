@@ -553,14 +553,18 @@ function m.init()
 	}
 
 	function icnv:map_cb()
-		-- TODO UseContextPlus seems harmless if not built with plus support
-		if guisys.caps().CDPLUS then
-			cd.UseContextPlus(true)
-			gui.infomsg("ContexIsPlus iup:%s cd:%s\n",tostring(cd.ContextIsPlus(cd.IUP)),tostring(cd.ContextIsPlus(cd.DBUFFER)))
+		if prefs.gui_context_plus then
+			-- TODO UseContextPlus seems harmless if not built with plus support
+			if guisys.caps().CDPLUS then
+				cd.UseContextPlus(true)
+				gui.infomsg("ContexIsPlus iup:%s cd:%s\n",tostring(cd.ContextIsPlus(cd.IUP)),tostring(cd.ContextIsPlus(cd.DBUFFER)))
+			else
+				gui.infomsg("context_plus requested but not available\n")
+			end
 		end
 		self.ccnv = cd.CreateCanvas(cd.IUP,self)
 		self.dccnv = cd.CreateCanvas(cd.DBUFFER,self.ccnv)
-		if guisys.caps().CDPLUS then
+		if prefs.gui_context_plus and guisys.caps().CDPLUS then
 			cd.UseContextPlus(false)
 		end
 		self.dccnv:SetBackground(cd.EncodeColor(32,32,32))
@@ -629,4 +633,5 @@ function m.on_dlg_run()
 	init_timer()
 end
 prefs._add('gui_dump_palette','boolean','dump live palette data on state change')
+prefs._add('gui_context_plus','boolean','use IUP context plus if available')
 return m
