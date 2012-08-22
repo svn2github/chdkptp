@@ -2,7 +2,7 @@ TOPDIR=.
 include include.mk
 
 ifdef USE_SVNREV
-SVNREV=$(shell svnversion -n |sed -r -e's/^([0-9]+:)?([0-9]+)[MSP]/\2/')
+SVNREV=$(shell svnversion -n |sed -r -e's/^([0-9]+:)?([0-9]+)[MSP]?/\2/')
 ifeq ("$(SVNREV)","")
 SVNREV=0
 endif
