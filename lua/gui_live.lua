@@ -166,6 +166,19 @@ local palette_size_for_type={
 	16*4,
 	256*4,
 }
+
+-- reset last frame fields so reload or new connection will be a "change"
+local function reset_last_frame_vals()
+	for i,f in ipairs(chdku.live_fields) do
+		last_frame_fields[f]=nil
+	end
+	for j,fb in ipairs({'vp','bm'}) do
+		for i,f in ipairs(chdku.live_fb_desc_fields) do
+			last_fb_fields[fb][f]=nil
+		end
+	end
+end
+
 local function update_frame_data(frame)
 	local dirty
 	for i,f in ipairs(chdku.live_fields) do
@@ -252,6 +265,8 @@ local function init_dump_replay()
 		printf("unrecognized file\n")
 		return
 	end
+
+	reset_last_frame_vals()
 --	m.dump_replay_file:seek('set',4)
 	local header = read_dump_rec(nil,m.dump_replay_file)
 
@@ -577,6 +592,7 @@ end
 function m.on_connect_change(lcon)
 	m.live_con_valid = false
 	if con:is_connected() then
+		reset_last_frame_vals()
 		if con:live_is_api_compatible() then
 			m.live_con_valid = true
 		else
