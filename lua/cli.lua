@@ -379,10 +379,11 @@ cli:add_commands{
 					return false, string.format("call failed:%s\n",r[2])
 				end
 				local s
+				local sopts={pretty=true,err_type=false,err_cycle=false,forceint=false,fix_bignum=false}
 				if #r > 1 then
-					s='=' .. serialize(r[2],{pretty=true,err_type=false,err_cycle=false})
+					s='=' .. serialize(r[2],sopts)
 					for i = 3, #r do
-						s = s .. ',' .. serialize(r[i],{pretty=true,err_type=false,err_cycle=false})
+						s = s .. ',' .. serialize(r[i],sopts)
 					end
 				end
 				return true, s
