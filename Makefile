@@ -64,6 +64,11 @@ ifdef CD_USE_PLUS
 SYS_LIBS+=$(CD_PLUS_SYS_LIBS)
 LINK_LIBS+=$(CD_PLUS_LIB)
 CFLAGS+=-DCHDKPTP_CD_PLUS=1
+# TODO static/dynamic should be a top level option.
+# This is required if you want to build a standalone context+ executable, otherwise libstdc++ and libgcc are dynamic
+ifeq ($(OSTYPE),Windows)
+LDFLAGS+=-static
+endif
 endif
 else
 LINK_LIBS=$(IUP_LUA_LIB) $(LUA_LIB) $(IUP_LIB) $(LIBUSB_LIB)
