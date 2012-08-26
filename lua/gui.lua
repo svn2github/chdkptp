@@ -378,7 +378,22 @@ cam_btn_frame = iup.vbox{
 			title='shoot half',
 			size='45x15',
 			action=function(self)
-				gui.execquick('press("shoot_half") repeat sleep(10) until get_shooting() == true release("shoot_half")')
+				gui.execquick([[
+local rec,vid = get_mode()
+if rec and not vid then
+	press("shoot_half")
+	local n = 0
+	repeat
+		sleep(10)
+		n = n + 1
+	until get_shooting() == true or n > 100
+	release("shoot_half")
+else
+	press("shoot_half") 
+	sleep(1000)
+	release("shoot_half")
+end
+]])
 			end,
 		},
 		iup.fill{
