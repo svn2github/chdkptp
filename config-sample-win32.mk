@@ -4,7 +4,9 @@
 IUP_SUPPORT=1
 # should gui include CD
 CD_SUPPORT=1
-# use CD "plus" context. gdiplus on windows, may have better alpha support
+# enable CD "plus" context support.
+# To actually render with contextplus, set gui_context_plus=true in your startup file
+# this uses gdiplus on windows, better image scaling but slower / larger exe
 #CD_USE_PLUS=gdiplus
 
 # root directories of various packages, used to set subdirs below.

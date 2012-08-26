@@ -34,7 +34,7 @@ the CLI will be started.
 If started with options and neither -g nor -i is given, chdkptp will run in
 batch mode, exiting after performing the actions specified by in the options
 
-When using -e, -c or r, you must quote any arguments that include spaces
+When using -e, -c or -r, you must quote any arguments that include spaces
 
 ==Startup files==
 Startup files can be used to automatically execute CLI commands at startup.
@@ -213,6 +213,22 @@ dumpframes   [options] [file]: - dump camera display frames to file
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
 
+==Runtime options==
+The set command allows you to set the following runtime options
+cli_time=false       - boolean: show cli execution times
+cli_xferstats=false  - boolean: show cli data transfer stats
+cli_verbose=1        - number: control verbosity of cli
+cli_source_max=10    - number: max nested source calls
+
+In the GUI, the following additional options are available:
+gui_dump_palette=false - boolean: dump live palette data on state change
+gui_context_plus=false - boolean: use IUP context plus if available
+gui_verbose=1        - number: control verbosity of g
+
+Notes:
+1) Setting a gui option when the gui is not running is currently an error
+2) gui_context_plus must be set in a startup file to take effect.
+
 =Examples=
 start chdkptp in interactive mode and connect to the first available camera
  chdkptp -i -c
@@ -260,5 +276,4 @@ ___> c 540
 con> list
  1:Canon PowerShot D10 b=bus-0 d=\\.\libusb0-0001--0x04a9-0x31bc v=0x4a9 p=0x31bc s=12345678123456781234567812345678
 *2:Canon PowerShot A540 b=bus-0 d=\\.\libusb0-0002--0x04a9-0x311b v=0x4a9 p=0x311b s=nil
-
 

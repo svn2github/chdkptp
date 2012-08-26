@@ -88,11 +88,13 @@ Download the appropriate IUP library for your platform from
 http://www.tecgraf.puc-rio.br/iup/
 unpack the package
 adjust the IUP_LIB_DIR and IUP_INCLUDE_DIR in config.mk
-
 You will also need a fully working gcc environment.
 
+CD - similar to IUP
+
 =Configuring the source (all platforms)=
-Edit config.mk to reflect the installation directories of the above packages
+Edit config.mk to reflect the installation directories of the above packages and
+desired compile time options
 See config-sample-*.mk for examples
 
 =Building=
