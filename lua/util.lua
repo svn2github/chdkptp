@@ -47,6 +47,30 @@ function util.errf(format,...)
 end
 
 --[[
+log2(n) = log(n)/log(2)
+]]
+function util.log2(n)
+	return math.log(n)/0.693147180559945
+end
+--[[
+round to nearest int, away from 0
+]]
+function util.round(n)
+	local f=math.floor(n)
+	if n > 0 then
+		if n-f < 0.5 then
+			return f
+		end
+		return math.ceil(n)
+	else
+		if n-f > 0.5 then
+			return math.ceil(n)
+		end
+		return f
+	end
+end
+
+--[[
 return a function that prints if result of curlevel_fn is greater than vlevel
 for making different areas of code have different verbosity
 ]]

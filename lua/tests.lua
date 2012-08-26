@@ -233,6 +233,16 @@ t.serialize = function()
 	-- TODO test error conditions
 end
 
+t.round = function()
+	assert(util.round(0)==0)
+	assert(util.round(0.4)==0)
+	assert(util.round(-0.4)==0)
+	assert(util.round(0.5)==1)
+	assert(util.round(-0.5)==-1)
+	assert(util.round(1.6)==2)
+	assert(util.round(-1.6)==-2)
+end
+
 function m:run(name)
 	-- TODO side affects galore
 	printf('%s:start\n',name)
