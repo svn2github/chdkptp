@@ -314,6 +314,7 @@ function cli:print_status(status,msg)
 			printf("\n")
 		end
 	end
+	return status,msg
 end
 
 function cli:run()
