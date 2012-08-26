@@ -157,7 +157,10 @@ function do_rc_file(name)
 		path = options.r
 	end
 	if lfs.attributes(path,'mode') ~= 'file' then
---		printf('rc %s not found\n',path)
+		-- if file specified on the command line, warn when not found
+		if options.r then
+			warnf('rc %s not found\n',path)
+		end
 		return false
 	end
 	local status, msg=cli:execfile(path)
