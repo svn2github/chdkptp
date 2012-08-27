@@ -1195,6 +1195,97 @@ cli:add_commands{
 			return status,err
 		end,
 	},
+	{
+		names={'shoot'},
+		help='shoot a picture with specified exposure',
+		arghelp="[options]",
+		args=argparser.create({
+			u='s',
+			tv=false,
+			sv=false,
+			av=false,
+			raw=false,
+			pretend=false,
+			nowait=false
+		}),
+		help_detail=[[
+ options:
+   -u=<s|a|96>
+      s   standard units (default)
+      a   APEX
+      96  APEX*96
+   -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
+   -sv=<v>    ISO value. In standard units, Canon "real" ISO
+   -av=<v>    Aperature value. In standard units, f number
+   -raw=1|0   Force raw on or off, default use current camera selection
+   -pretend   print actions instead of running them
+   -nowait    don't wait for shot to complete
+  Any exposure paramters not set use camera defaults
+]],
+		func=function(self,args) 
+			if not util.in_table({'s','a','96'},args.u) then
+				return false,"invalid units"
+			end
+			local opts={}
+			if args.u == 's' then
+				if args.av then
+					opts.av=exp.f_to_av96(args.av)
+				end
+				if args.sv then
+					opts.sv=exp.iso_to_sv96(args.sv)
+				end
+				if args.tv then
+					local n,d = string.match(args.tv,'^([%d]+)/([%d.]+)$')
+					if n then
+						n = tonumber(n)
+						d = tonumber(d)
+						if not n or not d or n == 0 then
+							return false, 'invalid tv fraction'
+						end
+						opts.tv = exp.shutter_to_tv96(n/d)
+					else
+						n = tonumber(args.tv)
+						if not n then
+							return false, 'invalid tv value'
+						end
+						opts.tv = exp.shutter_to_tv96(n)
+					end
+				end
+			elseif args.u == 'a' then
+				if args.av then
+					opts.av = util.round(args.av*96)
+				end
+				if args.sv then
+					opts.sv = util.round(args.sv*96)
+				end
+				if args.tv then
+					opts.tv = util.round(args.tv*96)
+				end
+			else
+				if args.av then
+					opts.av=tonumber(args.av)
+				end
+				if args.sv then
+					opts.sv=tonumber(args.sv)
+				end
+				if args.tv then
+					opts.tv=tonumber(args.tv)
+				end
+			end
+			-- hack for CHDK override bug that ignores APEX 0
+			if opts.tv == 0 then
+				opts.tv = 1
+			end
+			if args.raw then
+				opts.raw=args.raw
+			end
+			local cmd=string.format('rlib_shoot(%s)',util.serialize(opts))
+			if args.pretend then
+				return true,cmd
+			end
+			return con:exec(cmd,{wait=(not args.nowait),libs={'rlib_shoot'}})
+		end,
+	},
 };
 prefs._add('cli_time','boolean','show cli execution times')
 prefs._add('cli_xferstats','boolean','show cli data transfer stats')

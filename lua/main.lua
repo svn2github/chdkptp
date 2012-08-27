@@ -21,6 +21,7 @@ fsutil=require('fsutil')
 prefs=require('prefs')
 chdku=require('chdku')
 cli=require('cli')
+exp=require('exposure')
 --[[
 Command line arguments
 --]]

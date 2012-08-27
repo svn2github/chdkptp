@@ -922,6 +922,40 @@ end
 ]],
 },
 --[[
+support for cli shoot command
+]]
+{
+	name='rlib_shoot',
+	code=[[
+function rlib_shoot(opts)
+	local rec,vid = get_mode()
+	if not rec then
+		return false,'not in rec mode'
+	end
+
+	if opts.tv then
+		set_tv96_direct(opts.tv)
+	end
+	if opts.sv then
+		set_sv96(opts.sv)
+	end
+	if opts.av then
+		set_av96_direct(opts.av)
+	end
+	local save_raw
+	if opts.raw then
+		save_raw=get_raw()
+		set_raw(opts.raw)
+	end
+	shoot()
+	if save_raw then
+		set_raw(save_raw)
+	end
+	return true
+end
+	]],
+},
+--[[
 a simple long lived script for interactive testing
 example
 !return con:exec('msg_shell:run()',{libs='msg_shell'})

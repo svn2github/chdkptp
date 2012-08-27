@@ -213,6 +213,20 @@ dumpframes   [options] [file]: - dump camera display frames to file
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
 
+shoot        [options]   : - shoot a picture with specified exposure
+ options:
+   -u=<s|a|96>
+      s   standard units (default)
+      a   APEX
+      96  APEX*96
+   -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
+   -sv=<v>    ISO value. In standard units, Canon "real" ISO
+   -av=<v>    Aperature value. In standard units, f number
+   -raw=1|0   Force raw on or off, default use current camera selection
+   -pretend   print actions instead of running them
+   -nowait    don't wait for shot to complete
+  Any exposure paramters not set use camera defaults
+
 ==Runtime options==
 The set command allows you to set the following runtime options
 cli_time=false       - boolean: show cli execution times
