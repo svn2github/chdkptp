@@ -1239,7 +1239,7 @@ cli:add_commands{
 					if n then
 						n = tonumber(n)
 						d = tonumber(d)
-						if not n or not d or n == 0 then
+						if not n or not d or n == 0 or d == 0 then
 							return false, 'invalid tv fraction'
 						end
 						opts.tv = exp.shutter_to_tv96(n/d)
