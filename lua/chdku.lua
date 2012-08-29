@@ -139,6 +139,27 @@ function con_methods:listdir(path,opts)
 	return results
 end
 
+local function mdownload_single(lcon,finfo,lopts,src,dst)
+	-- ptp download fails on zero byte files (zero size data phase, possibly other problems)
+	if finfo.st.size > 0 then
+		-- TODO check newer/older etc
+		local status,err = lcon:download(src,dst)
+		if not status then
+			return status,err
+		end
+	else
+		local f,err=io.open(dst,"wb")
+		f:close()
+	end
+	if lopts.mtime then
+		status,err = lfs.touch(dst,chdku.ts_cam2pc(finfo.st.mtime));
+		if not status then
+			return status,err
+		end
+	end
+	return true
+end
+
 --[[
 download files and directories
 status[,err]=con:mdownload(srcpaths,dstpath,opts)
@@ -181,14 +202,23 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 		return true
 	end
 
+	local mkdir, download
+	local function nop()
+		return true
+	end
+	if opts.pretend then
+		mkdir=nop
+		download=nop
+	else
+		mkdir=fsutil.mkdir_m
+		download=mdownload_single
+	end
+
+
 	if not dstmode then
-		if opts.pretend then
-			printf('mkdir_m(%s)\n',dstpath)
-		else
-			local status,err=fsutil.mkdir_m(dstpath)
-			if not status then
-				return false,err
-			end
+		local status,err=fsutil.mkdir_m(dstpath)
+		if not status then
+			return false,err
 		end
 	end
 
@@ -207,42 +237,23 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 		end
 		dst=fsutil.joinpath(dstpath,relpath)
 		if finfo.st.is_dir then
-			if not opts.pretend then
-				local status,err = fsutil.mkdir_m(dst)
-				if not status then
-					return false,err
-				end
+			local status,err = mkdir(dst)
+			if not status then
+				return false,err
 			end
 		else
 			local dst_dir = fsutil.dirname(dst)
 			if dst_dir ~= '.' then
-				if not opts.pretend then
-					local status,err = fsutil.mkdir_m(dst_dir)
-					if not status then
-						return false,err
-					end
+				local status,err = mkdir(dst_dir)
+				if not status then
+					return false,err
 				end
 			end
 			-- TODO this should be optional
 			printf("%s->%s\n",src,dst);
-			if not opts.pretend then
-				-- ptp download fails on zero byte files (zero size data phase, possibly other problems)
-				if finfo.st.size > 0 then
-					-- TODO check newer/older etc
-					local status,err = self:download(src,dst)
-					if not status then
-						return status,err
-					end
-				else
-					local f,err=io.open(dst,"wb")
-					f:close()
-				end
-				if lopts.mtime then
-					status,err = lfs.touch(dst,chdku.ts_cam2pc(finfo.st.mtime));
-					if not status then
-						return status,err
-					end
-				end
+			local status, err=download(self,finfo,lopts,src,dst)
+			if not status then
+				return status,err
 			end
 		end
 	end
