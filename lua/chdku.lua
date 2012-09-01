@@ -180,7 +180,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 		return false,'mdownload: dest must be a directory'
 	end
 	local files={}
-	if opts.dbgmem then
+	if lopts.dbgmem then
 		files._dbg_fn=function(self,chunk) 
 			if chunk._dbg then
 				printf("dbg: %s\n",tostring(chunk._dbg))
@@ -206,7 +206,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	local function nop()
 		return true
 	end
-	if opts.pretend then
+	if lopts.pretend then
 		mkdir=nop
 		download=nop
 	else
