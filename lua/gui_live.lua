@@ -165,6 +165,7 @@ local palette_size_for_type={
 	16*4,
 	16*4,
 	256*4,
+	16*4,
 }
 
 -- reset last frame fields so reload or new connection will be a "change"
