@@ -77,6 +77,7 @@ typedef void (*yuv_palette_to_rgba_fn)(const char *pal_yuv, uint8_t pixel,palett
 void palette_type1_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
 void palette_type2_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
 void palette_type3_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
+void palette_type4_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
 
 void yuv_live_to_cd_rgb(const char *p_yuv,
 						unsigned buf_width,
@@ -104,6 +105,7 @@ palette_convert_t palette_funcs[] = {
 	{palette_type1_to_rgba,16},	// type 1 - ayuv, 16 entries double 4 bit index
 	{palette_type2_to_rgba,16}, 	// type 2 - like type 1, but with 2 bit alpha lookup - UNTESTED
 	{palette_type3_to_rgba,256}, 	// type 3 - vuya, 256 entries, 2 bit alpha lookup
+	{palette_type4_to_rgba,16}, 	// type 4 - with 2 bit alpha lookup like 2
 };
 
 #define N_PALETTE_FUNCS (sizeof(palette_funcs)/sizeof(palette_funcs[0]))
@@ -201,6 +203,31 @@ void palette_type3_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba
 	pal_rgb->r = yuv_to_r(pal[pixel].y,pal[pixel].v);
 	pal_rgb->g = yuv_to_g(pal[pixel].y,pal[pixel].u,pal[pixel].v);
 	pal_rgb->b = yuv_to_b(pal[pixel].y,pal[pixel].u);
+}
+
+// like 2, but vuya
+void palette_type4_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba_t *pal_rgb) {
+	const palette_entry_vuya_t *pal = (const palette_entry_vuya_t *)palette;
+	unsigned i1 = pixel & 0xF;
+	unsigned i2 = (pixel & 0xF0)>>4;
+	int8_t u,v;
+	uint8_t y;
+	// special case for index 0
+	if(pixel == 0) {
+		pal_rgb->a = pal_rgb->r = pal_rgb->g = pal_rgb->b = 0;
+		return;
+	}
+
+	// TODO this isn't right for sx110
+	uint8_t a = (pal[i1].a + pal[i2].a)>>1;
+	pal_rgb->a = alpha2_lookup[a&3];
+	// TODO not clear if these should be /2 or not
+	y = clamp_uint8(pal[i1].y + pal[i2].y);
+	u = clamp_int8(pal[i1].u + pal[i2].u);
+	v = clamp_int8(pal[i1].v + pal[i2].v);
+	pal_rgb->r = yuv_to_r(y,v);
+	pal_rgb->g = yuv_to_g(y,u,v);
+	pal_rgb->b = yuv_to_b(y,u);
 }
 
 void yuv_live_to_cd_rgb(const char *p_yuv,
