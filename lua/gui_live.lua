@@ -307,6 +307,10 @@ local function read_dump_frame()
 		data = read_dump_rec(m.dump_replay_frame._frame,m.dump_replay_file)
 	end
 	m.dump_replay_frame._frame = data
+	if prefs.gui_force_replay_palette ~= -1 then
+		m.dump_replay_frame._frame:set_u32(chdku.live_frame_map.palette_type,prefs.gui_force_replay_palette)
+	end
+
 	update_frame_data(m.dump_replay_frame)
 	stats:end_xfer(m.dump_replay_frame._frame:len())
 	-- TODO
@@ -634,4 +638,5 @@ function m.on_dlg_run()
 end
 prefs._add('gui_dump_palette','boolean','dump live palette data on state change')
 prefs._add('gui_context_plus','boolean','use IUP context plus if available')
+prefs._add('gui_force_replay_palette','number','override palette type dump replay, -1 disable',-1)
 return m
