@@ -164,10 +164,15 @@ void palette_type1_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba
 	int8_t u,v;
 	uint8_t y;
 	pal_rgb->a = (pal[i1].a + pal[i2].a)>>1;
-	// TODO not clear if these should be /2 or not
+	// TODO not clear if combined should be /2 or not
+	// special case in canon firmware, if lower 4 bits 0, grays
+	if(i1 == 0) {
+		u = v = 0;
+	} else {
+		u = clamp_int8(pal[i1].u + pal[i2].u);
+		v = clamp_int8(pal[i1].v + pal[i2].v);
+	}
 	y = clamp_uint8(pal[i1].y + pal[i2].y);
-	u = clamp_int8(pal[i1].u + pal[i2].u);
-	v = clamp_int8(pal[i1].v + pal[i2].v);
 	pal_rgb->r = yuv_to_r(y,v);
 	pal_rgb->g = yuv_to_g(y,u,v);
 	pal_rgb->b = yuv_to_b(y,u);
@@ -175,6 +180,7 @@ void palette_type1_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba
 
 static const uint8_t alpha2_lookup[] = {128,171,214,255};
 // like above, but with alpha lookup
+// TODO this is untested an probably wrong
 void palette_type2_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba_t *pal_rgb) {
 	const palette_entry_ayuv_t *pal = (const palette_entry_ayuv_t *)palette;
 	unsigned i1 = pixel & 0xF;
