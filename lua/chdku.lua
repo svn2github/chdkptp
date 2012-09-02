@@ -140,9 +140,29 @@ function con_methods:listdir(path,opts)
 end
 
 local function mdownload_single(lcon,finfo,lopts,src,dst)
+	local st
+	-- if not always overwrite, check local
+	if lopts.overwrite ~= true then
+		st = lfs.attributes(dst)
+	end
+	if st then
+		local skip
+		if not lopts.overwrite then
+			skip=true
+		elseif type(lopts.overwrite) == 'function' then
+			skip = not lopts.overwrite(lcon,lopts,finfo,st,src,dst)
+		else
+			error("unexpected overwrite option")
+		end
+		if skip then
+			-- TODO
+			printf('skip existing %s\n',dst)
+			return true
+		end
+	end
 	-- ptp download fails on zero byte files (zero size data phase, possibly other problems)
 	if finfo.st.size > 0 then
-		-- TODO check newer/older etc
+		-- TODO should download to a temp file and move to final when complete
 		local status,err = lcon:download(src,dst)
 		if not status then
 			return status,err
@@ -165,16 +185,19 @@ download files and directories
 status[,err]=con:mdownload(srcpaths,dstpath,opts)
 opts:
 	mtime=bool -- keep (default) or discard remote mtime NOTE files only for now
+	overwrite=bool|function -- overwrite if existing found
 other opts are passed to find_files
 ]]
 function con_methods:mdownload(srcpaths,dstpath,opts)
 	if not dstpath then
 		dstpath = '.'
 	end
-	local lopts=extend_table({mtime=true},opts)
+	local lopts=extend_table({mtime=true,overwrite=true},opts)
 	local ropts=extend_table({},opts)
 	ropts.dirsfirst=true
+	-- unset options that don't apply to remote
 	ropts.mtime=nil
+	ropts.overwrite=nil
 	local dstmode = lfs.attributes(dstpath,'mode')
 	if dstmode and dstmode ~= 'directory' then
 		return false,'mdownload: dest must be a directory'

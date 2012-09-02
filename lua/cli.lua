@@ -743,6 +743,7 @@ cli:add_commands{
 			nomtime=false,
 			batchsize=20,
 			dbgmem=false,
+			overwrite='y',
 		},
 		help_detail=[[
  <remote...> files/directories to download
@@ -757,6 +758,7 @@ cli:add_commands{
    -nomtime          don't preserve modification time of remote files
    -batchsize=n      lower = slower, less mememory used
    -dbgmem           print memory usage info
+   -overwrite=<str>  overwrite existing files (y|n|old)
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 ]],
 
@@ -781,6 +783,25 @@ cli:add_commands{
 				batchsize=tonumber(args.batchsize),
 				dbgmem=args.dbgmem,
 			}
+
+			local overwrite_opts={
+				n=false,
+				y=true,
+				old=function(lcon,lopts,finfo,st,src,dst)
+--					local tr = chdku.ts_cam2pc(finfo.st.mtime)
+--					printf("remote %s local %s\n",os.date('%c',tr),os.date('%c',st.modification))
+					return chdku.ts_cam2pc(finfo.st.mtime) > st.modification
+				end,
+			}
+			if type(args.overwrite) == 'string' then
+				local ow = overwrite_opts[args.overwrite]
+				if ow == nil then
+					return false,'unrecognized overwrite option '..args.overwrite
+				end
+				opts.overwrite = ow
+			else
+				return false,'unrecognized overwrite option '..tostring(args.overwrite)
+			end
 			return con:mdownload(srcs,dst,opts)
 		end,
 	},
