@@ -26,6 +26,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 #ifdef WIN32
 #include <winsock2.h>
@@ -1906,6 +1908,407 @@ int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDev
   
   return 1;
 }
+
+#if (PTP_CHDK_VERSION_MINOR >= 4)
+/*
+ * 1. send RemoteCaptureInit, with the bitmask of the desired formats and the crop dimensions
+ *  camera: error if not in still image record mode or if any of the requested formats is unavailable
+ *  else notes the settings, switches to "remote file" mode
+ * 2. send lua command shoot()
+ * 3. start cycle
+ *  - send RemoteCaptureIsReady
+ *   camera: sends "not ready" if not ready, bitmask of the available formats when it has become ready
+ *   different image formats become available in different times, typically: 1. raw, 2. jpeg+yuv
+ *  - if not already done, get filename with RemoteCaptureGetData
+ *  - choose an image format which was requested and is available
+ *  - if found, download it and strike from the list
+ *  - exit cycle if all requested formats are downloaded
+ * 4. send RemoteCaptureInit to disable remote file target
+ */
+int ptp_chdk_remoteshoot(char *local_dir, int picformat, int firstline, int numlines, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  int isready=0;
+  int gotit=0; //bitmask of file types received so far
+  int formattoget=0;
+  int gotname=0; //filename received
+  int tries=0;
+  char local_fn[1024]; //not the best idea...
+  char local_fnbuf[1024]; //even worse idea...
+  int isfile=0; //1 if local_dir is a filename (hmmm, guessed)
+#ifdef WIN32
+  char sep[]="\\";
+#else
+  char sep[]="/";
+#endif
+
+  PTPContainer ptp;
+  char *buf = NULL;
+  FILE *f;
+
+  //check the local "dir" parameter
+  struct stat ldstat;
+  if ( !stat(local_dir, &ldstat) )
+  {
+      if ( !S_ISDIR(ldstat.st_mode) )
+      {
+          isfile=1; //assumed to be a file name if it's not an existing dir
+      }
+  }
+  else
+  {
+      isfile=1; //stat() failed, assume it's a filename
+  }
+  
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=4;
+  ptp.Param1=PTP_CHDK_RemoteCaptureInit;
+  ptp.Param2=picformat; //1=jpeg 2=raw 4=yuv ORed together, todo: magic values should have names
+  ptp.Param3=firstline; //starting line for transfer, only for raw or yuv, 0-based
+  ptp.Param4=numlines; //number of lines to be transferred, only for raw or yuv, 0 = all
+
+  ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"RemoteCaptureInit: unexpected return code 0x%x",ret);
+    return 0;
+  }
+  if ( ptp.Param1 != 1 )
+  {
+    ptp_error(params,"RemoteCaptureInit: init failed");
+    return 0;
+  }
+  
+  if ( !ptp_chdk_exec_lua("shoot()",&isready,params,deviceinfo) )
+  {
+    ptp_error(params,"remoteshoot: shoot() failed");
+    return 0;
+  }
+  do //get all requested formats
+  {
+    tries=0;
+    ptp_debug(params,"enter RemoteCaptureIsReady loop");
+    do
+    {
+        usleep(50000); //50msec
+
+        PTP_CNT_INIT(ptp);
+        ptp.Code=PTP_OC_CHDK;
+        ptp.Nparam=1;
+        ptp.Param1=PTP_CHDK_RemoteCaptureIsReady;
+
+        ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
+        if ( ret != 0x2001 )
+        {
+            ptp_error(params,"RemoteCaptureIsReady: unexpected return code 0x%x",ret);
+            return 0;
+        }
+        
+        switch ( ptp.Param1 )
+        {
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+            case 5:
+            case 6:
+            case 7:
+                isready = ptp.Param1;  //ready
+                break;
+            case 0:
+                isready = 0;  //not ready
+                break;
+            default:
+                isready = -1; //error
+        }
+        
+        tries+=1;
+        
+    } while ( (tries<1200) && (isready==0) ); //wait at most 60 seconds
+    
+    if ( isready == -1 )
+    {
+        ptp_error(params,"RemoteCaptureIsReady: error at start (param 0x%x)",ptp.Param1);
+        return 0;
+    }
+    
+    if ( !gotname ) { //get name only once
+        if ( isfile != 1 )
+        {
+            PTP_CNT_INIT(ptp);
+            ptp.Code=PTP_OC_CHDK;
+            ptp.Nparam=2;
+            ptp.Param1=PTP_CHDK_RemoteCaptureGetData;
+            ptp.Param2=0; //get filename
+
+            ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
+            if ( ret != 0x2001 )
+            {
+                ptp_error(params,"RemoteCaptureGetData(0): unexpected return code 0x%x",ret);
+                return 0;
+            }
+            
+            if ( ptp.Param1 != 0 ) //string size
+            {
+                strcpy(local_fn,local_dir);
+                if ( local_fn[strlen(local_fn)-1] == sep[0] )
+                {
+                    strcat(local_fn, buf);
+                }
+                else
+                {
+                    strcat(local_fn, sep);
+                    strcat(local_fn, buf);
+                }
+                ptp_debug(params,"%s",local_fn);
+            }
+            else
+            {
+                return 0;
+            }
+            free(buf);
+            buf=NULL; 
+        }
+        else
+        {
+            strcpy(local_fn,local_dir);
+        }
+        gotname=1;
+    } //gotname
+    
+    formattoget=0;
+    
+    int n;
+    for ( n=0; n<3; n++ ) //iterate through the formats, select one that hasn't been received yet AND is available
+    {
+        ptp_debug(params,"n=%d, isready:%d picformat:%d gotit:%d",n,isready,picformat,gotit);
+        if ( ((isready>>n)&1)&&((picformat>>n)&1)&&(((gotit>>n)&1)==0) )
+        {
+            gotit = gotit | (1<<n);
+            formattoget=1<<n;
+            break;
+        }
+    }
+    
+    ptp_debug(params,"fmttoget:%d",formattoget);
+    if ( formattoget==0 ) break; //nothing left
+    
+    //build filename
+    strcpy(local_fnbuf,local_fn);
+    strcat(local_fnbuf,(formattoget==1)?".jpg":(formattoget==2)?".raw":".yuv");
+    f = fopen(local_fnbuf,"wb");
+    if ( f == NULL )
+    {
+        ptp_error(params,"could not open file \'%s\'",local_fnbuf);
+        return 0;
+    }
+
+    tries=0;
+    do
+    {
+        ptp_debug(params,"rcgetdata: fmttoget %d, %d",formattoget,tries);
+        PTP_CNT_INIT(ptp);
+        ptp.Code=PTP_OC_CHDK;
+        ptp.Nparam=2;
+        ptp.Param1=PTP_CHDK_RemoteCaptureGetData;
+        ptp.Param2=formattoget; //get chunk
+
+        ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
+        if ( ret != 0x2001 )
+        {
+            ptp_error(params,"RemoteCaptureGetData(1,%d): unexpected return code 0x%x",tries,ret);
+            fclose(f);
+            return 0;
+        }
+        if ( buf == NULL )
+        {
+            ptp_error(params,"RemoteCaptureGetData(1,%d): NULL buffer, params: 0x%x, 0x%x",tries,ptp.Param1,ptp.Param2);
+            fclose(f);
+            return 0;
+        }
+        if ( ptp.Param1 > 0 ) //chunk size
+        {
+            fwrite(buf,1,ptp.Param1,f);
+        }
+        free(buf);
+        buf=NULL;
+        tries+=1;
+    } while ( (ptp.Param1 > 0) && (ptp.Param2 > 0) && (tries<16) ); //(Param2 > 0) if not last chunk
+    fclose(f);
+    ptp_debug(params,"rcgetdata: file closed");
+    if ( gotit == picformat ) break; //break out when all done
+  } while (1); //files
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=4;
+  ptp.Param1=PTP_CHDK_RemoteCaptureInit;
+  ptp.Param2=0; //uninit 
+  ptp.Param3=0;
+  ptp.Param4=0;
+
+  ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"RemoteCaptureInit(disarm): unexpected return code 0x%x",ret);
+    return 0;
+  }
+  if ( ptp.Param1>0 )
+  {
+    ptp_error(params,"RemoteCaptureInit(disarm): uninit failed");
+    return 0;
+  }
+  
+  return 1;
+}
+
+/*
+ * init / uninit remote capture
+ * picformat: 1=jpeg, 2=raw, 4=yuv (can be ORed together, 0 can be used to uninitialize)
+ * firstline: first line to transmit for the non-compressed formats (0 is the first one)
+ * numlines: number of lines to transmit for the non-compressed formats (0 for all)
+ */
+int ptp_chdk_rcinit(int picformat, int firstline, int numlines, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=4;
+  ptp.Param1=PTP_CHDK_RemoteCaptureInit;
+  ptp.Param2=picformat; //1=jpeg 2=raw 4=yuv ORed together, todo: magic values should have names
+  ptp.Param3=firstline; //starting line for transfer, only for raw or yuv, 0-based
+  ptp.Param4=numlines; //number of lines to be transferred, only for raw or yuv, 0 = all
+
+  ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"RemoteCaptureInit: unexpected return code 0x%x",ret);
+    return 0;
+  }
+  if ( (picformat>0) && (ptp.Param1==0) )
+  {
+    ptp_error(params,"RemoteCaptureInit: init failed");
+    return 0;
+  }
+  if ( (picformat==0) && (ptp.Param1>0) )
+  {
+    ptp_error(params,"RemoteCaptureInit: uninit failed");
+    return 0;
+  }
+  return 1;
+}
+
+/*
+ * isready: 0: not ready, lowest 3 bits: available image formats, 0x10000000: error
+ */
+int ptp_chdk_rcisready(int *isready, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=1;
+  ptp.Param1=PTP_CHDK_RemoteCaptureIsReady;
+
+  ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
+  if ( ret != 0x2001 )
+  {
+      ptp_error(params,"RemoteCaptureIsReady: unexpected return code 0x%x",ret);
+      return 0;
+  }
+  *isready=ptp.Param1;
+  return 1;
+}
+
+/*
+ * name: will point to the buffer (caller needs to free the allocation)
+ * length: name length (might not be needed?)
+ */
+int ptp_chdk_rcgetname(char **name, int *length, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=2;
+  ptp.Param1=PTP_CHDK_RemoteCaptureGetData;
+  ptp.Param2=0; //get name
+
+  ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, name); //is this OK?
+  if ( ret != 0x2001 )
+  {
+      ptp_error(params,"RemoteCaptureGetData(name): unexpected return code 0x%x",ret);
+      return 0;
+  }
+  if ( name == NULL )
+  {
+      ptp_error(params,"RemoteCaptureGetData(name): NULL buffer, params: 0x%x, 0x%x",ptp.Param1,ptp.Param2);
+      return 0;
+  }
+  *length=ptp.Param1;
+  return 1;
+}
+
+/*
+ * fmt: image format (1: jpeg, 2: raw, 4: yuv)
+ * local_fn: local filename
+ */
+int ptp_chdk_rcgetfile(int fmt, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+  char *buf = NULL;
+  FILE *f;
+  int tries;
+
+
+  f = fopen(local_fn,"wb");
+  if ( f == NULL )
+  {
+      ptp_error(params,"could not open file \'%s\'",local_fn);
+      return 0;
+  }
+
+  tries=0;
+  do
+  {
+      PTP_CNT_INIT(ptp);
+      ptp.Code=PTP_OC_CHDK;
+      ptp.Nparam=2;
+      ptp.Param1=PTP_CHDK_RemoteCaptureGetData;
+      ptp.Param2=fmt; //get chunk
+
+      ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
+      if ( ret != 0x2001 )
+      {
+          ptp_error(params,"RemoteCaptureGetData(1,%d): unexpected return code 0x%x",tries,ret);
+          fclose(f);
+          return 0;
+      }
+      if ( buf == NULL )
+      {
+          ptp_error(params,"RemoteCaptureGetData(1,%d): NULL buffer, params: 0x%x, 0x%x",tries,ptp.Param1,ptp.Param2);
+          fclose(f);
+          return 0;
+      }
+      if ( ptp.Param1 > 0 ) //chunk size
+      {
+          fwrite(buf,1,ptp.Param1,f);
+      }
+      free(buf);
+      buf=NULL;
+      tries+=1;
+  } while ( (ptp.Param1 > 0) && (ptp.Param2 > 0) && (tries<16) ); //(Param2 > 0) if not last chunk
+  fclose(f);
+  return 1;
+}
+#endif
 
 int ptp_chdk_exec_lua(char *script, int *script_id, PTPParams* params, PTPDeviceInfo* deviceinfo)
 {

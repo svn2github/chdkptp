@@ -996,6 +996,131 @@ static int chdk_download(lua_State *L) {
 	return 1;
 }
 
+#if (PTP_CHDK_VERSION_MINOR >= 4)
+/*
+status[,errmsg]=con:remoteshoot(dst,format,startline,numlines)
+dst: local destination directory or file
+format: 1 jpeg, 2 raw, 4 yuv (ORed together)
+startline: first line to be transferred (0-based), ignored when jpeg
+numlines: nr of lines to be transferred, 0 = all, ignored when jpeg
+*/
+static int chdk_remoteshoot(lua_State *L) {
+	CHDK_CONNECTION_METHOD;
+	if (!ptp_usb->connected) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"not connected");
+		return 2;
+	}
+	char *dst = (char *)luaL_checkstring(L,2);
+	int format = (unsigned)luaL_checknumber(L,3);
+	int startline = (unsigned)luaL_checknumber(L,4);
+	int numlines = (unsigned)luaL_checknumber(L,5);
+	if ( !ptp_chdk_remoteshoot(dst,format,startline,numlines,params,&params->deviceinfo) ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"shoot failed");
+		return 2;
+	}
+	lua_pushboolean(L,1);
+	return 1;
+}
+
+/*
+status[,errmsg]=con:rcinit(format,startline,numlines)
+format: 0 to uninitialize, else 1 for jpeg, 2 for raw, 4 for yuv (ORed together)
+startline: first line to be transferred (0-based), ignored when jpeg
+numlines: nr of lines to be transferred, 0 = all, ignored when jpeg
+*/
+static int chdk_rcinit(lua_State *L) {
+	CHDK_CONNECTION_METHOD;
+	if (!ptp_usb->connected) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"not connected");
+		return 2;
+	}
+	int format = (unsigned)luaL_checknumber(L,2);
+	int startline = (unsigned)luaL_checknumber(L,3);
+	int numlines = (unsigned)luaL_checknumber(L,4);
+	if ( !ptp_chdk_rcinit(format,startline,numlines,params,&params->deviceinfo) ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"rcinit failed");
+		return 2;
+	}
+	lua_pushboolean(L,1);
+	return 1;
+}
+
+/*
+status[,errmsg]=con:rcisready(isready)
+isready: 0: not ready, lowest 3 bits: available image formats, 0x10000000: error
+*/
+static int chdk_rcisready(lua_State *L) {
+	CHDK_CONNECTION_METHOD;
+	if (!ptp_usb->connected) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"not connected");
+		return 2;
+	}
+	int isready = 0;
+	if ( !ptp_chdk_rcisready(&isready,params,&params->deviceinfo) ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"rcisready failed");
+		return 2;
+	}
+	lua_pushboolean(L,1);
+	lua_pushinteger(L,isready); //to be evaluated on the lua side
+	return 2;
+}
+
+/*
+status[,errmsg]=con:rcgetname(name,nlength)
+name: filename without path and extension
+nlength: filename length (probably unnecessary here)
+*/
+static int chdk_rcgetname(lua_State *L) {
+	CHDK_CONNECTION_METHOD;
+	if (!ptp_usb->connected) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"not connected");
+		return 2;
+	}
+	char *name;
+	int nlength;
+	if ( !ptp_chdk_rcgetname(&name,&nlength,params,&params->deviceinfo) ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"rcgetname failed");
+		return 2;
+	}
+	lua_pushboolean(L,1);
+	lua_pushinteger(L,nlength);
+	lua_pushstring(L,name);
+	free(name);
+	return 3;
+}
+
+/*
+status[,errmsg]=con:rcgetfile(fmt,local_fn)
+local_fn: local (full) file name
+fmt: image format (1: jpeg, 2: raw, 4: yuv)
+*/
+static int chdk_rcgetfile(lua_State *L) {
+	CHDK_CONNECTION_METHOD;
+	if (!ptp_usb->connected) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"not connected");
+		return 2;
+	}
+	int fmt = (unsigned)luaL_checknumber(L,2);
+	char *local_fn = (char *)luaL_checkstring(L,3);
+	if ( !ptp_chdk_rcgetfile(fmt,local_fn,params,&params->deviceinfo) ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"rcgetfile failed");
+		return 2;
+	}
+	lua_pushboolean(L,1);
+	return 1;
+}
+#endif
+
 /*
 r,msg=con:getmem(address,count[,dest])
 dest is
@@ -1457,6 +1582,13 @@ static const luaL_Reg chdkconnection[] = {
   {"get_ptp_devinfo", chdk_get_ptp_devinfo},
   {"get_usb_devinfo", chdk_get_usb_devinfo}, // does not need to be connected, returns bus and dev at minimum
   {"get_live_data",chdk_get_live_data},
+#if (PTP_CHDK_VERSION_MINOR >= 4)
+  {"remoteshoot", chdk_remoteshoot},
+  {"rcinit", chdk_rcinit},
+  {"rcisready", chdk_rcisready},
+  {"rcgetname", chdk_rcgetname},
+  {"rcgetfile", chdk_rcgetfile},
+#endif 
   {"reset_counters",chdk_reset_counters},
   {"get_counters",chdk_get_counters},
   {NULL, NULL}

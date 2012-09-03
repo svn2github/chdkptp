@@ -730,6 +730,50 @@ cli:add_commands{
 		end,
 	},
 	{
+		names={'remote_shoot','rs'},
+		help='execute remote shoot (under development, requires special CHDK build!)',
+		arghelp="<local> [-f=format] [-s=starting line] [-c=line count]",
+		args=argparser.create{
+			f=1,
+			s=0,
+			c=0,
+		},
+		help_detail=[[
+ <local>            local destination directory or filename (w/o extension!)
+ [-f=format]        image format: 1=JPEG (def.), 2=RAW, 4=YUV, can be ORed together
+ [-s=starting line] first line to be transferred (def. 0), ignored for JPEG
+ [-c=line count]    number of lines to be transferred (def. 0=all), ignored for JPEG
+]],
+		func=function(self,args)
+			if type(chdk_connection.remoteshoot) ~= 'function' then
+				return false,'remote shoot not supported in this build'
+			end
+			local dst = args[1]
+			if not dst then
+				return false,'expected destination file or directory'
+			end
+			if string.match(dst,'[\\/]+$') then
+				-- explicit / treat it as a directory
+				-- and check if it is
+				local dst_dir = fsutil.dirname(dst)
+				-- TODO should create it
+				if lfs.attributes(dst_dir,'mode') ~= 'directory' then
+					return false,'not a directory: '..dst_dir
+				end
+			elseif lfs.attributes(dst,'mode') ~= 'directory' then
+			end
+			local fformat=tonumber(args.f)
+			if (fformat < 1) or (fformat >7) then
+				return false,'wrong format requested'
+			end
+			local lstart=tonumber(args.s)
+			local lcount=tonumber(args.c)
+
+			local r, msg = con:remoteshoot(dst,fformat,lstart,lcount)
+			return r, msg
+		end,
+	},
+	{
 		names={'mdownload','mdl'},
 		help='download file/directories from the camera',
 		arghelp="[options] <remote, remote, ...> <target dir>",
