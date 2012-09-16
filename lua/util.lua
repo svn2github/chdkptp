@@ -239,6 +239,27 @@ function util.table_amean(table)
 end
 
 --[[
+--turn an integer into a zero based array of bits
+--]]
+function util.bit_unpack(n)
+	local t={}
+	n=math.floor(n)
+	for i=0,31 do
+		t[i]=n%2
+		n=math.floor(n/2)
+	end
+	return t
+end
+
+function util.bit_packu(bits)
+	local r=0
+	for i=0,31 do
+		r = r + bits[i]*2^i
+	end
+	return r
+end
+
+--[[
 very simple meta-table inheritance
 ]]
 function util.mt_inherit(t,base)
