@@ -1050,8 +1050,10 @@ static int chdk_rcinit(lua_State *L) {
 }
 
 /*
-status[,errmsg]=con:rcisready(isready)
-isready: 0: not ready, lowest 3 bits: available image formats, 0x10000000: error
+isready[,errmsg]=con:rcisready()
+isready: 
+	false: local error in errmsg
+	0: not ready, lowest 3 bits: available image formats, 0x10000000: error
 */
 static int chdk_rcisready(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
@@ -1066,9 +1068,8 @@ static int chdk_rcisready(lua_State *L) {
 		lua_pushstring(L,"rcisready failed");
 		return 2;
 	}
-	lua_pushboolean(L,1);
 	lua_pushinteger(L,isready); //to be evaluated on the lua side
-	return 2;
+	return 1;
 }
 
 /*

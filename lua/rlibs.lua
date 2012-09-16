@@ -956,6 +956,39 @@ end
 	]],
 },
 --[[
+TODO temp - should be integrated into above
+support for cli remote capture shoot command
+starts shoot, doesn't wait for it to finish
+]]
+{
+	name='rs_shoot',
+	code=[[
+function rs_shoot(opts)
+	local rec,vid = get_mode()
+	if not rec then
+		return false,'not in rec mode'
+	end
+	if type(init_remotecap) ~= 'function' then
+		return false, 'remotecap not supported'
+	end
+	if bitand(get_remotecap_support(),opts.fformat) ~= opts.fformat then
+		return false, 'unsupported format'
+	end
+	if not init_remotecap(opts.fformat,opts.lstart,opts.lcount) then
+		return false, 'init failed'
+	end
+	press('shoot_half')
+	repeat
+		sleep(10)
+	until get_shooting()
+	click('shoot_full')
+
+	return true
+end
+	]],
+},
+
+--[[
 a simple long lived script for interactive testing
 example
 !return con:exec('msg_shell:run()',{libs='msg_shell'})

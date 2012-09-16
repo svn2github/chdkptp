@@ -772,10 +772,11 @@ sleep until specified status is met
 status,errmsg=con:wait_status(opts)
 opts:
 {
-	-- bool values cause the function to return when the status matches the given value
+	-- msg/run bool values cause the function to return when the status matches the given value
 	-- if not set, status of that item is ignored
 	msg=bool
 	run=bool
+	rsdata=bool -- if true, return when remote shoot data available, data in status.rsdata
 	timeout=<number> -- timeout in ms
 	poll=<number> -- polling interval in ms
 	pollstart=<number> -- if not false, start polling at pollstart, double interval each iteration until poll is reached
@@ -804,10 +805,31 @@ function con_methods:wait_status(opts)
 		sys.sleep(opts.initwait)
 		timeleft = timeleft - opts.initwait
 	end
+	-- if waiting on remotecap state, make sure it's supported
+	if opts.rsdata then
+		-- temp for development version
+		if self.apiver.MINOR < 104 then
+			return false, 'camera does not support remotecap'
+		end
+		if type(self.rcisready) ~= 'function' then
+			return false, 'client does not support remotecap'
+		end
+	end
+
 	while true do
 		local status,msg = self:script_status()
 		if not status then
 			return false,msg
+		end
+		-- TODO this should be available in script_status call
+		if opts.rsdata then
+			status.rsdata,msg = self:rcisready()
+			if not status.rsdata then
+				return false,msg
+			end
+			if status.rsdata ~= 0 then
+				return status
+			end
 		end
 		if status.run == opts.run or status.msg == opts.msg then
 			return status
