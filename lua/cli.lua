@@ -1454,7 +1454,9 @@ cli:add_commands{
 					opts.tv=tonumber(args.tv)
 				end
 			end
+
 			-- hack for CHDK override bug that ignores APEX 0
+			-- TODO only required for CHDK 1.1 and earlier
 			if opts.tv == 0 then
 				opts.tv = 1
 			end
