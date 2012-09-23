@@ -504,10 +504,8 @@ b:flush() sends any remaining items
 function msg_batcher(opts)
 	local t = extend_table({
 		batchsize=50,
---		batchpause=10,
 		batchgc='step',
 		timeout=100000,
-		dbgmem=true,
 	},opts)
 	t.data={}
 	t.n=0
