@@ -730,132 +730,6 @@ cli:add_commands{
 		end,
 	},
 	{
-		names={'remote_shoot','rs'},
-		help='execute remote shoot (under development, requires special CHDK build!)',
-		arghelp="<local> [-f=format] [-s=starting line] [-c=line count]",
-		args=argparser.create{
-			f=1,
-			s=0,
-			c=0,
-		},
-		help_detail=[[
- <local>            local destination directory or filename (w/o extension!)
- [-f=format]        image format: 1=JPEG (def.), 2=RAW, 4=YUV, can be ORed together
- [-s=starting line] first line to be transferred (def. 0), ignored for JPEG
- [-c=line count]    number of lines to be transferred (def. 0=all), ignored for JPEG
-]],
-		func=function(self,args)
-			if type(chdk_connection.remoteshoot) ~= 'function' then
-				return false,'remote shoot not supported in this build'
-			end
-			local dst = args[1]
-			if not dst then
-				return false,'expected destination file or directory'
-			end
-			if string.match(dst,'[\\/]+$') then
-				-- explicit / treat it as a directory
-				-- and check if it is
-				local dst_dir = fsutil.dirname(dst)
-				-- TODO should create it
-				if lfs.attributes(dst_dir,'mode') ~= 'directory' then
-					return false,'not a directory: '..dst_dir
-				end
-			elseif lfs.attributes(dst,'mode') ~= 'directory' then
-			end
-			local fformat=tonumber(args.f)
-			if (fformat < 1) or (fformat >7) then
-				return false,'wrong format requested'
-			end
-			local lstart=tonumber(args.s)
-			local lcount=tonumber(args.c)
-
-			local r, msg = con:remoteshoot(dst,fformat,lstart,lcount)
-			return r, msg
-		end,
-	},
-	{
-		names={'remote_shoot2','rs2'},
-		help='execute remote shoot (under development, requires special CHDK build!)',
-		arghelp="<local> [-f=format] [-s=starting line] [-c=line count]",
-		args=argparser.create{
-			f=1,
-			s=0,
-			c=0,
-		},
-		help_detail=[[
- <local>            local destination directory or filename (w/o extension!)
- [-f=format]        image format: 1=JPEG (def.), 2=RAW, 4=YUV, can be ORed together
- [-s=starting line] first line to be transferred (def. 0), ignored for JPEG
- [-c=line count]    number of lines to be transferred (def. 0=all), ignored for JPEG
-]],
-		func=function(self,args)
-			if type(chdk_connection.remoteshoot) ~= 'function' then
-				return false,'remote shoot not supported in this build'
-			end
-			local dst = args[1]
-			if dst then
-				if string.match(dst,'[\\/]+$') then
-					-- explicit / treat it as a directory
-					-- and check if it is
-					local dst_dir = fsutil.dirname(dst)
-					-- TODO should create it
-					if lfs.attributes(dst_dir,'mode') ~= 'directory' then
-						return false,'not a directory: '..dst_dir
-					end
-				elseif lfs.attributes(dst,'mode') ~= 'directory' then
-				end
-			end
-			local fformat=tonumber(args.f)
-			if (fformat < 1) or (fformat >7) then
-				return false,'wrong format requested'
-			end
-			local lstart=tonumber(args.s)
-			local lcount=tonumber(args.c)
-
-			local status,rstatus,rerr = con:execwait('return rs_shoot('..serialize({
-				fformat=fformat,
-				lstart=lstart,
-				lcount=lcount,
-			})..')',{libs={'rs_shoot'}})
-			-- rs_shoot should not initialize remotecap if there's an error, so no need to clear
-			if not status then
-				return false,rstatus
-			end
-			if not rstatus then
-				return false,rerr
-			end
-
-			local status, err = con:get_remotecap_data({
-				datatypes=fformat,
-				handler=function(lcon,rcdatabit)
-					local err, fname
-					if not dst then
-						dst,err = con:rcgetname()
-						if not dst then
-							return false, err
-						end
-						cli.dbgmsg('got name %s\n',dst);
-					end
-					local fname = dst..'.'..chdku.remotecap_ftypes[rcdatabit+1].ext;
-					cli.dbgmsg('rcgetfile %s %d\n',fname,rcdatabit)
-					return lcon:rcgetfile(chdku.remotecap_ftypes[rcdatabit+1].n,fname)
-				end,
-			});
-			local ustatus, uerr = con:exec('init_remotecap(0)') -- try to uninit
-			-- if uninit failed, combine with previous status
-			if not ustatus then
-				uerr = 'uninit '..tostring(uerr)
-				status = false
-				if err then
-					err = err .. ' ' .. uerr
-				else 
-					err = uerr
-				end
-			end
-			return status, err
-		end,
-	},
-	{
 		names={'mdownload','mdl'},
 		help='download file/directories from the camera',
 		arghelp="[options] <remote, remote, ...> <target dir>",
@@ -1435,7 +1309,139 @@ cli:add_commands{
 			return con:exec(cmd,{wait=(not args.nowait),libs={'rlib_shoot'}})
 		end,
 	},
-};
+}
+
+-- TEMP only add remoteshoot commands if client build supports
+if type(chdk_connection.remoteshoot) == 'function' then
+cli:add_commands{
+	{
+		names={'remote_shoot','rs'},
+		help='execute remote shoot (under development, requires special CHDK build!)',
+		arghelp="<local> [-f=format] [-s=starting line] [-c=line count]",
+		args=argparser.create{
+			f=1,
+			s=0,
+			c=0,
+		},
+		help_detail=[[
+ <local>            local destination directory or filename (w/o extension!)
+ [-f=format]        image format: 1=JPEG (def.), 2=RAW, 4=YUV, can be ORed together
+ [-s=starting line] first line to be transferred (def. 0), ignored for JPEG
+ [-c=line count]    number of lines to be transferred (def. 0=all), ignored for JPEG
+]],
+		func=function(self,args)
+			if type(chdk_connection.remoteshoot) ~= 'function' then
+				return false,'remote shoot not supported in this build'
+			end
+			local dst = args[1]
+			if not dst then
+				return false,'expected destination file or directory'
+			end
+			if string.match(dst,'[\\/]+$') then
+				-- explicit / treat it as a directory
+				-- and check if it is
+				local dst_dir = fsutil.dirname(dst)
+				-- TODO should create it
+				if lfs.attributes(dst_dir,'mode') ~= 'directory' then
+					return false,'not a directory: '..dst_dir
+				end
+			elseif lfs.attributes(dst,'mode') ~= 'directory' then
+			end
+			local fformat=tonumber(args.f)
+			if (fformat < 1) or (fformat >7) then
+				return false,'wrong format requested'
+			end
+			local lstart=tonumber(args.s)
+			local lcount=tonumber(args.c)
+
+			local r, msg = con:remoteshoot(dst,fformat,lstart,lcount)
+			return r, msg
+		end,
+	},
+	{
+		names={'remote_shoot2','rs2'},
+		help='execute remote shoot (under development, requires special CHDK build!)',
+		arghelp="[local] [-f=format] [-s=starting line] [-c=line count]",
+		args=argparser.create{
+			f=1,
+			s=0,
+			c=0,
+		},
+		help_detail=[[
+ [local]            local destination directory or filename (w/o extension!)
+ [-f=format]        image format: 1=JPEG (def.), 2=RAW, 4=YUV, can be ORed together
+ [-s=starting line] first line to be transferred (def. 0), ignored for JPEG
+ [-c=line count]    number of lines to be transferred (def. 0=all), ignored for JPEG
+]],
+		func=function(self,args)
+			if type(chdk_connection.remoteshoot) ~= 'function' then
+				return false,'remote shoot not supported in this build'
+			end
+			local dst = args[1]
+			if dst then
+				if string.match(dst,'[\\/]+$') then
+					-- explicit / treat it as a directory
+					-- and check if it is
+					local dst_dir = fsutil.dirname(dst)
+					-- TODO should create it
+					if lfs.attributes(dst_dir,'mode') ~= 'directory' then
+						return false,'not a directory: '..dst_dir
+					end
+				elseif lfs.attributes(dst,'mode') ~= 'directory' then
+				end
+			end
+			local fformat=tonumber(args.f)
+			if (fformat < 1) or (fformat >7) then
+				return false,'wrong format requested'
+			end
+			local lstart=tonumber(args.s)
+			local lcount=tonumber(args.c)
+
+			local status,rstatus,rerr = con:execwait('return rs_shoot('..serialize({
+				fformat=fformat,
+				lstart=lstart,
+				lcount=lcount,
+			})..')',{libs={'rs_shoot'}})
+			-- rs_shoot should not initialize remotecap if there's an error, so no need to clear
+			if not status then
+				return false,rstatus
+			end
+			if not rstatus then
+				return false,rerr
+			end
+
+			local status, err = con:get_remotecap_data({
+				datatypes=fformat,
+				handler=function(lcon,rcdatabit)
+					local err, fname
+					if not dst then
+						dst,err = con:rcgetname()
+						if not dst then
+							return false, err
+						end
+						cli.dbgmsg('got name %s\n',dst);
+					end
+					local fname = dst..'.'..chdku.remotecap_ftypes[rcdatabit+1].ext;
+					cli.dbgmsg('rcgetfile %s %d\n',fname,rcdatabit)
+					return lcon:rcgetfile(chdku.remotecap_ftypes[rcdatabit+1].n,fname)
+				end,
+			});
+			local ustatus, uerr = con:exec('init_remotecap(0)') -- try to uninit
+			-- if uninit failed, combine with previous status
+			if not ustatus then
+				uerr = 'uninit '..tostring(uerr)
+				status = false
+				if err then
+					err = err .. ' ' .. uerr
+				else 
+					err = uerr
+				end
+			end
+			return status, err
+		end,
+	},
+}
+end
 prefs._add('cli_time','boolean','show cli execution times')
 prefs._add('cli_xferstats','boolean','show cli data transfer stats')
 prefs._add('cli_verbose','number','control verbosity of cli',1)
