@@ -1909,7 +1909,7 @@ int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDev
   return 1;
 }
 
-#if (PTP_CHDK_VERSION_MINOR >= 4)
+#if (PTP_CHDK_VERSION_MINOR >= 104)
 /*
  * 1. send RemoteCaptureInit, with the bitmask of the desired formats and the crop dimensions
  *  camera: error if not in still image record mode or if any of the requested formats is unavailable
