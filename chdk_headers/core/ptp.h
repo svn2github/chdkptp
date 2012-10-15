@@ -1,7 +1,7 @@
 #ifndef __CHDK_PTP_H
 #define __CHDK_PTP_H
 #define PTP_CHDK_VERSION_MAJOR 2  // increase only with backwards incompatible changes (and reset minor)
-#define PTP_CHDK_VERSION_MINOR 3  // increase with extensions of functionality
+#define PTP_CHDK_VERSION_MINOR 4  // increase with extensions of functionality
 /*
 protocol version history
 0.1 - initial proposal from mweerden, + luar
@@ -10,7 +10,8 @@ protocol version history
 2.0 - return PTP_CHDK_TYPE_TABLE for tables instead of TYPE_STRING, allow return of empty strings
 2.1 - experimental live view, not formally released
 2.2 - live view (work in progress)
-2.3 - live view (work in progress)
+2.3 - live view - released in 1.1
+2.4 - live view protocol 2.1
 */
 
 #define PTP_OC_CHDK 0x9999

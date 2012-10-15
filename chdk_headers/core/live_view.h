@@ -16,11 +16,13 @@ Protocol notes:
 */
 // Live View protocol version
 #define LIVE_VIEW_VERSION_MAJOR 2  // increase only with backwards incompatible changes (and reset minor)
-#define LIVE_VIEW_VERSION_MINOR 0  // increase with extensions of functionality
+#define LIVE_VIEW_VERSION_MINOR 1  // increase with extensions of functionality
 
 /*
 protocol version history
 < 2.0 - development versions
+2.0 - initial release, chdk 1.1
+2.1 - added palette type 4 - 16 entry VUYA, 2 bit alpha
 */
 
 
