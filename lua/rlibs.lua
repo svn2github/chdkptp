@@ -890,7 +890,7 @@ function ls(path,opts_in)
 	end
 	local b=msg_batcher{
 		batchsize=opts.msglimit,
-		timeoute=opts.msgtimeout
+		timeout=opts.msgtimeout
 	}
 	for i,v in ipairs(t) do
 		if not opts.match or string.match(v,opts.match) then
