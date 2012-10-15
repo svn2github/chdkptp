@@ -138,10 +138,16 @@ end
 copy members of source into target
 by default, not deep so any tables will be copied as references
 returns target so you can do x=extend_table({},...)
+opts
+	deep=bool - copy recursively
+	keys={key,key...} - copy only specified subset of keys, if key in source is unset, target is unchanged
 if deep, cycles result in an error
 deep does not copy keys which are themselves tables (the key will be a reference to the original key table)
 ]]
-function util.extend_table(target,source,deep)
+function util.extend_table(target,source,opts)
+	if not opts then
+		opts={}
+	end
 	if type(target) ~= 'table' then
 		error('extend_table: target not table')
 	end
@@ -154,14 +160,25 @@ function util.extend_table(target,source,deep)
 	if source == target then
 		error('extend_table: source == target')
 	end
-	if deep then
+	if opts.deep then
 		return extend_table_r(target, source)
-	else 
+	elseif opts.keys then -- copy only specific keys
+		for i,k in ipairs(opts.keys) do
+			if type(source[k]) == 'table' and opts.deep then
+				if type(target[k]) ~= 'table' then
+					target[k]={}
+				end
+				extend_table_r(target[k],source[k])
+			elseif source[k] ~= nil then
+				target[k] = source[k]
+			end
+		end
+	else
 		for k,v in pairs(source) do
 			target[k]=v
 		end
-		return target
 	end
+	return target
 end
 
 --[[

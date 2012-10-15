@@ -243,6 +243,18 @@ t.round = function()
 	assert(util.round(-1.6)==-2)
 end
 
+t.extend_table = function()
+	local tsub={ka='a',kb='b','one','two'}
+	local t={1,2,3,tsub=tsub}
+	assert(util.compare_values(util.extend_table({},t),t))
+	assert(util.compare_values_subset(util.extend_table({'a','b','c','d'},t),t))
+	assert(util.compare_values(util.extend_table({},t,{deep=true}),t))
+	assert(util.compare_values(util.extend_table({},t,{keys={1,2}}),{1,2}))
+	assert(util.compare_values(util.extend_table({},t,{keys={1,2,'tsub'}}),{1,2,tsub=tsub}))
+	assert(not util.compare_values(util.extend_table({},t,{keys={1,2,'tsub'}}),t))
+	assert(util.compare_values(util.extend_table({a='a'},t,{keys={1,2,'a'}}),{1,2,a='a'}))
+end
+
 function m:run(name)
 	-- TODO side affects galore
 	printf('%s:start\n',name)
