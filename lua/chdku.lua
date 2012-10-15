@@ -767,6 +767,73 @@ function con_methods:wait_msg(opts)
 	end
 	return self:read_msg_strict(opts)
 end
+
+-- bit number to ext + id mapping
+chdku.remotecap_ftypes={
+	{
+		ext='jpg',
+		n=1,
+	},
+	{ 
+		ext='raw',
+		n=2,
+	},
+	{
+		ext='yuv',
+		n=4,
+	},
+
+}
+--[[
+fetch remote capture data
+status,errmsg=con:get_remotecap_data(opts)
+opts:
+	timeout, initwait, poll, pollstart -- passed to wait_status
+	datatypes=<number> -- types expected
+	handler=f(lcon,rcdatabit) -- chunk handler
+]]
+function con_methods:get_remotecap_data(opts)
+	opts=util.extend_table({
+		timeout=20000,
+	},opts)
+	local wait_opts=util.extend_table({rsdata=true},opts,{keys={'timeout','initwait','poll','pollstart'}})
+
+	local toget = util.bit_unpack(opts.datatypes)
+	local done
+	while not done do
+		local status,err = con:wait_status(wait_opts)
+		if not status then
+			return false,'wait_status '..tostring(err)
+		end
+		if status.timeout then
+			return false,'timed out'
+		end
+		if status.rsdata == 0x10000000 then
+			return false,'remote shoot error'
+		end
+		local avail = util.bit_unpack(status.rsdata)
+		local n_toget = 0
+		for i=0,3 do
+			if avail[i] == 1 then
+				if toget[i] == 0 then
+					printf('unexpected type %d',i)
+				end
+				local status, err = opts.handler(self,i)
+				if not status then
+					return false,tostring(err)
+				end
+				toget[i] = 0
+			end
+			if toget[i] == 1 then
+				n_toget = n_toget + 1
+			end
+		end
+		if n_toget == 0 then
+			done = true
+		end
+	end
+	return true
+end
 --[[
 sleep until specified status is met
 status,errmsg=con:wait_status(opts)

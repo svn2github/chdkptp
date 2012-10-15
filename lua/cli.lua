@@ -789,37 +789,21 @@ cli:add_commands{
  [-c=line count]    number of lines to be transferred (def. 0=all), ignored for JPEG
 ]],
 		func=function(self,args)
-			-- bit number to ext + id mapping
-			local ftypes={
-				{
-					ext='jpg',
-					n=1,
-				},
-				{ 
-					ext='raw',
-					n=2,
-				},
-				{
-					ext='yuv',
-					n=4,
-				},
-			}
 			if type(chdk_connection.remoteshoot) ~= 'function' then
 				return false,'remote shoot not supported in this build'
 			end
 			local dst = args[1]
-			if not dst then
-				return false,'expected destination file or directory'
-			end
-			if string.match(dst,'[\\/]+$') then
-				-- explicit / treat it as a directory
-				-- and check if it is
-				local dst_dir = fsutil.dirname(dst)
-				-- TODO should create it
-				if lfs.attributes(dst_dir,'mode') ~= 'directory' then
-					return false,'not a directory: '..dst_dir
+			if dst then
+				if string.match(dst,'[\\/]+$') then
+					-- explicit / treat it as a directory
+					-- and check if it is
+					local dst_dir = fsutil.dirname(dst)
+					-- TODO should create it
+					if lfs.attributes(dst_dir,'mode') ~= 'directory' then
+						return false,'not a directory: '..dst_dir
+					end
+				elseif lfs.attributes(dst,'mode') ~= 'directory' then
 				end
-			elseif lfs.attributes(dst,'mode') ~= 'directory' then
 			end
 			local fformat=tonumber(args.f)
 			if (fformat < 1) or (fformat >7) then
@@ -841,53 +825,34 @@ cli:add_commands{
 				return false,rerr
 			end
 
-			local toget = util.bit_unpack(fformat)
-			local done
-			while not done do
-				status,err = con:wait_status{
-					rsdata=true,
-					timeout=20000, -- 20 sec
-					initwait=100, -- TODO could tune this to typical shot lenght+exp time if known
-				}
-				if not status then
-					-- TODO depending on the error, we might want to try to uninit remotecap
-					return false,'wait_status '..tostring(err)
-				end
-				if status.timeout then
-					con:exec('init_remotecap(0)') -- try to uninit
-					return false,'timed out'
-				end
-				if status.rsdata == 0x10000000 then
-					return false,'remote shoot error'
-				end
-				local avail = util.bit_unpack(status.rsdata)
-				local n_toget = 0
-				for i=0,3 do
-					if avail[i] == 1 then
-						if toget[i] == 0 then
-							printf('unexpected type %d',i)
+			local status, err = con:get_remotecap_data({
+				datatypes=fformat,
+				handler=function(lcon,rcdatabit)
+					local err, fname
+					if not dst then
+						dst,err = con:rcgetname()
+						if not dst then
+							return false, err
 						end
-						-- TODO ignoring name for now
-						local status, err = con:rcgetfile(ftypes[i+1].n,dst..'.'..ftypes[i+1].ext)
-						if not status then
-							con:exec('init_remotecap(0)') -- try to uninit
-							return false,'rcgetfile '..tostring(err)
-						end
-						toget[i] = 0
+						cli.dbgmsg('got name %s\n',dst);
 					end
-					if toget[i] == 1 then
-						n_toget = n_toget + 1
-					end
-				end
-				if n_toget == 0 then
-					done = true
+					local fname = dst..'.'..chdku.remotecap_ftypes[rcdatabit+1].ext;
+					cli.dbgmsg('rcgetfile %s %d\n',fname,rcdatabit)
+					return lcon:rcgetfile(chdku.remotecap_ftypes[rcdatabit+1].n,fname)
+				end,
+			});
+			local ustatus, uerr = con:exec('init_remotecap(0)') -- try to uninit
+			-- if uninit failed, combine with previous status
+			if not ustatus then
+				uerr = 'uninit '..tostring(uerr)
+				status = false
+				if err then
+					err = err .. ' ' .. uerr
+				else 
+					err = uerr
 				end
 			end
-			local status, err = con:exec('init_remotecap(0)') -- try to uninit
-			if not status then
-				return false, 'uninit '..tostring(err)
-			end
-			return true
+			return status, err
 		end,
 	},
 	{
