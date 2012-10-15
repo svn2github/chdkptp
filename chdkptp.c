@@ -996,7 +996,7 @@ static int chdk_download(lua_State *L) {
 	return 1;
 }
 
-#if (PTP_CHDK_VERSION_MINOR >= 4)
+#if (PTP_CHDK_VERSION_MINOR >= 104)
 /*
 status[,errmsg]=con:remoteshoot(dst,format,startline,numlines)
 dst: local destination directory or file
@@ -1073,9 +1073,8 @@ static int chdk_rcisready(lua_State *L) {
 }
 
 /*
-status[,errmsg]=con:rcgetname(name,nlength)
-name: filename without path and extension
-nlength: filename length (probably unnecessary here)
+name[,errmsg]=con:rcgetname()
+name: filename without path and extension, or false on error
 */
 static int chdk_rcgetname(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
@@ -1084,18 +1083,16 @@ static int chdk_rcgetname(lua_State *L) {
 		lua_pushstring(L,"not connected");
 		return 2;
 	}
-	char *name;
+	char *name = NULL;
 	int nlength;
 	if ( !ptp_chdk_rcgetname(&name,&nlength,params,&params->deviceinfo) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"rcgetname failed");
 		return 2;
 	}
-	lua_pushboolean(L,1);
-	lua_pushinteger(L,nlength);
-	lua_pushstring(L,name);
+	lua_pushstring(L,name); // returned name is null terminated
 	free(name);
-	return 3;
+	return 1;
 }
 
 /*
