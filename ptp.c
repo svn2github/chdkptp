@@ -270,6 +270,8 @@ ptp_usb_getresp (PTPParams* params, PTPContainer* resp)
 	resp->Param3=dtoh32(usbresp.payload.params.param3);
 	resp->Param4=dtoh32(usbresp.payload.params.param4);
 	resp->Param5=dtoh32(usbresp.payload.params.param5);
+	resp->Nparam=(dtoh32(usbresp.length)-12)/4;
+
 	return ret;
 }
 
