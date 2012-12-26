@@ -996,7 +996,7 @@ static int chdk_download(lua_State *L) {
 	return 1;
 }
 
-#if (PTP_CHDK_VERSION_MINOR >= 104)
+#if (PTP_CHDK_VERSION_MINOR >= 105)
 /*
 status[,errmsg]=con:remoteshoot(dst,format,startline,numlines)
 dst: local destination directory or file
@@ -1580,7 +1580,7 @@ static const luaL_Reg chdkconnection[] = {
   {"get_ptp_devinfo", chdk_get_ptp_devinfo},
   {"get_usb_devinfo", chdk_get_usb_devinfo}, // does not need to be connected, returns bus and dev at minimum
   {"get_live_data",chdk_get_live_data},
-#if (PTP_CHDK_VERSION_MINOR >= 104)
+#if (PTP_CHDK_VERSION_MINOR >= 105)
   {"remoteshoot", chdk_remoteshoot},
   {"rcinit", chdk_rcinit},
   {"rcisready", chdk_rcisready},

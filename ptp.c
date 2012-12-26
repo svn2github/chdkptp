@@ -1911,7 +1911,7 @@ int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDev
   return 1;
 }
 
-#if (PTP_CHDK_VERSION_MINOR >= 104)
+#if (PTP_CHDK_VERSION_MINOR >= 105)
 /*
  * 1. send RemoteCaptureInit, with the bitmask of the desired formats and the crop dimensions
  *  camera: error if not in still image record mode or if any of the requested formats is unavailable
@@ -2088,12 +2088,14 @@ int ptp_chdk_remoteshoot(char *local_dir, int picformat, int firstline, int numl
         if ( ((isready>>n)&1)&&((picformat>>n)&1)&&(((gotit>>n)&1)==0) )
         {
             gotit = gotit | (1<<n);
-            formattoget=1<<n;
+            formattoget=1<<n; // TODO should get YUV before JPEG
             break;
         }
     }
     
     ptp_debug(params,"fmttoget:%d",formattoget);
+//    printf("format: %d\n",formattoget);
+        
     if ( formattoget==0 ) break; //nothing left
     
     //build filename
@@ -2117,6 +2119,7 @@ int ptp_chdk_remoteshoot(char *local_dir, int picformat, int firstline, int numl
         ptp.Param2=formattoget; //get chunk
 
         ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
+        //printf("parameter count %d\n",ptp.Nparam);
         if ( ret != 0x2001 )
         {
             ptp_error(params,"RemoteCaptureGetData(1,%d): unexpected return code 0x%x",tries,ret);
@@ -2128,6 +2131,19 @@ int ptp_chdk_remoteshoot(char *local_dir, int picformat, int firstline, int numl
             ptp_error(params,"RemoteCaptureGetData(1,%d): NULL buffer, params: 0x%x, 0x%x",tries,ptp.Param1,ptp.Param2);
             fclose(f);
             return 0;
+        }
+        if ( /*(ptp.Nparam > 2) &&*/ ((int32_t)ptp.Param3 > -1) ) //chunk needs to be written at this file position
+        {
+ //           printf("seek to file position %d\n",ptp.Param3);
+            if (ptp.Param3 < 32*1024*1024) //temporary safety limit
+            {
+                fseek(f,ptp.Param3,SEEK_SET);
+            }
+        }
+        /*if ( ptp.Nparam > 3 )*/ //source address
+        {
+            //printf("source buffer address: 0x%x, size: 0x%x\n",ptp.Param4,ptp.Param1);
+    		ptp_debug(params,"rcgetdata: file closed");
         }
         if ( ptp.Param1 > 0 ) //chunk size
         {
@@ -2298,6 +2314,13 @@ int ptp_chdk_rcgetfile(int fmt, char *local_fn, PTPParams* params, PTPDeviceInfo
           ptp_error(params,"RemoteCaptureGetData(1,%d): NULL buffer, params: 0x%x, 0x%x",tries,ptp.Param1,ptp.Param2);
           fclose(f);
           return 0;
+      }
+      if ( /*(ptp.Nparam > 2) &&*/ ((int32_t)ptp.Param3 > -1) ) //chunk needs to be written at this file position
+      {
+          if (ptp.Param3 < 32*1024*1024) //temporary safety limit
+          {
+              fseek(f,ptp.Param3,SEEK_SET);
+          }
       }
       if ( ptp.Param1 > 0 ) //chunk size
       {
