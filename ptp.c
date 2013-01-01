@@ -2094,7 +2094,6 @@ int ptp_chdk_remoteshoot(char *local_dir, int picformat, int firstline, int numl
     }
     
     ptp_debug(params,"fmttoget:%d",formattoget);
-//    printf("format: %d\n",formattoget);
         
     if ( formattoget==0 ) break; //nothing left
     
@@ -2119,7 +2118,6 @@ int ptp_chdk_remoteshoot(char *local_dir, int picformat, int firstline, int numl
         ptp.Param2=formattoget; //get chunk
 
         ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
-        //printf("parameter count %d\n",ptp.Nparam);
         if ( ret != 0x2001 )
         {
             ptp_error(params,"RemoteCaptureGetData(1,%d): unexpected return code 0x%x",tries,ret);
@@ -2134,7 +2132,7 @@ int ptp_chdk_remoteshoot(char *local_dir, int picformat, int firstline, int numl
         }
         if ( /*(ptp.Nparam > 2) &&*/ ((int32_t)ptp.Param3 > -1) ) //chunk needs to be written at this file position
         {
- //           printf("seek to file position %d\n",ptp.Param3);
+			ptp_debug(params,"seek to file position %d\n",ptp.Param3);
             if (ptp.Param3 < 32*1024*1024) //temporary safety limit
             {
                 fseek(f,ptp.Param3,SEEK_SET);
