@@ -210,6 +210,7 @@ local function do_no_gui_startup()
 		return cli:run()
 	end
 end
+prefs._add('core_verbose','number','ptp core verbosity',0,corevar.get_verbose,corevar.set_verbose)
 
 con=chdku.connection()
 

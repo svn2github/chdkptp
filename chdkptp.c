@@ -1660,6 +1660,15 @@ static int syslib_getenv(lua_State *L) {
 	return 0;
 }
 
+static int corevar_set_verbose(lua_State *L) {
+	verbose = luaL_checknumber(L,1);
+	return 0;
+}
+static int corevar_get_verbose(lua_State *L) {
+	lua_pushnumber(L,verbose);
+	return 1;
+}
+
 static const luaL_Reg lua_syslib[] = {
   {"sleep", syslib_sleep},
   {"ostype", syslib_ostype},
@@ -1667,6 +1676,13 @@ static const luaL_Reg lua_syslib[] = {
   {"getcmd",syslib_getcmd},
   {"getargs",syslib_getargs},
   {"getenv",syslib_getenv},
+  {NULL, NULL}
+};
+
+// getters/setters for variables exposed to lua
+static const luaL_Reg lua_corevar[] = {
+  {"set_verbose", corevar_set_verbose},
+  {"get_verbose", corevar_get_verbose},
   {NULL, NULL}
 };
 
@@ -1748,6 +1764,7 @@ static int chdkptp_registerlibs(lua_State *L) {
 	luaL_register(L, "chdk", chdklib);
 
 	luaL_register(L, "sys", lua_syslib);
+	luaL_register(L, "corevar", lua_corevar);
 	luaL_register(L, "guisys", lua_guisyslib);
 
 	liveimg_open(L);	

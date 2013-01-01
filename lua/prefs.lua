@@ -62,7 +62,7 @@ local function read_val(vtype,val)
 	return vtypes[vtype].parse(val)
 end
 
-function m._add(name,vtype,desc,default)
+function m._add(name,vtype,desc,default,get_fn,set_fn)
 	if type(name) ~= 'string' then 
 		error('pref name must be string')
 	end
@@ -80,12 +80,25 @@ function m._add(name,vtype,desc,default)
 		error(val)
 	end
 	table.insert(order,name)
-	prefs[name]={
+	local p={
 		vtype=vtype,
 		desc=desc,
 		default=val,
-		value=val
+		set=set_fn,
+		get=get_fn,
 	}
+	if p.set==nil then
+		p.set = function(val)
+			p.value=val
+		end
+	end
+	if p.get==nil then
+		p.get = function(val)
+			return p.value
+		end
+	end
+	prefs[name]=p
+	p.set(val)
 end
 function m._each()
 	local i=0
@@ -99,7 +112,7 @@ function m._describe(name,mode)
 	if not prefs[name] then
 		return false,'invalid pref: '..tostring(name)
 	end
-	local r=string.format('%s=%s',name,tostring(prefs[name].value))
+	local r=string.format('%s=%s',name,tostring(prefs[name].get()))
 	if mode == 'full' then
 		r=string.format('%-20s - %s: %s',r,prefs[name].vtype,prefs[name].desc)
 	elseif mode == 'cmd' then
@@ -115,7 +128,7 @@ function m._set(name,value)
 	if p then
 		local status,value = read_val(p.vtype,value)
 		if status then
-			p.value = value
+			p.set(value)
 			return true
 		end
 		return false,value
@@ -124,7 +137,7 @@ function m._set(name,value)
 end
 function m._get(name)
 	if prefs[name] then
-		return true,prefs[name].value
+		return true,prefs[name].get()
 	end
 	return false,'invalid pref: ' .. tostring(name)
 end
