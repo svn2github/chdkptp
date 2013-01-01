@@ -1309,6 +1309,40 @@ cli:add_commands{
 			return con:exec(cmd,{wait=(not args.nowait),libs={'rlib_shoot'}})
 		end,
 	},
+	{
+		names={'rec'},
+		help='switch camera to shooting mode',
+		func=function(self,args) 
+			local status,rstatus,rerr = con:execwait([[
+if not get_mode() then
+	switch_mode_usb(1)
+	return true
+end
+return false,'already in rec'
+]])
+			if not status then
+				return false,rstatus
+			end
+			return rstatus,rerr
+		end,
+	},
+	{
+		names={'play'},
+		help='switch camera to playback mode',
+		func=function(self,args) 
+			local status,rstatus,rerr = con:execwait([[
+if get_mode() then
+	switch_mode_usb(0)
+	return true
+end
+return false,'already in play'
+]])
+			if not status then
+				return false,rstatus
+			end
+			return rstatus,rerr
+		end,
+	},
 }
 
 -- TEMP only add remoteshoot commands if client build supports

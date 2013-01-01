@@ -246,16 +246,19 @@ end
 
 --[[
 switch play / rec mode, update capture mode dropdown
+TODO the cli command should integrate with this
 ]]
 function switch_mode(m)
 	local capmode
 	if m == 0 then
-		gui.execquick('switch_mode_usb(0)')
+		gui.execquick('if get_mode() then switch_mode_usb(0) end')
 	else
 		local status
 		-- switch mode, wait for complete, return current mode
 		status,capmode=con:execwait([[
-switch_mode_usb(1)
+if not get_mode() then
+	switch_mode_usb(1)
+end
 local i=0
 local capmode = require'capmode'
 while capmode.get() == 0 and i < 50 do
