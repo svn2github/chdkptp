@@ -1025,31 +1025,6 @@ static int chdk_remoteshoot(lua_State *L) {
 }
 
 /*
-status[,errmsg]=con:rcinit(format,startline,numlines)
-format: 0 to uninitialize, else 1 for jpeg, 2 for raw, 4 for yuv (ORed together)
-startline: first line to be transferred (0-based), ignored when jpeg
-numlines: nr of lines to be transferred, 0 = all, ignored when jpeg
-*/
-static int chdk_rcinit(lua_State *L) {
-	CHDK_CONNECTION_METHOD;
-	if (!ptp_usb->connected) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
-	int format = (unsigned)luaL_checknumber(L,2);
-	int startline = (unsigned)luaL_checknumber(L,3);
-	int numlines = (unsigned)luaL_checknumber(L,4);
-	if ( !ptp_chdk_rcinit(format,startline,numlines,params,&params->deviceinfo) ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"rcinit failed");
-		return 2;
-	}
-	lua_pushboolean(L,1);
-	return 1;
-}
-
-/*
 isready[,errmsg]=con:rcisready()
 isready: 
 	false: local error in errmsg
@@ -1582,7 +1557,6 @@ static const luaL_Reg chdkconnection[] = {
   {"get_live_data",chdk_get_live_data},
 #if (PTP_CHDK_VERSION_MINOR >= 105)
   {"remoteshoot", chdk_remoteshoot},
-  {"rcinit", chdk_rcinit},
   {"rcisready", chdk_rcisready},
   {"rcgetname", chdk_rcgetname},
   {"rcgetfile", chdk_rcgetfile},

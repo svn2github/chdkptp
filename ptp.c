@@ -2180,44 +2180,6 @@ int ptp_chdk_remoteshoot(char *local_dir, int picformat, int firstline, int numl
 }
 
 /*
- * init / uninit remote capture
- * picformat: 1=jpeg, 2=raw, 4=yuv (can be ORed together, 0 can be used to uninitialize)
- * firstline: first line to transmit for the non-compressed formats (0 is the first one)
- * numlines: number of lines to transmit for the non-compressed formats (0 for all)
- */
-int ptp_chdk_rcinit(int picformat, int firstline, int numlines, PTPParams* params, PTPDeviceInfo* deviceinfo)
-{
-  uint16_t ret;
-  PTPContainer ptp;
-
-  PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
-  ptp.Nparam=4;
-  ptp.Param1=PTP_CHDK_RemoteCaptureInit;
-  ptp.Param2=picformat; //1=jpeg 2=raw 4=yuv ORed together, todo: magic values should have names
-  ptp.Param3=firstline; //starting line for transfer, only for raw or yuv, 0-based
-  ptp.Param4=numlines; //number of lines to be transferred, only for raw or yuv, 0 = all
-
-  ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-  if ( ret != 0x2001 )
-  {
-    ptp_error(params,"RemoteCaptureInit: unexpected return code 0x%x",ret);
-    return 0;
-  }
-  if ( (picformat>0) && (ptp.Param1==0) )
-  {
-    ptp_error(params,"RemoteCaptureInit: init failed");
-    return 0;
-  }
-  if ( (picformat==0) && (ptp.Param1>0) )
-  {
-    ptp_error(params,"RemoteCaptureInit: uninit failed");
-    return 0;
-  }
-  return 1;
-}
-
-/*
  * isready: 0: not ready, lowest 3 bits: available image formats, 0x10000000: error
  */
 int ptp_chdk_rcisready(int *isready, PTPParams* params, PTPDeviceInfo* deviceinfo)
