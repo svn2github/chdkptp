@@ -998,33 +998,6 @@ static int chdk_download(lua_State *L) {
 
 #if (PTP_CHDK_VERSION_MINOR >= 105)
 /*
-status[,errmsg]=con:remoteshoot(dst,format,startline,numlines)
-dst: local destination directory or file
-format: 1 jpeg, 2 raw, 4 yuv (ORed together)
-startline: first line to be transferred (0-based), ignored when jpeg
-numlines: nr of lines to be transferred, 0 = all, ignored when jpeg
-*/
-static int chdk_remoteshoot(lua_State *L) {
-	CHDK_CONNECTION_METHOD;
-	if (!ptp_usb->connected) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
-	char *dst = (char *)luaL_checkstring(L,2);
-	int format = (unsigned)luaL_checknumber(L,3);
-	int startline = (unsigned)luaL_checknumber(L,4);
-	int numlines = (unsigned)luaL_checknumber(L,5);
-	if ( !ptp_chdk_remoteshoot(dst,format,startline,numlines,params,&params->deviceinfo) ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"shoot failed");
-		return 2;
-	}
-	lua_pushboolean(L,1);
-	return 1;
-}
-
-/*
 isready[,errmsg]=con:rcisready()
 isready: 
 	false: local error in errmsg
@@ -1556,7 +1529,6 @@ static const luaL_Reg chdkconnection[] = {
   {"get_usb_devinfo", chdk_get_usb_devinfo}, // does not need to be connected, returns bus and dev at minimum
   {"get_live_data",chdk_get_live_data},
 #if (PTP_CHDK_VERSION_MINOR >= 105)
-  {"remoteshoot", chdk_remoteshoot},
   {"rcisready", chdk_rcisready},
   {"rcgetname", chdk_rcgetname},
   {"rcgetfile", chdk_rcgetfile},
