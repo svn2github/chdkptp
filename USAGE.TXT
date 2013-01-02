@@ -228,12 +228,16 @@ shoot        [options]   : - shoot a picture with specified exposure
    -nowait    don't wait for shot to complete
   Any exposure paramters not set use camera defaults
 
+rec                      : - switch camera to shooting mode
+play                     : - switch camera to playback mode
+
 ==Runtime options==
 The set command allows you to set the following runtime options
 cli_time=false       - boolean: show cli execution times
 cli_xferstats=false  - boolean: show cli data transfer stats
 cli_verbose=1        - number: control verbosity of cli
 cli_source_max=10    - number: max nested source calls
+core_verbose=0       - number: ptp core verbosity
 
 In the GUI, the following additional options are available:
 gui_dump_palette=false - boolean: dump live palette data on state change
