@@ -875,7 +875,7 @@ function con_methods:wait_status(opts)
 	-- if waiting on remotecap state, make sure it's supported
 	if opts.rsdata then
 		-- temp for development version
-		if self.apiver.MINOR < 104 then
+		if self.apiver.MINOR < 106 then
 			return false, 'camera does not support remotecap'
 		end
 		if type(self.rcisready) ~= 'function' then
