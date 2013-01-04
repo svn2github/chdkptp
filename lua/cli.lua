@@ -1365,16 +1365,23 @@ cli:add_commands{
 ]],
 		func=function(self,args)
 			local dst = args[1]
+			local dst_dir
 			if dst then
 				if string.match(dst,'[\\/]+$') then
 					-- explicit / treat it as a directory
 					-- and check if it is
-					local dst_dir = fsutil.dirname(dst)
-					-- TODO should create it
+					dst_dir = string.sub(dst,1,-2)
 					if lfs.attributes(dst_dir,'mode') ~= 'directory' then
-						return false,'not a directory: '..dst_dir
+						cli.dbgmsg('mkdir %s\n',dst_dir)
+						local status,err = fsutil.mkdir_m(dst_dir)
+						if not status then
+							return false,err
+						end
 					end
-				elseif lfs.attributes(dst,'mode') ~= 'directory' then
+					dst = nil
+				elseif lfs.attributes(dst,'mode') == 'directory' then
+					dst_dir = dst
+					dst = nil
 				end
 			end
 			local fformat=tonumber(args.f)
@@ -1409,6 +1416,9 @@ cli:add_commands{
 						cli.dbgmsg('got name %s\n',dst);
 					end
 					local fname = dst..'.'..chdku.remotecap_ftypes[rcdatabit+1].ext;
+					if dst_dir then
+						fname = fsutil.joinpath(dst_dir,fname)
+					end
 					cli.dbgmsg('rcgetfile %s %d\n',fname,rcdatabit)
 					return lcon:rcgetfile(chdku.remotecap_ftypes[rcdatabit+1].n,fname)
 				end,
