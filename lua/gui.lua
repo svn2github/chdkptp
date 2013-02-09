@@ -261,8 +261,9 @@ if not get_mode() then
 end
 local i=0
 local capmode = require'capmode'
-while capmode.get() == 0 and i < 50 do
+while capmode.get() == 0 and i < 300 do
 	sleep(10)
+	i=i+1
 end
 return capmode.get()
 ]])
