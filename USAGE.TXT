@@ -297,3 +297,29 @@ con> list
  1:Canon PowerShot D10 b=bus-0 d=\\.\libusb0-0001--0x04a9-0x31bc v=0x4a9 p=0x31bc s=12345678123456781234567812345678
 *2:Canon PowerShot A540 b=bus-0 d=\\.\libusb0-0002--0x04a9-0x311b v=0x4a9 p=0x311b s=nil
 
+
+==Run a script file on the camera==
+The suggested way to run a lua script file on the cameras is
+
+con> .loadfile('A/CHDK/SCRIPTS/MY.LUA')()
+
+loadfile returns a function, the following () executes it immediately.
+
+The reason to loadfile instead of the more obvious dofile() or require() is
+that code executed in these functions cannot yield, which means you wouldn't
+be able to use sleep or keyboard functions.
+
+If the script was written to be loaded from the CHDK script menu and expects
+menu settings, you will need to manually set the corresponding variables, e.g.
+
+con> .a=1; b=2; loadfile("A/CHDK/SCRIPTS/MY.LUA")()
+
+While the script is running you will not be able to control the camera from
+chdkptp using the GUI key buttons or any other script commands. You also will
+note be able to gracefully terminate the script without physically pressing the
+shutter button.
+
+If you want to have a script that runs for a long time on the camera, but still
+be able to control it over ptp, you will probably need to write your own script
+using the ptp message interface. Some examples of this in the chdkptp lua code
+lua/rlibs.lua msg_shell and lua/multicam.lua
