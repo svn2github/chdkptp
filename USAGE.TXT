@@ -57,6 +57,9 @@ is started.
 =CLI=
 CLI commands are available from the console, GUI and the command line
 
+Many CLI commands have full descriptive name and a short name. The short 
+is listed in parenthesis in the command reference below.
+
 ==CLI parsing==
 The cli commands lua, luar, exec and putm all accept a single line of free-form
 text and pass it unmodified to the underlying function.
