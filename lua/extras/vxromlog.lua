@@ -23,6 +23,8 @@ date (looks like fixed length)
 FsIoNotify.c + nulls through offset 67?
 2C 2E 1C 0B = task id? at offset 68
 tFsIoNotif = task name at offset 72
+prio offset 124
+
 stack offset 556 ? (not clear if full dump, but includes debug assert address)
 
 total header 668
@@ -133,7 +135,7 @@ function m.load(name)
 		end
 		local o
 		local r = ''
-		for o = self.stack_start,self.stack_start + 4*self.stack_words,4 do
+		for o = self.stack_start,self.stack_start + 4*(self.stack_words-1),4 do
 			r = r..string.format('0x%08x %12d\n',self._lb:get_u32(o),self._lb:get_i32(o))
 		end
 		return r
