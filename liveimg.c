@@ -78,6 +78,7 @@ void palette_type1_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgb
 void palette_type2_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
 void palette_type3_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
 void palette_type4_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
+void palette_type5_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
 
 void yuv_live_to_cd_rgb(const char *p_yuv,
 						unsigned buf_width,
@@ -106,6 +107,7 @@ palette_convert_t palette_funcs[] = {
 	{palette_type2_to_rgba,16}, 	// type 2 - like type 1, but with 2 bit alpha lookup - UNTESTED
 	{palette_type3_to_rgba,256}, 	// type 3 - vuya, 256 entries, 2 bit alpha lookup
 	{palette_type4_to_rgba,16}, 	// type 4 - with 2 bit alpha lookup like 2
+	{palette_type5_to_rgba,256}, 	// type 5 - vuya, 256 entries, 6 bit alpha lookup (only 2 bits used)
 };
 
 #define N_PALETTE_FUNCS (sizeof(palette_funcs)/sizeof(palette_funcs[0]))
@@ -198,17 +200,23 @@ void palette_type2_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba
 	pal_rgb->b = yuv_to_b(y,u);
 }
 
-void palette_type3_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba_t *pal_rgb) {
+// Convert 32 bit AYUV palette to RGB.
+// Assumes A only uses 2 bits - 'shift' parameter used to scale A value.
+void palette_AYUV_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb, int shift) {
 	const palette_entry_vuya_t *pal = (const palette_entry_vuya_t *)palette;
 	// special case for index 0
 	if(pixel == 0) {
 		pal_rgb->a = pal_rgb->r = pal_rgb->g = pal_rgb->b = 0;
 		return;
 	}
-	pal_rgb->a = alpha2_lookup[pal[pixel].a&3];
+	pal_rgb->a = alpha2_lookup[(pal[pixel].a>>shift)&3];
 	pal_rgb->r = yuv_to_r(pal[pixel].y,pal[pixel].v);
 	pal_rgb->g = yuv_to_g(pal[pixel].y,pal[pixel].u,pal[pixel].v);
 	pal_rgb->b = yuv_to_b(pal[pixel].y,pal[pixel].u);
+}
+
+void palette_type3_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba_t *pal_rgb) {
+    palette_AYUV_to_rgba(palette, pixel, pal_rgb, 0);
 }
 
 // like 2, but vuya
@@ -234,6 +242,10 @@ void palette_type4_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba
 	pal_rgb->r = yuv_to_r(y,v);
 	pal_rgb->g = yuv_to_g(y,u,v);
 	pal_rgb->b = yuv_to_b(y,u);
+}
+
+void palette_type5_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba_t *pal_rgb) {
+    palette_AYUV_to_rgba(palette, pixel, pal_rgb, 4);
 }
 
 void yuv_live_to_cd_rgb(const char *p_yuv,
