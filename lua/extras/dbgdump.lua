@@ -108,7 +108,7 @@ function m.load(name)
 		return false, 'unknown version '..tostring(d.ver)
 	end
 	printf("loaded version %d\n",d.ver)
-	printf("time %s\n",os.date('%c',d.time))
+	printf("time %s (%d)\n",os.date('!%Y:%m:%d %H:%M:%S',d.time),d.time)
 	for i=3,#m.header_fields do
 		local name = m.header_fields[i]
 		printf("%19s %11u 0x%08x\n",name,d[name],d[name])
@@ -159,6 +159,7 @@ function m.load(name)
 	if d.user_data_len > 0 then
 		printf('user data:\n%s\n',util.hexdump(d.user_data_str(),d.user_val))
 	end
+	return d
 end
 
 return m
