@@ -215,6 +215,13 @@ t.lbufutil = function()
 	assert(b.last==2)
 	b.last = 3
 	assert(b.last==3)
+	b:bind_seek('set',0)
+	b:bind_i32('s1')
+	assert(b.s1==1)
+	assert(b:bind_seek() == 4) -- return current pos
+	assert(b:bind_seek(4) == 8) -- cur +4
+	assert(b:bind_seek('end') == b._lb:len()) -- length
+	assert(b:bind_seek('end',-4) == b._lb:len()-4)
 end
 
 t.lbuff = function()
