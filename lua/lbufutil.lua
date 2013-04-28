@@ -125,14 +125,14 @@ function lbu.wrap(lb)
 
 	-- return a getter for an integer value
 	local bind_int_get = function(vtype)
-		mname = 'get_'..vtype
+		local mname = 'get_'..vtype
 		if type(lbuf[mname]) ~= 'function' then
 			error(string.format('invalid lbuf method "%s"',tostring(mname)))
 		end
 		return function(fld) return t._lb[mname](t._lb,fld.offset) end
 	end
 	local bind_int_set = function(vtype)
-		mname = 'set_'..vtype
+		local mname = 'set_'..vtype
 		if type(lbuf[mname]) ~= 'function' then
 			error(string.format('invalid lbuf method "%s"',tostring(mname)))
 		end

@@ -199,6 +199,24 @@ t.lbufi = function()
 	assert(t[1] == -1)
 end
 
+t.lbufutil = function()
+	-- TODO doesn't exercise file loading
+	local lbu=require'lbufutil'
+	local b=lbu.wrap(lbuf.new('\001\000\000\000\255\255\255\255hello world\000\002\000\000\000'))
+	b:bind_i32('first')
+	b:bind_i32('second')
+	b:bind_u32('second_u',4)
+	b:bind_sz('str',12)
+	b:bind_rw_i32('last')
+	assert(b.first==1)
+	assert(b.second==-1)
+	assert(b.second_u==0xFFFFFFFF)
+	assert(b.str=="hello world")
+	assert(b.last==2)
+	b.last = 3
+	assert(b.last==3)
+end
+
 t.lbuff = function()
 	local l=lbuf.new('hello world')
 	local f=io.open('lbuftest.dat','wb')
