@@ -302,12 +302,26 @@ function v1_methods.print_udata_hex(self)
 	end
 end
 
-function v1_methods.print_udata_words(self)
+function v1_methods.print_udata_words(self,start,count)
 	if self.user_data_len == 0 then
 		return
 	end
-	local count = math.floor(self.user_data_len/4) - 1
-	for i=0,count do
+	if type(start) == 'nil' then
+		start = 0
+	end
+	local max = math.floor(self.user_data_len/4) - 1
+	if start > max then
+		util.warnf('start > max');
+		return
+	end
+	if type(count) ~= 'nil' then
+		if start + count <= max then
+			max = start+count-1
+		else
+			util.warnf('start + count > max');
+		end
+	end
+	for i=start,max do
 		local v=self:udatau(i)
 		printf('%04d: 0x%08x %11d %s\n',i*4,v,v,self:annotate_addr(v))
 	end
