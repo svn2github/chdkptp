@@ -158,6 +158,9 @@ function module_methods.print(self)
 	for i,fname in ipairs(m.module_fields) do
 		print_field(self,fname)
 	end
+	for i,fname in ipairs({'text','data','bss'}) do
+		print_field(self,fname..'_addr')
+	end
 end
 
 function module_methods.is_text_addr(self,a) 
