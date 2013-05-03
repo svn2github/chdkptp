@@ -998,6 +998,8 @@ putm exec print(message)
 	code=[[
 msg_shell={}
 msg_shell.done=false
+msg_shell.sleep=10
+msg_shell.msg_wait=10000
 msg_shell.cmds={
 	quit=function(msg)
 		msg_shell.done=true
@@ -1034,9 +1036,12 @@ msg_shell.cmds={
 		end
 	end,
 }
+msg_shell.idle = function()
+	sleep(msg_shell.sleep)
+end
 msg_shell.run=function(self)
 	repeat 
-		local msg=read_usb_msg()
+		local msg=read_usb_msg(self.read_msg_timeout)
 		if msg then
 			local cmd = string.match(msg,'^%w+')
 			if type(self.cmds[cmd]) == 'function' then
@@ -1047,7 +1052,7 @@ msg_shell.run=function(self)
 				print('undefined command: '..cmd)
 			end
 		else
-			sleep(100)
+			self.idle()
 		end
 	until self.done
 end
