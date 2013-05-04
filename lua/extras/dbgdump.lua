@@ -238,7 +238,7 @@ function v1_methods.stacku(self,i)
 end
 function v1_methods.is_stack_addr(self,v)
 	-- TODO we don't know the actual stack size
-	return (v >= self.sp and v <= self.sp+d.stack_count*4)
+	return (v >= self.sp and v <= self.sp+self.stack_count*4)
 end
 
 -- user data functions
@@ -262,7 +262,7 @@ function v1_methods.print_header(self)
 end
 
 function v1_methods.annotate_addr(self,v)
-	if v >= d.romstart then
+	if v >= self.romstart then
 		return 'ROM'
 	end
 	local desc
@@ -274,11 +274,11 @@ function v1_methods.annotate_addr(self,v)
 	end
 	if v >= self.text_start and v < self.data_start then
 		desc = 'CHDK text ' .. annotate_arm_thumb(v)
-	elseif v >= d.data_start and v < d.bss_start then
+	elseif v >= self.data_start and v < self.bss_start then
 		desc = 'CHDK data'
-	elseif v >= d.bss_start and v <= d.bss_end then
+	elseif v >= self.bss_start and v <= self.bss_end then
 		desc = 'CHDK bss'
-	elseif d:is_stack_addr(v) then
+	elseif self:is_stack_addr(v) then
 		 -- may not be accurate since we don't know full depth of stack
 		desc = 'stack ?'
 	else
@@ -295,7 +295,7 @@ function v1_methods.print_stack(self)
 			printf("truncated dump at %d ?\n",i*4)
 			break
 		end
-		printf('%04d 0x%08x: 0x%08x %11d %s\n',i*4,d.sp + i*4,v,v,self:annotate_addr(v))
+		printf('%04d 0x%08x: 0x%08x %11d %s\n',i*4,self.sp + i*4,v,v,self:annotate_addr(v))
 	end
 end
 
