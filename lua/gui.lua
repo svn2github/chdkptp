@@ -306,8 +306,12 @@ gui.mode_dropdown = iup.list{
 	DROPDOWN="YES",
 }
 function gui.mode_dropdown:valuechanged_cb()
-	gui.dbgmsg('mode_dropdown\n',self.value)
+	gui.dbgmsg('mode_dropdown %s\n',tostring(self.value))
 	local v = tonumber(self.value)
+	-- 0 means none selected. Callback can be called with this (multiple times) when list is emptied
+	if v == 0 then
+		return
+	end
 	if not gui.mode_map or not gui.mode_map[v] then
 		gui.infomsg('tried to set invalid mode %s\n',tostring(v))
 		return
