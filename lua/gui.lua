@@ -306,10 +306,10 @@ gui.mode_dropdown = iup.list{
 	DROPDOWN="YES",
 }
 function gui.mode_dropdown:valuechanged_cb()
-	gui.dbgmsg('mode_dropdown',self.value)
+	gui.dbgmsg('mode_dropdown\n',self.value)
 	local v = tonumber(self.value)
 	if not gui.mode_map or not gui.mode_map[v] then
-		gui.infomsg('tried to set invalid mode %s',tostring(v))
+		gui.infomsg('tried to set invalid mode %s\n',tostring(v))
 		return
 	end
 	gui.execquick(string.format('set_capture_mode(%d)',gui.mode_map[v]))
