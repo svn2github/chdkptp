@@ -1113,6 +1113,40 @@ static int chdk_setmem(lua_State *L) {
 	return 2;
 }
 
+/*
+ret=con:call_function(ptr,arg1,arg2...arg10)
+call a pointer directly from ptp code.
+useful if lua is not available
+args must be numbers, or pointers set up on the cam by other means
+*/
+static int chdk_call_function(lua_State *L) {
+	CHDK_CONNECTION_METHOD;
+	int args[11];
+	int ret;
+	if ( !ptp_usb->connected ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"not connected");
+		return 2;
+	}
+	memset(args,0,sizeof(args));
+	int size = lua_gettop(L)-1; // args excluding self
+	if(size > 10 || size < 1) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"invalid number of arguments");
+		return 2;
+	}
+	int i;
+	for(i=2;i<=size+1;i++) {
+		args[i-2] = luaL_checknumber(L,i);
+	}
+	if ( !ptp_chdk_call_function(params,&params->deviceinfo,args,size,&ret) ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"ptp error");
+	}
+	lua_pushnumber(L,ret);
+	return 1;
+}
+
 static int chdk_script_support(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	unsigned status = 0;
@@ -1519,6 +1553,7 @@ static const luaL_Reg chdkconnection[] = {
   {"download", chdk_download},
   {"getmem", chdk_getmem},
   {"setmem", chdk_setmem},
+  {"call_function", chdk_call_function},
   {"script_support", chdk_script_support},
   {"script_status", chdk_script_status},
   {"read_msg", chdk_read_msg},

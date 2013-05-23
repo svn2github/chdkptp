@@ -2193,3 +2193,26 @@ int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,unsigned
   return 1;
 
 }
+
+int ptp_chdk_call_function(PTPParams* params, PTPDeviceInfo* deviceinfo, int *args, int size, int *ret)
+{
+  uint16_t r;
+  PTPContainer ptp;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=1;
+  ptp.Param1=PTP_CHDK_CallFunction;
+  r=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, size*sizeof(int), (char **) &args);
+  if ( r != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",r);
+    return 0;
+  }
+  if ( ret )
+  {
+    *ret = ptp.Param1;
+  }
+  return 1;
+}
+

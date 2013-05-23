@@ -904,5 +904,5 @@ int ptp_chdk_get_script_status(PTPParams* params, PTPDeviceInfo* deviceinfo, uns
 int ptp_chdk_write_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo, char *data, unsigned size, int target_script_id, int *status);
 int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_chdk_script_msg **msg);
 int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,unsigned flags,char **data,unsigned *data_size);
-
+int ptp_chdk_call_function(PTPParams* params, PTPDeviceInfo* deviceinfo, int *args, int size, int *ret);
 #endif /* __PTP_H__ */
