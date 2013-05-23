@@ -1142,6 +1142,7 @@ static int chdk_call_function(lua_State *L) {
 	if ( !ptp_chdk_call_function(params,&params->deviceinfo,args,size,&ret) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"ptp error");
+		return 2;
 	}
 	lua_pushnumber(L,ret);
 	return 1;
