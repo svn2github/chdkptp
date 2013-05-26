@@ -47,6 +47,13 @@ function util.errf(format,...)
 end
 
 --[[
+force reload a module
+]]
+function util.forcerequire(modname,...)
+	package.loaded[modname] = nil
+	return require(modname,...)
+end
+--[[
 log2(n) = log(n)/log(2)
 ]]
 function util.log2(n)
