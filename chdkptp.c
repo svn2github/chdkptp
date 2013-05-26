@@ -1107,6 +1107,11 @@ static int chdk_getmem(lua_State *L) {
 	return 1;
 }
 
+/*
+TODO
+status[,msg]=con:setmem(address,data)
+data is a number (to bet set as a 32 bit int) or string
+*/
 static int chdk_setmem(lua_State *L) {
 	lua_pushboolean(L,0);
 	lua_pushstring(L,"not implemented yet, use lua poke()");
@@ -1137,7 +1142,7 @@ static int chdk_call_function(lua_State *L) {
 	}
 	int i;
 	for(i=2;i<=size+1;i++) {
-		args[i-2] = luaL_checknumber(L,i);
+		args[i-2] = (unsigned)luaL_checknumber(L,i);
 	}
 	if ( !ptp_chdk_call_function(params,&params->deviceinfo,args,size,&ret) ) {
 		lua_pushboolean(L,0);
