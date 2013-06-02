@@ -756,7 +756,7 @@ cli:add_commands{
    -maxdepth=n       only recurse into N levels of directory
    -pretend          print actions instead of doing them
    -nomtime          don't preserve modification time of remote files
-   -batchsize=n      lower = slower, less mememory used
+   -batchsize=n      lower = slower, less memory used
    -dbgmem           print memory usage info
    -overwrite=<str>  overwrite existing files (y|n|old)
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
@@ -1226,9 +1226,13 @@ cli:add_commands{
 			sv=false,
 			av=false,
 			raw=false,
+			dng=false,
 			pretend=false,
-			nowait=false
+			nowait=false,
+			dl=false,
+			rm=false,
 		}),
+		-- TODO allow setting destinations and filetypes for -dl
 		help_detail=[[
  options:
    -u=<s|a|96>
@@ -1238,9 +1242,12 @@ cli:add_commands{
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value. In standard units, Canon "real" ISO
    -av=<v>    Aperature value. In standard units, f number
-   -raw=1|0   Force raw on or off, default use current camera selection
+   -raw[=1|0] Force raw on or off, defaults to current camera setting
+   -dng[=1|0] Force DNG on or off, implies raw if on, default current camera setting
    -pretend   print actions instead of running them
    -nowait    don't wait for shot to complete
+   -dl        download shot file(s)
+   -rm        remove file after shooting
   Any exposure paramters not set use camera defaults
 ]],
 		func=function(self,args) 
@@ -1299,14 +1306,97 @@ cli:add_commands{
 			if opts.tv == 0 then
 				opts.tv = 1
 			end
+			-- allow -dng
+			if args.dng == true then
+				args.dng = 1
+			end
+			if args.dng then
+				opts.dng = tonumber(args.dng)
+				if opts.dng == 1 then
+					-- force raw on if dng. TODO complain if raw/dng mismatch?
+					args.raw = 1
+				end
+			end
+			-- allow -raw to turn raw on
+			if args.raw == true then
+				args.raw=1
+			end
 			if args.raw then
-				opts.raw=args.raw
+				opts.raw=tonumber(args.raw)
+			end
+			if args.rm or args.dl then
+				if args.nowait then
+					return false, "can't download or remove with nowait"
+				end
+				opts.info=true
 			end
 			local cmd=string.format('rlib_shoot(%s)',util.serialize(opts))
 			if args.pretend then
 				return true,cmd
 			end
-			return con:exec(cmd,{wait=(not args.nowait),libs={'rlib_shoot'}})
+			if args.nowait then
+				return con:exec(cmd,{libs={'rlib_shoot'}})
+			end
+
+			local status,rstatus,rerr = con:execwait('return '..cmd,{libs={'serialize_msgs','rlib_shoot'}})
+
+			if not status then
+				return false,rstatus
+			end
+			if not rstatus then
+				return false, rerr
+			end
+			if not (args.dl or args.rm) then
+				return true
+			end
+
+			local info = rstatus
+
+			local jpg_path = string.format('%s/IMG_%04d.JPG',info.dir,info.exp)
+			local raw_path
+
+			if info.raw then
+				-- TODO
+				-- get_config_value only returns indexes
+				-- chdk versions might change these
+				local pfx_list = {[0]="IMG", "CRW", "SND"}
+				local ext_list = {[0]="JPG", "CRW", "CR2", "THM", "WAV"}
+				local raw_dir
+				local raw_ext
+				local raw_pfx
+				if info.raw_in_dir then
+					raw_dir = info.dir
+				else
+					raw_dir = 'A/DCIM/100CANON'
+				end
+				if info.dng and info.use_dng_ext then
+					raw_ext = 'DNG'
+				else
+					raw_ext = ext_list[info.raw_ext]
+					if not raw_ext then
+						raw_ext = 'RAW'
+					end
+				end
+				raw_pfx = pfx_list[info.raw_pfx]
+				if not raw_pfx then
+					raw_pfx = 'RAW_'
+				end
+				raw_path = string.format('%s/%s_%04d.%s',raw_dir,raw_pfx,info.exp,raw_ext)
+			end
+			-- TODO some delay may be required between shot and dl start
+			if args.dl then
+				cli:print_status(cli:execute('download '..jpg_path))
+				if raw_path then
+					cli:print_status(cli:execute('download '..raw_path))
+				end
+			end
+			if args.rm then
+				cli:print_status(cli:execute('rm -maxdepth=0 '..jpg_path))
+				if raw_path then
+					cli:print_status(cli:execute('rm -maxdepth=0 '..raw_path))
+				end
+			end
+			return true
 		end,
 	},
 	{

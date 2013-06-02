@@ -945,11 +945,38 @@ function rlib_shoot(opts)
 		save_raw=get_raw()
 		set_raw(opts.raw)
 	end
+	local save_dng
+	if opts.dng then
+		save_dng=get_config_value(226)
+		set_config_value(226,opts.dng)
+	end
 	shoot()
+	local r
+	if opts.info then
+		r = {
+			dir=get_image_dir(),
+			exp=get_exp_count(),
+			raw=(get_raw() == 1),
+		}
+		if r.raw then
+			r.raw_in_dir = (get_config_value(35) == 1)
+			r.raw_pfx = get_config_value(36)
+			r.raw_ext = get_config_value(37)
+			r.dng = (get_config_value(226) == 1)
+			if r.dng then
+				r.use_dng_ext = (get_config_value(234) == 1)
+			end
+		end
+	else
+		r=true
+	end
 	if save_raw then
 		set_raw(save_raw)
 	end
-	return true
+	if save_dng then
+		set_config_value(226,save_dng)
+	end
+	return r
 end
 	]],
 },
