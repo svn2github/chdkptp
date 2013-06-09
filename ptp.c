@@ -1917,7 +1917,7 @@ int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDev
  */
 #if (PTP_CHDK_VERSION_MINOR >= 106)
 /*
- * isready: 0: not ready, lowest 3 bits: available image formats, 0x10000000: error
+ * isready: 0: not ready, lowest 2 bits: available image formats, 0x10000000: error
  */
 int ptp_chdk_rcisready(int *isready, PTPParams* params, PTPDeviceInfo* deviceinfo)
 {
@@ -1971,7 +1971,7 @@ int ptp_chdk_rcgetname(char **name, int *length, PTPParams* params, PTPDeviceInf
 }
 
 /*
- * fmt: image format (1: jpeg, 2: raw, 4: yuv)
+ * fmt: image format (1: jpeg, 2: raw)
  * local_fn: local filename
  */
 int ptp_chdk_rcgetfile(int fmt, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo)

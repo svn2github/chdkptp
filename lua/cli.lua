@@ -1449,7 +1449,7 @@ cli:add_commands{
 		},
 		help_detail=[[
  [local]            local destination directory or filename (w/o extension!)
- [-f=format]        image format: 1=JPEG (def.), 2=RAW, 4=YUV, can be ORed together
+ [-f=format]        image format: 1=JPEG (def.), 2=RAW can be ORed together
  [-s=starting line] first line to be transferred (def. 0), ignored for JPEG
  [-c=line count]    number of lines to be transferred (def. 0=all), ignored for JPEG
 ]],
@@ -1475,7 +1475,7 @@ cli:add_commands{
 				end
 			end
 			local fformat=tonumber(args.f)
-			if (fformat < 1) or (fformat >7) then
+			if (fformat < 1) or (fformat >3) then
 				return false,'wrong format requested'
 			end
 			local lstart=tonumber(args.s)
