@@ -1436,7 +1436,7 @@ return false,'already in play'
 }
 
 -- TEMP only add remoteshoot commands if client build supports
-if type(chdk_connection.rcgetfile) == 'function' then
+if type(chdk_connection.rcgetchunk) == 'function' then
 cli:add_commands{
 	{
 		names={'remoteshoot','rs'},
@@ -1494,6 +1494,8 @@ cli:add_commands{
 				return false,rerr
 			end
 
+			-- TODO handler should go in library code
+			-- note dst is upvalue
 			local status, err = con:get_remotecap_data({
 				datatypes=fformat,
 				handler=function(lcon,rcdatabit)
@@ -1510,7 +1512,41 @@ cli:add_commands{
 						fname = fsutil.joinpath(dst_dir,fname)
 					end
 					cli.dbgmsg('rcgetfile %s %d\n',fname,rcdatabit)
-					return lcon:rcgetfile(chdku.remotecap_ftypes[rcdatabit+1].n,fname)
+					--return lcon:rcgetfile(chdku.remotecap_ftypes[rcdatabit+1].n,fname)
+					
+					local fh,err=io.open(fname,'w+b')
+					if not fh then
+						return false, err
+					end
+
+					local chunk
+					local tries = 0
+					local max_tries = 16
+					repeat
+						cli.dbgmsg('rcgetchunk %s %d\n',fname,rcdatabit)
+						chunk, err=lcon:rcgetchunk(chdku.remotecap_ftypes[rcdatabit+1].n)	
+						if not chunk then
+							fh:close()
+							return false,err
+						end
+						cli.dbgmsg('rcgetchunk size:%d offset:%s last:%s\n',
+									chunk.size,
+									tostring(chunk.offset),
+									tostring(chunk.last))
+
+						if chunk.offset then
+							fh:seek('set',chunk.offset)
+						end
+						chunk.data:fwrite(fh)
+						tries = tries + 1
+					until chunk.last or tries > max_tries
+					fh:close()
+
+					if tries > max_tries then
+						return false, 'exceeded max_tries'
+					end
+
+					return true
 				end,
 			});
 			local ustatus, uerr = con:exec('init_remotecap(0)') -- try to uninit

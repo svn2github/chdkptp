@@ -1046,7 +1046,7 @@ static int chdk_rcgetname(lua_State *L) {
 /*
 status[,errmsg]=con:rcgetfile(fmt,local_fn)
 local_fn: local (full) file name
-fmt: image format (1: jpeg, 2: raw, 4: yuv)
+fmt: image format (1: jpeg, 2: raw)
 */
 static int chdk_rcgetfile(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
@@ -1063,6 +1063,48 @@ static int chdk_rcgetfile(lua_State *L) {
 		return 2;
 	}
 	lua_pushboolean(L,1);
+	return 1;
+}
+
+/*
+chunk[,errmsg]=con:rcgetchunk(fmt)
+fmt: image format (1: jpeg, 2: raw)
+chunk:
+false or
+{
+	size=number,
+	offset=number|nil,
+	last=bool
+	data=lbuf
+}
+*/
+static int chdk_rcgetchunk(lua_State *L) {
+	CHDK_CONNECTION_METHOD;
+	if (!ptp_usb->connected) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"not connected");
+		return 2;
+	}
+	int fmt = (unsigned)luaL_checknumber(L,2);
+	ptp_chdk_rc_chunk chunk;
+	if ( !ptp_chdk_rcgetchunk(params,&params->deviceinfo,fmt,&chunk) ) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"rcgetchunk failed");
+		return 2;
+	}
+	lua_createtable(L,0,4);
+	lua_pushinteger(L, chunk.size);
+	lua_setfield(L, -2, "size");
+	if((int32_t)chunk.offset != -1) {
+		lua_pushinteger(L, chunk.offset);
+		lua_setfield(L, -2, "offset");
+	}
+	lua_pushboolean(L, chunk.last);
+	lua_setfield(L, -2, "last");
+
+	lbuf_create(L,chunk.data,chunk.size,LBUF_FL_FREE); // data is allocated by ptp chunk, will be freed on gc
+	lua_setfield(L, -2, "data");
+
 	return 1;
 }
 #endif
@@ -1573,6 +1615,7 @@ static const luaL_Reg chdkconnection[] = {
   {"rcisready", chdk_rcisready},
   {"rcgetname", chdk_rcgetname},
   {"rcgetfile", chdk_rcgetfile},
+  {"rcgetchunk", chdk_rcgetchunk},
 #endif 
   {"reset_counters",chdk_reset_counters},
   {"get_counters",chdk_get_counters},

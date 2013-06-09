@@ -778,11 +778,6 @@ chdku.remotecap_ftypes={
 		ext='raw',
 		n=2,
 	},
-	{
-		ext='yuv',
-		n=4,
-	},
-
 }
 --[[
 fetch remote capture data
@@ -813,7 +808,7 @@ function con_methods:get_remotecap_data(opts)
 		end
 		local avail = util.bit_unpack(status.rsdata)
 		local n_toget = 0
-		for i=0,3 do
+		for i=0,2 do
 			if avail[i] == 1 then
 				if toget[i] == 0 then
 					printf('unexpected type %d',i)

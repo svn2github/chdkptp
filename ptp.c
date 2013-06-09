@@ -2030,6 +2030,35 @@ int ptp_chdk_rcgetfile(int fmt, char *local_fn, PTPParams* params, PTPDeviceInfo
   fclose(f);
   return 1;
 }
+
+int ptp_chdk_rcgetchunk(PTPParams* params, PTPDeviceInfo* deviceinfo,int fmt, ptp_chdk_rc_chunk *chunk)
+{
+	uint16_t ret;
+	PTPContainer ptp;
+
+	PTP_CNT_INIT(ptp);
+	ptp.Code=PTP_OC_CHDK;
+	ptp.Nparam=2;
+	ptp.Param1=PTP_CHDK_RemoteCaptureGetData;
+	ptp.Param2=fmt; //get chunk
+
+	chunk->data = NULL;
+	chunk->size = 0;
+	chunk->offset = 0;
+	chunk->last = 0;
+
+	// TODO should allow ptp_getdata_transaction to send chunks directly to file, or to mem
+	ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &chunk->data);
+	if ( ret != 0x2001 )
+	{
+	  ptp_error(params,"RemoteCaptureGetData: unexpected return code 0x%x",ret);
+	  return 0;
+	}
+	chunk->size = ptp.Param1;
+	chunk->last = (ptp.Param2 == 0);
+  	chunk->offset = ptp.Param3; //-1 for none
+	return 1;
+}
 #endif
 
 int ptp_chdk_exec_lua(char *script, int *script_id, PTPParams* params, PTPDeviceInfo* deviceinfo)

@@ -887,16 +887,29 @@ typedef struct {
     char data[];
 } ptp_chdk_script_msg;
 
+/*
+chunk for remote capture
+*/
+typedef struct {
+	uint32_t size; // length of data
+	int last; // is it the last chunk?
+	uint32_t offset; // offset within file, or -1
+	char *data; // data, must be free'd by caller when done
+} ptp_chdk_rc_chunk;
+
+
 char* ptp_chdk_get_memory(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_set_memory_long(int addr, int val, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_call(int *args, int size, int *ret, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_upload(char *local_fn, char *remote_fn, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo);
-int ptp_chdk_remoteshoot(char *local_dir, int picformat, int firstline, int numlines, PTPParams* params, PTPDeviceInfo* deviceinfo);
-int ptp_chdk_rcinit(int picformat, int firstline, int numlines, PTPParams* params, PTPDeviceInfo* deviceinfo);
+
+// remote capture
 int ptp_chdk_rcisready(int *isready, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_rcgetname(char **name, int *length, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_rcgetfile(int fmt, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo);
+int ptp_chdk_rcgetchunk(PTPParams* params, PTPDeviceInfo* deviceinfo,int fmt, ptp_chdk_rc_chunk *chunk);
+
 int ptp_chdk_exec_lua(char *script, int *script_id, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_get_version(PTPParams* params, PTPDeviceInfo* deviceinfo, int *major, int *minor);
 int ptp_chdk_get_script_support(PTPParams* params, PTPDeviceInfo* deviceinfo, unsigned *status);
