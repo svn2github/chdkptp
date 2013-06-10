@@ -898,24 +898,23 @@ typedef struct {
 } ptp_chdk_rc_chunk;
 
 
-char* ptp_chdk_get_memory(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo);
-int ptp_chdk_set_memory_long(int addr, int val, PTPParams* params, PTPDeviceInfo* deviceinfo);
-int ptp_chdk_call(int *args, int size, int *ret, PTPParams* params, PTPDeviceInfo* deviceinfo);
-int ptp_chdk_upload(char *local_fn, char *remote_fn, PTPParams* params, PTPDeviceInfo* deviceinfo);
-int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo);
+char* ptp_chdk_get_memory(PTPParams* params, int start, int num);
+int ptp_chdk_set_memory_long(PTPParams* params, int addr, int val);
+int ptp_chdk_upload(PTPParams* params, char *local_fn, char *remote_fn);
+int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn);
 
 // remote capture
-int ptp_chdk_rcisready(int *isready, PTPParams* params, PTPDeviceInfo* deviceinfo);
-int ptp_chdk_rcgetname(char **name, int *length, PTPParams* params, PTPDeviceInfo* deviceinfo);
-int ptp_chdk_rcgetfile(int fmt, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo);
-int ptp_chdk_rcgetchunk(PTPParams* params, PTPDeviceInfo* deviceinfo,int fmt, ptp_chdk_rc_chunk *chunk);
+int ptp_chdk_rcisready(PTPParams* params, int *isready);
+int ptp_chdk_rcgetname( PTPParams* params, char **name, int *length);
+int ptp_chdk_rcgetfile(PTPParams* params, int fmt, char *local_fn);
+int ptp_chdk_rcgetchunk(PTPParams* params,int fmt, ptp_chdk_rc_chunk *chunk);
 
-int ptp_chdk_exec_lua(char *script, int *script_id, PTPParams* params, PTPDeviceInfo* deviceinfo);
-int ptp_chdk_get_version(PTPParams* params, PTPDeviceInfo* deviceinfo, int *major, int *minor);
-int ptp_chdk_get_script_support(PTPParams* params, PTPDeviceInfo* deviceinfo, unsigned *status);
-int ptp_chdk_get_script_status(PTPParams* params, PTPDeviceInfo* deviceinfo, unsigned *status);
-int ptp_chdk_write_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo, char *data, unsigned size, int target_script_id, int *status);
-int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_chdk_script_msg **msg);
-int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,unsigned flags,char **data,unsigned *data_size);
-int ptp_chdk_call_function(PTPParams* params, PTPDeviceInfo* deviceinfo, int *args, int size, int *ret);
+int ptp_chdk_exec_lua(PTPParams* params, char *script, int *script_id);
+int ptp_chdk_get_version(PTPParams* params, int *major, int *minor);
+int ptp_chdk_get_script_support(PTPParams* params, unsigned *status);
+int ptp_chdk_get_script_status(PTPParams* params, unsigned *status);
+int ptp_chdk_write_script_msg(PTPParams* params, char *data, unsigned size, int target_script_id, int *status);
+int ptp_chdk_read_script_msg(PTPParams* params, ptp_chdk_script_msg **msg);
+int ptp_chdk_get_live_data(PTPParams* params, unsigned flags, char **data, unsigned *data_size);
+int ptp_chdk_call_function(PTPParams* params, int *args, int size, int *ret);
 #endif /* __PTP_H__ */

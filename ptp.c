@@ -1746,7 +1746,7 @@ ptp_get_operation_name(PTPParams* params, uint16_t oc)
 
 
 /****** CHDK interface ******/
-char* ptp_chdk_get_memory(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo)
+char* ptp_chdk_get_memory(PTPParams* params, int start, int num)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -1768,7 +1768,7 @@ char* ptp_chdk_get_memory(int start, int num, PTPParams* params, PTPDeviceInfo* 
   return buf;
 }
 
-int ptp_chdk_set_memory_long(int addr, int val, PTPParams* params, PTPDeviceInfo* deviceinfo)
+int ptp_chdk_set_memory_long(PTPParams* params, int addr, int val)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -1789,29 +1789,7 @@ int ptp_chdk_set_memory_long(int addr, int val, PTPParams* params, PTPDeviceInfo
   return 1;
 }
 
-int ptp_chdk_call(int *args, int size, int *ret, PTPParams* params, PTPDeviceInfo* deviceinfo)
-{
-  uint16_t r;
-  PTPContainer ptp;
-
-  PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
-  ptp.Nparam=1;
-  ptp.Param1=PTP_CHDK_CallFunction;
-  r=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, size*sizeof(int), (char **) &args);
-  if ( r != 0x2001 )
-  {
-    ptp_error(params,"unexpected return code 0x%x",r);
-    return 0;
-  }
-  if ( ret )
-  {
-    *ret = ptp.Param1;
-  }
-  return 1;
-}
-
-int ptp_chdk_upload(char *local_fn, char *remote_fn, PTPParams* params, PTPDeviceInfo* deviceinfo)
+int ptp_chdk_upload(PTPParams* params, char *local_fn, char *remote_fn)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -1865,7 +1843,7 @@ static uint16_t gd_to_file(unsigned char *bytes,unsigned len, PTPGetDataParams *
 	return PTP_RC_OK;
 }
 
-int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo)
+int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -1919,7 +1897,7 @@ int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDev
 /*
  * isready: 0: not ready, lowest 2 bits: available image formats, 0x10000000: error
  */
-int ptp_chdk_rcisready(int *isready, PTPParams* params, PTPDeviceInfo* deviceinfo)
+int ptp_chdk_rcisready(PTPParams* params, int *isready)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -1943,7 +1921,7 @@ int ptp_chdk_rcisready(int *isready, PTPParams* params, PTPDeviceInfo* deviceinf
  * name: will point to the buffer (caller needs to free the allocation)
  * length: name length (might not be needed?)
  */
-int ptp_chdk_rcgetname(char **name, int *length, PTPParams* params, PTPDeviceInfo* deviceinfo)
+int ptp_chdk_rcgetname(PTPParams* params, char **name, int *length)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -1974,7 +1952,7 @@ int ptp_chdk_rcgetname(char **name, int *length, PTPParams* params, PTPDeviceInf
  * fmt: image format (1: jpeg, 2: raw)
  * local_fn: local filename
  */
-int ptp_chdk_rcgetfile(int fmt, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo)
+int ptp_chdk_rcgetfile(PTPParams* params, int fmt, char *local_fn)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -2031,7 +2009,7 @@ int ptp_chdk_rcgetfile(int fmt, char *local_fn, PTPParams* params, PTPDeviceInfo
   return 1;
 }
 
-int ptp_chdk_rcgetchunk(PTPParams* params, PTPDeviceInfo* deviceinfo,int fmt, ptp_chdk_rc_chunk *chunk)
+int ptp_chdk_rcgetchunk(PTPParams* params, int fmt, ptp_chdk_rc_chunk *chunk)
 {
 	uint16_t ret;
 	PTPContainer ptp;
@@ -2061,7 +2039,7 @@ int ptp_chdk_rcgetchunk(PTPParams* params, PTPDeviceInfo* deviceinfo,int fmt, pt
 }
 #endif
 
-int ptp_chdk_exec_lua(char *script, int *script_id, PTPParams* params, PTPDeviceInfo* deviceinfo)
+int ptp_chdk_exec_lua(PTPParams* params, char *script, int *script_id)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2085,7 +2063,7 @@ int ptp_chdk_exec_lua(char *script, int *script_id, PTPParams* params, PTPDevice
   return (ptp.Param2 == PTP_CHDK_S_ERRTYPE_NONE);
 }
 
-int ptp_chdk_get_version(PTPParams* params, PTPDeviceInfo* deviceinfo, int *major, int *minor)
+int ptp_chdk_get_version(PTPParams* params, int *major, int *minor)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2104,7 +2082,7 @@ int ptp_chdk_get_version(PTPParams* params, PTPDeviceInfo* deviceinfo, int *majo
   *minor = ptp.Param2;
   return 1;
 }
-int ptp_chdk_get_script_status(PTPParams* params, PTPDeviceInfo* deviceinfo, unsigned *status)
+int ptp_chdk_get_script_status(PTPParams* params, unsigned *status)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2122,7 +2100,7 @@ int ptp_chdk_get_script_status(PTPParams* params, PTPDeviceInfo* deviceinfo, uns
   *status = ptp.Param1;
   return 1;
 }
-int ptp_chdk_get_script_support(PTPParams* params, PTPDeviceInfo* deviceinfo, unsigned *status)
+int ptp_chdk_get_script_support(PTPParams* params, unsigned *status)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2140,7 +2118,7 @@ int ptp_chdk_get_script_support(PTPParams* params, PTPDeviceInfo* deviceinfo, un
   *status = ptp.Param1;
   return 1;
 }
-int ptp_chdk_write_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo, char *data, unsigned size, int target_script_id, int *status)
+int ptp_chdk_write_script_msg(PTPParams* params, char *data, unsigned size, int target_script_id, int *status)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2167,7 +2145,7 @@ int ptp_chdk_write_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo, char
   *status = ptp.Param1;
   return 1;
 }
-int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_chdk_script_msg **msg)
+int ptp_chdk_read_script_msg(PTPParams* params, ptp_chdk_script_msg **msg)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2198,7 +2176,7 @@ int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_ch
   return 1;
 }
 
-int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,unsigned flags,char **data,unsigned *data_size) {
+int ptp_chdk_get_live_data(PTPParams* params, unsigned flags,char **data,unsigned *data_size) {
   uint16_t r;
   PTPContainer ptp;
 
@@ -2223,7 +2201,7 @@ int ptp_chdk_get_live_data(PTPParams* params, PTPDeviceInfo* deviceinfo,unsigned
 
 }
 
-int ptp_chdk_call_function(PTPParams* params, PTPDeviceInfo* deviceinfo, int *args, int size, int *ret)
+int ptp_chdk_call_function(PTPParams* params, int *args, int size, int *ret)
 {
   uint16_t r;
   PTPContainer ptp;

@@ -836,7 +836,7 @@ static int chdk_camera_api_version(lua_State *L) {
 		lua_pushstring(L,"not connected");
 		return 2;
 	}
-	if(ptp_chdk_get_version(params,&params->deviceinfo,&major,&minor) ) {
+	if(ptp_chdk_get_version(params,&major,&minor) ) {
 		lua_pushnumber(L,major);
 		lua_pushnumber(L,minor);
 	} else {
@@ -894,7 +894,7 @@ static int chdk_execlua(lua_State *L) {
 		return 2;
 	}
 
-	if(!ptp_chdk_exec_lua((char *)luaL_optstring(L,2,""),&ptp_usb->script_id,params,&params->deviceinfo)) {
+	if(!ptp_chdk_exec_lua(params,(char *)luaL_optstring(L,2,""),&ptp_usb->script_id)) {
 		lua_pushboolean(L,0);
 		// if we got a script id, script request got as far as the the camera
 		if(ptp_usb->script_id) {
@@ -965,7 +965,7 @@ static int chdk_upload(lua_State *L) {
 	}
 	char *src = (char *)luaL_checkstring(L,2);
 	char *dst = (char *)luaL_checkstring(L,3);
-	if ( !ptp_chdk_upload(src,dst,params,&params->deviceinfo) ) {
+	if ( !ptp_chdk_upload(params,src,dst) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"upload failed");
 		return 2;
@@ -987,7 +987,7 @@ static int chdk_download(lua_State *L) {
 	}
 	char *src = (char *)luaL_checkstring(L,2);
 	char *dst = (char *)luaL_checkstring(L,3);
-	if ( !ptp_chdk_download(src,dst,params,&params->deviceinfo) ) {
+	if ( !ptp_chdk_download(params,src,dst) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"download failed");
 		return 2;
@@ -1011,7 +1011,7 @@ static int chdk_rcisready(lua_State *L) {
 		return 2;
 	}
 	int isready = 0;
-	if ( !ptp_chdk_rcisready(&isready,params,&params->deviceinfo) ) {
+	if ( !ptp_chdk_rcisready(params,&isready) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"rcisready failed");
 		return 2;
@@ -1033,7 +1033,7 @@ static int chdk_rcgetname(lua_State *L) {
 	}
 	char *name = NULL;
 	int nlength;
-	if ( !ptp_chdk_rcgetname(&name,&nlength,params,&params->deviceinfo) ) {
+	if ( !ptp_chdk_rcgetname(params,&name,&nlength) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"rcgetname failed");
 		return 2;
@@ -1057,7 +1057,7 @@ static int chdk_rcgetfile(lua_State *L) {
 	}
 	int fmt = (unsigned)luaL_checknumber(L,2);
 	char *local_fn = (char *)luaL_checkstring(L,3);
-	if ( !ptp_chdk_rcgetfile(fmt,local_fn,params,&params->deviceinfo) ) {
+	if ( !ptp_chdk_rcgetfile(params,fmt,local_fn) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"rcgetfile failed");
 		return 2;
@@ -1087,7 +1087,7 @@ static int chdk_rcgetchunk(lua_State *L) {
 	}
 	int fmt = (unsigned)luaL_checknumber(L,2);
 	ptp_chdk_rc_chunk chunk;
-	if ( !ptp_chdk_rcgetchunk(params,&params->deviceinfo,fmt,&chunk) ) {
+	if ( !ptp_chdk_rcgetchunk(params,fmt,&chunk) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"rcgetchunk failed");
 		return 2;
@@ -1135,7 +1135,7 @@ static int chdk_getmem(lua_State *L) {
 	dest = luaL_optstring(L,4,"string");
 
 	// TODO check dest values
-	if ( (buf = ptp_chdk_get_memory(addr,count,params,&params->deviceinfo)) == NULL ) {
+	if ( (buf = ptp_chdk_get_memory(params,addr,count)) == NULL ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"error getting memory");
 		return 2;
@@ -1186,7 +1186,7 @@ static int chdk_call_function(lua_State *L) {
 	for(i=2;i<=size+1;i++) {
 		args[i-2] = (unsigned)luaL_checknumber(L,i);
 	}
-	if ( !ptp_chdk_call_function(params,&params->deviceinfo,args,size,&ret) ) {
+	if ( !ptp_chdk_call_function(params,args,size,&ret) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"ptp error");
 		return 2;
@@ -1203,7 +1203,7 @@ static int chdk_script_support(lua_State *L) {
 		lua_pushstring(L,"not connected");
 		return 2;
 	}
-    if ( !ptp_chdk_get_script_support(params,&params->deviceinfo,&status) ) {
+    if ( !ptp_chdk_get_script_support(params,&status) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"ptp error");
 		return 2;
@@ -1224,7 +1224,7 @@ static int chdk_script_status(lua_State *L) {
 		lua_pushstring(L,"not connected");
 		return 2;
 	}
-	if ( !ptp_chdk_get_script_status(params,&params->deviceinfo,&status) ) {
+	if ( !ptp_chdk_get_script_status(params,&status) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"ptp error");
 		return 2;
@@ -1251,7 +1251,7 @@ static int chdk_get_live_data(lua_State *L) {
 		lua_pushstring(L,"not connected");
 		return 2;
 	}
-	if ( !ptp_chdk_get_live_data(params,&params->deviceinfo,flags,&data,&data_size) ) {
+	if ( !ptp_chdk_get_live_data(params,flags,&data,&data_size) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"ptp error");
 		return 2;
@@ -1329,7 +1329,7 @@ static int chdk_read_msg(lua_State *L) {
 		return 2;
 	}
 
-	if(!ptp_chdk_read_script_msg(params,&params->deviceinfo,&msg)) {
+	if(!ptp_chdk_read_script_msg(params,&msg)) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"ptp error");
 		return 2;
@@ -1402,7 +1402,7 @@ static int chdk_write_msg(lua_State *L) {
 		return 2;
 	}
 
-	if ( !ptp_chdk_write_script_msg(params,&params->deviceinfo,(char *)str,len,target_script_id,&status) ) {
+	if ( !ptp_chdk_write_script_msg(params,(char *)str,len,target_script_id,&status) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"ptp error");
 		return 2;
