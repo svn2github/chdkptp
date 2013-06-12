@@ -1449,7 +1449,7 @@ cli:add_commands{
 		},
 		help_detail=[[
  [local]            local destination directory or filename (w/o extension!)
- [-f=format]        image format: 1=JPEG (def.), 2=RAW can be ORed together
+ [-f=format]        image format: 1=JPEG (def.), 2=RAW, 4=DNG header can be ORed together
  [-s=starting line] first line to be transferred (def. 0), ignored for JPEG
  [-c=line count]    number of lines to be transferred (def. 0=all), ignored for JPEG
 ]],
@@ -1475,9 +1475,10 @@ cli:add_commands{
 				end
 			end
 			local fformat=tonumber(args.f)
-			if (fformat < 1) or (fformat >3) then
-				return false,'wrong format requested'
+			if (fformat < 1) or (fformat >7) then
+				return false,'invalid format requested'
 			end
+			local fbits =  util.bit_unpack(fformat)
 			local lstart=tonumber(args.s)
 			local lcount=tonumber(args.c)
 
@@ -1507,21 +1508,39 @@ cli:add_commands{
 						end
 						cli.dbgmsg('got name %s\n',dst);
 					end
-					local fname = dst..'.'..chdku.remotecap_ftypes[rcdatabit+1].ext;
+					local is_dng_img_data = (rcdatabit == 1 and fbits[2] == 1)
+					-- on raw bit and dng selected
+					if is_dng_img_data then
+						fname = dst..'.'..chdku.remotecap_ftypes[3].ext -- dng
+					elseif rcdatabit == 2 and fbits[1] == 0 then -- dng selected with now raw
+						fname = dst..'.dng_hdr' -- dng header only
+					else
+						fname = dst..'.'..chdku.remotecap_ftypes[rcdatabit+1].ext
+					end
 					if dst_dir then
 						fname = fsutil.joinpath(dst_dir,fname)
 					end
 					cli.dbgmsg('rcgetfile %s %d\n',fname,rcdatabit)
 					--return lcon:rcgetfile(chdku.remotecap_ftypes[rcdatabit+1].n,fname)
 					
-					local fh,err=io.open(fname,'w+b')
+					local fh
+					if is_dng_img_data then
+						fh=io.open(fname,'ab')
+					else
+						fh=io.open(fname,'wb')
+					end
 					if not fh then
 						return false, err
+					end
+
+					if is_dng_img_data then
+						fh:write(string.rep('\0',128*96*3)) -- TODO fake thumb
 					end
 
 					local chunk
 					local tries = 0
 					local max_tries = 16
+					-- note only jpeg has multiple chunks
 					repeat
 						cli.dbgmsg('rcgetchunk %s %d\n',fname,rcdatabit)
 						chunk, err=lcon:rcgetchunk(chdku.remotecap_ftypes[rcdatabit+1].n)	
@@ -1536,6 +1555,10 @@ cli:add_commands{
 
 						if chunk.offset then
 							fh:seek('set',chunk.offset)
+						end
+						-- TODO doesn't handle sub images
+						if is_dng_img_data then
+							chunk.data:reverse_bytes()
 						end
 						chunk.data:fwrite(fh)
 						tries = tries + 1

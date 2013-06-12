@@ -996,7 +996,7 @@ static int chdk_download(lua_State *L) {
 	return 1;
 }
 
-#if (PTP_CHDK_VERSION_MINOR >= 106)
+#if (PTP_CHDK_VERSION_MINOR >= 107)
 /*
 isready[,errmsg]=con:rcisready()
 isready: 
@@ -1040,29 +1040,6 @@ static int chdk_rcgetname(lua_State *L) {
 	}
 	lua_pushstring(L,name); // returned name is null terminated
 	free(name);
-	return 1;
-}
-
-/*
-status[,errmsg]=con:rcgetfile(fmt,local_fn)
-local_fn: local (full) file name
-fmt: image format (1: jpeg, 2: raw)
-*/
-static int chdk_rcgetfile(lua_State *L) {
-	CHDK_CONNECTION_METHOD;
-	if (!ptp_usb->connected) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
-	int fmt = (unsigned)luaL_checknumber(L,2);
-	char *local_fn = (char *)luaL_checkstring(L,3);
-	if ( !ptp_chdk_rcgetfile(params,fmt,local_fn) ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"rcgetfile failed");
-		return 2;
-	}
-	lua_pushboolean(L,1);
 	return 1;
 }
 
@@ -1611,10 +1588,9 @@ static const luaL_Reg chdkconnection[] = {
   {"get_ptp_devinfo", chdk_get_ptp_devinfo},
   {"get_usb_devinfo", chdk_get_usb_devinfo}, // does not need to be connected, returns bus and dev at minimum
   {"get_live_data",chdk_get_live_data},
-#if (PTP_CHDK_VERSION_MINOR >= 106)
+#if (PTP_CHDK_VERSION_MINOR >= 107)
   {"rcisready", chdk_rcisready},
   {"rcgetname", chdk_rcgetname},
-  {"rcgetfile", chdk_rcgetfile},
   {"rcgetchunk", chdk_rcgetchunk},
 #endif 
   {"reset_counters",chdk_reset_counters},

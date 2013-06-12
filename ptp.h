@@ -905,8 +905,7 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn);
 
 // remote capture
 int ptp_chdk_rcisready(PTPParams* params, int *isready);
-int ptp_chdk_rcgetname( PTPParams* params, char **name, int *length);
-int ptp_chdk_rcgetfile(PTPParams* params, int fmt, char *local_fn);
+int ptp_chdk_rcgetname(PTPParams* params, char **name, int *length);
 int ptp_chdk_rcgetchunk(PTPParams* params,int fmt, ptp_chdk_rc_chunk *chunk);
 
 int ptp_chdk_exec_lua(PTPParams* params, char *script, int *script_id);

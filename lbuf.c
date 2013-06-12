@@ -287,6 +287,23 @@ static int lbuf_fwrite(lua_State *L) {
 	return 1;
 }
 
+/*
+lbuf:reverse_bytes()
+swap byte order in place
+TODO maybe add range, dest?
+*/
+static int lbuf_reverse_bytes(lua_State *L) {
+	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
+	// not optimized
+	int i;
+	for(i=0;i<buf->len-1;i+=2) {
+		int t=buf->bytes[i+1];
+		buf->bytes[i+1]=buf->bytes[i];
+		buf->bytes[i]=t;
+	}
+	return 0;
+}
+
 static const luaL_Reg lbuf_methods[] = {
   {"len", lbuf_len},
   {"string", lbuf_string},
@@ -297,6 +314,7 @@ static const luaL_Reg lbuf_methods[] = {
   {"set_u32", lbuf_set_u32},
   {"fread",lbuf_fread},
   {"fwrite",lbuf_fwrite},
+  {"reverse_bytes",lbuf_reverse_bytes},
   {NULL, NULL}
 };
 

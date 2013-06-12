@@ -1893,7 +1893,7 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
  * Preliminary remote capture over USB code. Corresponding CHDK code is in the ptp-remote-capture-test
  * This is under development and should not be included in builds for general distribution
  */
-#if (PTP_CHDK_VERSION_MINOR >= 106)
+#if (PTP_CHDK_VERSION_MINOR >= 107)
 /*
  * isready: 0: not ready, lowest 2 bits: available image formats, 0x10000000: error
  */
@@ -1945,67 +1945,6 @@ int ptp_chdk_rcgetname(PTPParams* params, char **name, int *length)
       return 0;
   }
   *length=ptp.Param1;
-  return 1;
-}
-
-/*
- * fmt: image format (1: jpeg, 2: raw)
- * local_fn: local filename
- */
-int ptp_chdk_rcgetfile(PTPParams* params, int fmt, char *local_fn)
-{
-  uint16_t ret;
-  PTPContainer ptp;
-  char *buf = NULL;
-  FILE *f;
-  int tries;
-
-
-  f = fopen(local_fn,"wb");
-  if ( f == NULL )
-  {
-      ptp_error(params,"could not open file \'%s\'",local_fn);
-      return 0;
-  }
-
-  tries=0;
-  do
-  {
-      PTP_CNT_INIT(ptp);
-      ptp.Code=PTP_OC_CHDK;
-      ptp.Nparam=2;
-      ptp.Param1=PTP_CHDK_RemoteCaptureGetData;
-      ptp.Param2=fmt; //get chunk
-
-      ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
-      if ( ret != 0x2001 )
-      {
-          ptp_error(params,"RemoteCaptureGetData(1,%d): unexpected return code 0x%x",tries,ret);
-          fclose(f);
-          return 0;
-      }
-      if ( buf == NULL )
-      {
-          ptp_error(params,"RemoteCaptureGetData(1,%d): NULL buffer, params: 0x%x, 0x%x",tries,ptp.Param1,ptp.Param2);
-          fclose(f);
-          return 0;
-      }
-      if ( /*(ptp.Nparam > 2) &&*/ ((int32_t)ptp.Param3 > -1) ) //chunk needs to be written at this file position
-      {
-          if (ptp.Param3 < 32*1024*1024) //temporary safety limit
-          {
-              fseek(f,ptp.Param3,SEEK_SET);
-          }
-      }
-      if ( ptp.Param1 > 0 ) //chunk size
-      {
-          fwrite(buf,1,ptp.Param1,f);
-      }
-      free(buf);
-      buf=NULL;
-      tries+=1;
-  } while ( (ptp.Param1 > 0) && (ptp.Param2 > 0) && (tries<16) ); //(Param2 > 0) if not last chunk
-  fclose(f);
   return 1;
 }
 
