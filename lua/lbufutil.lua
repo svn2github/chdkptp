@@ -27,12 +27,16 @@ function lbu.loadfile(name)
 	if not f then
 		return false, err
 	end
-	local s=f:read('*a')
-	f:close()
-	if not s then
-		return false, 'read failed'
+	local len = f:seek('end')
+	f:seek('set')
+	local lb
+	lb,err=lbuf.new(len)
+	if not lb then
+		return false, err
 	end
-	return lbuf.new(s)
+	lb:fread(f)
+	f:close()
+	return lb
 end
 
 -- methods that don't need upvalues
