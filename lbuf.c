@@ -135,15 +135,27 @@ static int lbuf_byte(lua_State *L) {
 
 typedef void (*get_vals_fn)(lua_State *L,void *p);
 
-void get_vals_int32(lua_State *L,void *p) {
+static void get_vals_int32(lua_State *L,void *p) {
 	int32_t v;
-	memcpy(&v,p,4); // p might not be aligned
+	memcpy(&v,p,sizeof(v)); // p might not be aligned
 	lua_pushnumber(L,v);
 }
 
-void get_vals_uint32(lua_State *L,void *p) {
+static void get_vals_uint32(lua_State *L,void *p) {
 	uint32_t v;
-	memcpy(&v,p,4); // p might not be aligned
+	memcpy(&v,p,sizeof(v)); // p might not be aligned
+	lua_pushnumber(L,v);
+}
+
+static void get_vals_int16(lua_State *L,void *p) {
+	int16_t v;
+	memcpy(&v,p,sizeof(v)); // p might not be aligned
+	lua_pushnumber(L,v);
+}
+
+static void get_vals_uint16(lua_State *L,void *p) {
+	uint16_t v;
+	memcpy(&v,p,sizeof(v)); // p might not be aligned
 	lua_pushnumber(L,v);
 }
 
@@ -189,16 +201,33 @@ static int lbuf_get_u32(lua_State *L) {
 	return get_vals(L,4,get_vals_uint32);
 }
 
-typedef void (*set_vals_fn)(lua_State *L,void *p,int i);
-
-void set_vals_int32(lua_State *L,void *p,int i) {
-	int32_t v=lua_tonumber(L,i);
-	memcpy(p,&v,4); // p might not be aligned
+static int lbuf_get_i16(lua_State *L) {
+	return get_vals(L,2,get_vals_int16);
+}
+static int lbuf_get_u16(lua_State *L) {
+	return get_vals(L,2,get_vals_uint16);
 }
 
-void set_vals_uint32(lua_State *L,void *p,int i) {
+typedef void (*set_vals_fn)(lua_State *L,void *p,int i);
+
+static void set_vals_int32(lua_State *L,void *p,int i) {
+	int32_t v=lua_tonumber(L,i);
+	memcpy(p,&v,sizeof(v)); // p might not be aligned
+}
+
+static void set_vals_uint32(lua_State *L,void *p,int i) {
 	uint32_t v=lua_tonumber(L,i);
-	memcpy(p,&v,4); // p might not be aligned
+	memcpy(p,&v,sizeof(v)); // p might not be aligned
+}
+
+static void set_vals_int16(lua_State *L,void *p,int i) {
+	int16_t v=lua_tonumber(L,i);
+	memcpy(p,&v,sizeof(v)); // p might not be aligned
+}
+
+static void set_vals_uint16(lua_State *L,void *p,int i) {
+	uint16_t v=lua_tonumber(L,i);
+	memcpy(p,&v,sizeof(v)); // p might not be aligned
 }
 
 /*
@@ -241,6 +270,15 @@ static int lbuf_set_i32(lua_State *L) {
 }
 static int lbuf_set_u32(lua_State *L) {
 	lua_pushnumber(L,set_vals(L,4,set_vals_uint32));
+	return 1;
+}
+
+static int lbuf_set_i16(lua_State *L) {
+	lua_pushnumber(L,set_vals(L,2,set_vals_int16));
+	return 1;
+}
+static int lbuf_set_u16(lua_State *L) {
+	lua_pushnumber(L,set_vals(L,2,set_vals_uint16));
 	return 1;
 }
 
@@ -312,6 +350,10 @@ static const luaL_Reg lbuf_methods[] = {
   {"get_u32", lbuf_get_u32},
   {"set_i32", lbuf_set_i32},
   {"set_u32", lbuf_set_u32},
+  {"get_i16", lbuf_get_i16},
+  {"get_u16", lbuf_get_u16},
+  {"set_i16", lbuf_set_i16},
+  {"set_u16", lbuf_set_u16},
   {"fread",lbuf_fread},
   {"fwrite",lbuf_fwrite},
   {"reverse_bytes",lbuf_reverse_bytes},
