@@ -126,6 +126,25 @@ local function init_int_methods()
 					off)
 		end
 	end
+	for i,vt in ipairs({'i16','u16'}) do
+		local vtype = vt
+		-- default read only
+		lbu_methods['bind_'..vtype] = function(self,name,off)
+				self:bind(name,
+					bind_int_get(self,vtype),
+					nil,
+					2,
+					off) 
+		end
+		-- read/write
+		lbu_methods['bind_rw_'..vtype] = function(self,name,off)
+				self:bind(name,
+					bind_int_get(self,vtype),
+					bind_int_set(self,vtype),
+					2,
+					off)
+		end
+	end
 end
 init_int_methods()
 
