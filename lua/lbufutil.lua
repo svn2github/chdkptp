@@ -105,44 +105,27 @@ local bind_int_set = function(t,vtype)
 end
 	
 local function init_int_methods()
-	-- set up integer bind methods
-	-- TODO assumes 4 byte
-	for i,vt in ipairs({'i32','u32'}) do
-		local vtype = vt
-		-- default read only
-		lbu_methods['bind_'..vtype] = function(self,name,off)
-				self:bind(name,
-					bind_int_get(self,vtype),
-					nil,
-					4,
-					off) 
-		end
-		-- read/write
-		lbu_methods['bind_rw_'..vtype] = function(self,name,off)
-				self:bind(name,
-					bind_int_get(self,vtype),
-					bind_int_set(self,vtype),
-					4,
-					off)
-		end
-	end
-	for i,vt in ipairs({'i16','u16'}) do
-		local vtype = vt
-		-- default read only
-		lbu_methods['bind_'..vtype] = function(self,name,off)
-				self:bind(name,
-					bind_int_get(self,vtype),
-					nil,
-					2,
-					off) 
-		end
-		-- read/write
-		lbu_methods['bind_rw_'..vtype] = function(self,name,off)
-				self:bind(name,
-					bind_int_get(self,vtype),
-					bind_int_set(self,vtype),
-					2,
-					off)
+	for j,size in ipairs({1,2,4}) do
+		local bits=tostring(size*8)
+		-- set up integer bind methods
+		for i,vt in ipairs({'i'..bits,'u'..bits}) do
+			local vtype = vt
+			-- default read only
+			lbu_methods['bind_'..vtype] = function(self,name,off)
+					self:bind(name,
+						bind_int_get(self,vtype),
+						nil,
+						size,
+						off) 
+			end
+			-- read/write
+			lbu_methods['bind_rw_'..vtype] = function(self,name,off)
+					self:bind(name,
+						bind_int_get(self,vtype),
+						bind_int_set(self,vtype),
+						size,
+						off)
+			end
 		end
 	end
 end

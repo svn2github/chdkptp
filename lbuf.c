@@ -106,6 +106,7 @@ static int lbuf_string(lua_State *L) {
 /*
 byte,...=buf:byte([i[,j])
 return bytes of buffer as numbers. i and j behave like string.byte
+for semantics of equivalent to get_i32 etc, use get_*8
 */
 static int lbuf_byte(lua_State *L) {
 	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
@@ -159,6 +160,14 @@ static void get_vals_uint16(lua_State *L,void *p) {
 	lua_pushnumber(L,v);
 }
 
+static void get_vals_int8(lua_State *L,void *p) {
+	lua_pushnumber(L,*(int8_t *)p);
+}
+
+static void get_vals_uint8(lua_State *L,void *p) {
+	lua_pushnumber(L,*(uint8_t*)p);
+}
+
 /*
 v,...=buf:<get_vals_func>([offset[,count]])
 return elements of buff in starting at offset in chunks, exact format depending on functions
@@ -208,6 +217,13 @@ static int lbuf_get_u16(lua_State *L) {
 	return get_vals(L,2,get_vals_uint16);
 }
 
+static int lbuf_get_i8(lua_State *L) {
+	return get_vals(L,1,get_vals_int8);
+}
+static int lbuf_get_u8(lua_State *L) {
+	return get_vals(L,1,get_vals_uint8);
+}
+
 typedef void (*set_vals_fn)(lua_State *L,void *p,int i);
 
 static void set_vals_int32(lua_State *L,void *p,int i) {
@@ -228,6 +244,16 @@ static void set_vals_int16(lua_State *L,void *p,int i) {
 static void set_vals_uint16(lua_State *L,void *p,int i) {
 	uint16_t v=lua_tonumber(L,i);
 	memcpy(p,&v,sizeof(v)); // p might not be aligned
+}
+
+static void set_vals_int8(lua_State *L,void *p,int i) {
+	int8_t v=lua_tonumber(L,i);
+	*(int8_t *)p = v;
+}
+
+static void set_vals_uint8(lua_State *L,void *p,int i) {
+	uint8_t v=lua_tonumber(L,i);
+	*(uint8_t *)p = v;
 }
 
 /*
@@ -281,6 +307,16 @@ static int lbuf_set_u16(lua_State *L) {
 	lua_pushnumber(L,set_vals(L,2,set_vals_uint16));
 	return 1;
 }
+
+static int lbuf_set_i8(lua_State *L) {
+	lua_pushnumber(L,set_vals(L,1,set_vals_int8));
+	return 1;
+}
+static int lbuf_set_u8(lua_State *L) {
+	lua_pushnumber(L,set_vals(L,1,set_vals_uint8));
+	return 1;
+}
+
 
 /*
 bool=lbuf:fread(file)
@@ -354,6 +390,10 @@ static const luaL_Reg lbuf_methods[] = {
   {"get_u16", lbuf_get_u16},
   {"set_i16", lbuf_set_i16},
   {"set_u16", lbuf_set_u16},
+  {"get_i8", lbuf_get_i8},
+  {"get_u8", lbuf_get_u8},
+  {"set_i8", lbuf_set_i8},
+  {"set_u8", lbuf_set_u8},
   {"fread",lbuf_fread},
   {"fwrite",lbuf_fwrite},
   {"reverse_bytes",lbuf_reverse_bytes},
