@@ -214,6 +214,16 @@ t.lbufi = function()
 	local t={l:get_i32(0,2)}
 	assert(#t == 1)
 	assert(t[1] == -1)
+	local l=lbuf.new(16)
+	assert(l:fill("a")==16)
+	assert(l:get_u8()==string.byte('a'))
+	local l2=lbuf.new(4)
+	assert(l2:fill("hello world")==4)
+	assert(l:fill(l2,100,1)==0)
+	assert(l:fill(l2,1,2)==8)
+	assert(l:string(2,9)=="hellhell")
+	assert(l:string()=="ahellhellaaaaaaa")
+	assert(l:fill(l2,14,20)==2)
 end
 
 t.lbufutil = function()

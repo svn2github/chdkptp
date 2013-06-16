@@ -378,6 +378,71 @@ static int lbuf_reverse_bytes(lua_State *L) {
 	return 0;
 }
 
+/*
+byte_count = lbuf:fill(value[,offset[,count]])
+fill lbuf with count copies byte pattern specified by "value" starting at offset,
+value:string or lbuf
+offset:number
+	offset in bytes, default 0
+count:number
+	number of copies to fill, default => through end of buffer)
+any values that would fall outside the lbuf are ignored
+
+returns
+	number of bytes written
+
+TODO might want to allow creating pre-filled
+TODO support negative offset to indicate from end?
+*/
+static int lbuf_fill(lua_State *L) {
+	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
+	const char *fill_val;
+	unsigned fill_len;
+	if(lua_type(L,2) == LUA_TUSERDATA) {
+		lBuf_t *buf2 = (lBuf_t *)luaL_checkudata(L,2,LBUF_META);
+		fill_val = buf2->bytes;
+		fill_len = buf2->len;
+	} else if(lua_type(L,2) == LUA_TSTRING) { // we do not want coercion here
+		fill_val = lua_tolstring(L,2,&fill_len);
+	} else {
+		return luaL_error(L,"invalid argument");
+	}
+	unsigned offset = luaL_optnumber(L,3,0);
+
+	// zero length fill or outside end, done
+	if(fill_len == 0 || offset >= buf->len) {
+		lua_pushnumber(L,0);
+		return 1;
+	}
+	unsigned count = luaL_optnumber(L,4,buf->len/fill_len + 1); // this will be clamped later, guaranteed to fill the buffer
+
+	unsigned fill_bytes = count * fill_len;
+	if(buf->len - offset < fill_bytes) {
+		fill_bytes = buf->len - offset;
+	}
+	// if less than a full repetition fits, clamp
+	if(fill_len > fill_bytes) {
+		fill_len = fill_bytes;
+	}
+	char *p = buf->bytes + offset;
+	// memset is more efficient
+	if(fill_len == 1) {
+		memset(p,*fill_val,fill_bytes);
+	} else {
+		count = fill_bytes / fill_len;
+		unsigned rest = fill_bytes % fill_len;
+		int i;
+		for(i=0;i<count;i++,p+=fill_len) {
+			memcpy(p,fill_val,fill_len);
+		}
+		if(rest) {
+			memcpy(p,fill_val,rest);
+		}
+	}
+	lua_pushnumber(L,fill_bytes);
+	return 1;
+}
+
 static const luaL_Reg lbuf_methods[] = {
   {"len", lbuf_len},
   {"string", lbuf_string},
@@ -397,6 +462,7 @@ static const luaL_Reg lbuf_methods[] = {
   {"fread",lbuf_fread},
   {"fwrite",lbuf_fwrite},
   {"reverse_bytes",lbuf_reverse_bytes},
+  {"fill",lbuf_fill},
   {NULL, NULL}
 };
 
