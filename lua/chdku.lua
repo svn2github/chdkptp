@@ -852,6 +852,11 @@ function chdku.rc_build_path(hdata,dir,filename,ext)
 end
 --[[
 return a raw handler that will take a previously received dng header and build a DNG file
+dng_info:
+	lstart=<number> sub image start
+	lcount=<number> sub image lines
+	hdr=<lbuf> dng header lbuf
+
 ]]
 function chdku.rc_handler_raw_dng_file(dir,filename,ext,dng_info)
 	return function(lcon,hdata)
@@ -862,7 +867,7 @@ function chdku.rc_handler_raw_dng_file(dir,filename,ext,dng_info)
 		if not dng_info then
 			return false, 'missing dng_info'
 		end
-		if not dng_info.hdr[1] then
+		if not dng_info.hdr then
 			return false, 'missing dng_hdr'
 		end
 
@@ -873,12 +878,17 @@ function chdku.rc_handler_raw_dng_file(dir,filename,ext,dng_info)
 			return false, err
 		end
 
-		dng_info.hdr[1].data:fwrite(fh)
+		dng_info.hdr:fwrite(fh)
 		fh:write(string.rep('\0',128*96*3)) -- TODO fake thumb
+		cli.dbgmsg('rc chunk get %s %d\n',filename,hdata.id)
 		local raw,err=lcon:rcgetchunk(hdata.id)	
 		if not raw then
 			return false, err
 		end
+		cli.dbgmsg('rc chunk size:%d offset:%s last:%s\n',
+						raw.size,
+						tostring(raw.offset),
+						tostring(raw.last))
 		raw.data:reverse_bytes()
 		raw.data:fwrite(fh)
 		fh:close()

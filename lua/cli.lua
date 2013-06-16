@@ -1538,9 +1538,8 @@ cli:add_commands{
 				local dng_info = {
 					lstart=lstart,
 					lcount=lcount,
-					hdr={}
 				}
-				rcopts.dng_hdr = chdku.rc_handler_store(dng_info.hdr)
+				rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
 				rcopts.raw = chdku.rc_handler_raw_dng_file(dst_dir,dst,'dng',dng_info)
 			else
 				if args.raw then
