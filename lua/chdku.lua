@@ -769,27 +769,98 @@ function con_methods:wait_msg(opts)
 end
 
 -- bit number to ext + id mapping
-chdku.remotecap_ftypes={
-	{
+chdku.remotecap_dtypes={
+	[0]={
 		ext='jpg',
-		n=1,
+		id=1,
+		max_chunks=16, -- should be much less, but exact value not certain
 	},
 	{ 
 		ext='raw',
-		n=2,
+		id=2,
+		max_chunks=1,
 	},
 	{ 
-		ext='dng', -- note actually only the header
-		n=4,
+		ext='dng_hdr', -- header only
+		id=4,
+		max_chunks=1,
 	},
 }
+
+--[[
+return a handler function that just downloads the data to a file
+TODO should stream to disk in C code like download
+]]
+function con_methods:rc_handler_file(dir,filename,ext)
+	return function(lcon,hdata)
+		local err
+		-- if not specified, use remote
+		if not filename then
+			filename,err = hdata.remotename()
+			if not filename then
+				return false, err
+			end
+		end
+
+		if ext then
+			filename = filename..'.'..ext
+		else
+			filename = filename..'.'..hdata.ext
+		end
+
+		if dir then
+			filename = fsutil.joinpath(dir,filename)
+		end
+		cli.dbgmsg('rc file %s %d\n',filename,hdata.id)
+		
+		local fh,err = io.open(filename,'wb')
+		if not fh then
+			return false, err
+		end
+
+		local chunk
+		local n_chunks = 0
+		-- note only jpeg has multiple chunks
+		repeat
+			cli.dbgmsg('rc chunk get %s %d %d\n',filename,hdata.id,n_chunks)
+			chunk,err=lcon:rcgetchunk(hdata.id)	
+			if not chunk then
+				fh:close()
+				return false,err
+			end
+			cli.dbgmsg('rc chunk size:%d offset:%s last:%s\n',
+						chunk.size,
+						tostring(chunk.offset),
+						tostring(chunk.last))
+
+			if chunk.offset then
+				fh:seek('set',chunk.offset)
+			end
+			chunk.data:fwrite(fh)
+			n_chunks = n_chunks + 1
+		until chunk.last or n_chunks > hdata.max_chunks
+		fh:close()
+		if n_chunks > hdata.max_chunks then
+			return false, 'exceeded max_chunks'
+		end
+		return true
+	end
+end
 --[[
 fetch remote capture data
 status,errmsg=con:get_remotecap_data(opts)
 opts:
 	timeout, initwait, poll, pollstart -- passed to wait_status
-	datatypes=<number> -- types expected
-	handler=f(lcon,rcdatabit) -- chunk handler
+	jpg=handler,
+	raw=handler,
+	dng_hdr=handler,
+handler:
+	f(lcon,handler_data)
+handler_data:
+	ext -- extension from remotecap dtypes
+	id  -- data type number
+	opts -- options passed to get_remotecap_data
+	remotename() -- returns remote name, requesting only if needed
 ]]
 function con_methods:get_remotecap_data(opts)
 	opts=util.extend_table({
@@ -797,7 +868,36 @@ function con_methods:get_remotecap_data(opts)
 	},opts)
 	local wait_opts=util.extend_table({rsdata=true},opts,{keys={'timeout','initwait','poll','pollstart'}})
 
-	local toget = util.bit_unpack(opts.datatypes)
+	local toget = {}
+	local handlers = {}
+
+	-- TODO can probalby combine these
+	if opts.jpg then
+		toget[0] = true
+		handlers[0] = opts.jpg
+	end
+	if opts.raw then
+		toget[1] = true
+		handlers[1] = opts.raw
+	end
+	if opts.dng_hdr then
+		toget[2] = true
+		handlers[2] = opts.dng_hdr
+	end
+
+	-- function to return remote name if needed
+	local remotename
+	local getremotename = function()
+		if not remotename then
+			local err
+			remotename,err = self:rcgetname()
+			if not remotename then
+				return false, err
+			end
+		end
+		return remotename
+	end
+
 	local done
 	while not done do
 		local status,err = con:wait_status(wait_opts)
@@ -814,16 +914,22 @@ function con_methods:get_remotecap_data(opts)
 		local n_toget = 0
 		for i=0,2 do
 			if avail[i] == 1 then
-				if toget[i] == 0 then
-					printf('unexpected type %d',i)
+				if not toget[i] then
+					-- TODO could have a nop handler
+					return false, string.format('unexpected type %d',i)
 				end
-				local status, err = opts.handler(self,i)
+				local hdata = util.extend_table({
+					remotename=getremotename,
+					opts=opts,
+				},chdku.remotecap_dtypes[i])
+
+				local status, err = handlers[i](self,hdata)
 				if not status then
 					return false,tostring(err)
 				end
-				toget[i] = 0
+				toget[i] = nil
 			end
-			if toget[i] == 1 then
+			if toget[i] then
 				n_toget = n_toget + 1
 			end
 		end

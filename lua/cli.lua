@@ -1441,17 +1441,24 @@ cli:add_commands{
 	{
 		names={'remoteshoot','rs'},
 		help='execute remote shoot (under development, requires special CHDK build!)',
-		arghelp="[local] [-f=format] [-s=starting line] [-c=line count]",
+		arghelp="[local] [options]",
 		args=argparser.create{
-			f=1,
-			s=0,
-			c=0,
+			jpg=false,
+			raw=false,
+			dng=false,
+			dnghdr=false,
+			s=false,
+			c=false,
 		},
 		help_detail=[[
- [local]            local destination directory or filename (w/o extension!)
- [-f=format]        image format: 1=JPEG (def.), 2=RAW, 4=DNG header can be ORed together
- [-s=starting line] first line to be transferred (def. 0), ignored for JPEG
- [-c=line count]    number of lines to be transferred (def. 0=all), ignored for JPEG
+ [local]       local destination directory or filename (w/o extension!)
+ options:
+  -jpg         jpeg, default if no other options (not supported on all cams)
+  -raw         framebuffer dump raw
+  -dng         DNG format raw
+  -dnghdr      save DNG header to a seperate file, ignored with -dng
+  -s=<start>   first line of for subimage raw
+  -c=<count>   number of lines for subimage
 ]],
 		func=function(self,args)
 			local dst = args[1]
@@ -1474,13 +1481,41 @@ cli:add_commands{
 					dst = nil
 				end
 			end
-			local fformat=tonumber(args.f)
-			if (fformat < 1) or (fformat >7) then
-				return false,'invalid format requested'
+			-- fformat required for init
+			local fformat=0
+			if args.jpg then
+				fformat = fformat + 1
 			end
-			local fbits =  util.bit_unpack(fformat)
-			local lstart=tonumber(args.s)
-			local lcount=tonumber(args.c)
+			if args.dng then
+				fformat = fformat + 6
+			else
+				if args.raw then
+					fformat = fformat + 2
+				end
+				if args.dnghdr then
+					fformat = fformat + 4
+				end
+			end
+			-- default to jpeg TODO won't be supported on cams without raw hook
+			if fformat == 0 then
+				fformat = 1
+				args.jpg = true
+			end
+
+			local lstart=0
+			local lcount=0
+			if args.s or args.l then
+				if args.dng or args.raw then
+					if args.s then
+						lstart = tonumber(args.s)
+					end
+					if args.l then
+						lcount = tonumber(args.l)
+					end
+				else
+					util.warnf('subimage without raw ignored\n')
+				end
+			end
 
 			local status,rstatus,rerr = con:execwait('return rs_shoot('..serialize({
 				fformat=fformat,
@@ -1495,83 +1530,71 @@ cli:add_commands{
 				return false,rerr
 			end
 
-			-- TODO handler should go in library code
-			-- note dst is upvalue
-			local status, err = con:get_remotecap_data({
-				datatypes=fformat,
-				handler=function(lcon,rcdatabit)
-					local err, fname
-					if not dst then
-						dst,err = con:rcgetname()
-						if not dst then
+			local rcopts={}
+			if args.jpg then
+				rcopts.jpg=con:rc_handler_file(dst_dir,dst)
+			end
+			if args.dng then
+				local dng_hdr
+				rcopts.dng_hdr = function(lcon,hdata)
+					local err
+					dng_hdr,err=lcon:rcgetchunk(hdata.id)	
+					if not dng_hdr then
+						return false, err
+					end
+					return true
+				end
+				-- handle raw data, write 
+				rcopts.raw = function(lcon,hdata)
+					-- TODO copy/ paste from rc_handler_file
+					local dir = dst_dir
+					local filename = dst
+
+					if not filename then
+						filename,err = hdata.remotename()
+						if not filename then
 							return false, err
 						end
-						cli.dbgmsg('got name %s\n',dst);
 					end
-					local is_dng_img_data = (rcdatabit == 1 and fbits[2] == 1)
-					-- on raw bit and dng selected
-					if is_dng_img_data then
-						fname = dst..'.'..chdku.remotecap_ftypes[3].ext -- dng
-					elseif rcdatabit == 2 and fbits[1] == 0 then -- dng selected with now raw
-						fname = dst..'.dng_hdr' -- dng header only
+
+					if ext then
+						filename = filename..'.'..ext
 					else
-						fname = dst..'.'..chdku.remotecap_ftypes[rcdatabit+1].ext
+						filename = filename..'.dng'
 					end
-					if dst_dir then
-						fname = fsutil.joinpath(dst_dir,fname)
+
+					if dir then
+						filename = fsutil.joinpath(dir,filename)
 					end
-					cli.dbgmsg('rcgetfile %s %d\n',fname,rcdatabit)
-					--return lcon:rcgetfile(chdku.remotecap_ftypes[rcdatabit+1].n,fname)
+					cli.dbgmsg('rc file %s %d\n',filename,hdata.id)
 					
-					local fh
-					if is_dng_img_data then
-						fh=io.open(fname,'ab')
-					else
-						fh=io.open(fname,'wb')
-					end
+					local fh,err=io.open(filename,'wb')
 					if not fh then
 						return false, err
 					end
 
-					if is_dng_img_data then
-						fh:write(string.rep('\0',128*96*3)) -- TODO fake thumb
+					dng_hdr.data:fwrite(fh)
+					fh:write(string.rep('\0',128*96*3)) -- TODO fake thumb
+					local raw,err=lcon:rcgetchunk(hdata.id)	
+					if not raw then
+						return false, err
 					end
-
-					local chunk
-					local tries = 0
-					local max_tries = 16
-					-- note only jpeg has multiple chunks
-					repeat
-						cli.dbgmsg('rcgetchunk %s %d\n',fname,rcdatabit)
-						chunk, err=lcon:rcgetchunk(chdku.remotecap_ftypes[rcdatabit+1].n)	
-						if not chunk then
-							fh:close()
-							return false,err
-						end
-						cli.dbgmsg('rcgetchunk size:%d offset:%s last:%s\n',
-									chunk.size,
-									tostring(chunk.offset),
-									tostring(chunk.last))
-
-						if chunk.offset then
-							fh:seek('set',chunk.offset)
-						end
-						-- TODO doesn't handle sub images
-						if is_dng_img_data then
-							chunk.data:reverse_bytes()
-						end
-						chunk.data:fwrite(fh)
-						tries = tries + 1
-					until chunk.last or tries > max_tries
+					raw.data:reverse_bytes()
+					raw.data:fwrite(fh)
 					fh:close()
-
-					if tries > max_tries then
-						return false, 'exceeded max_tries'
-					end
-
 					return true
-				end,
-			});
+				end
+			else
+				if args.raw then
+					rcopts.raw=con:rc_handler_file(dst_dir,dst)
+				end
+				if args.dnghdr then
+					rcopts.dng_hdr=con:rc_handler_file(dst_dir,dst)
+				end
+			end
+
+			local status,err = con:get_remotecap_data(rcopts)
+
 			local ustatus, uerr = con:exec('init_remotecap(0)') -- try to uninit
 			-- if uninit failed, combine with previous status
 			if not ustatus then
