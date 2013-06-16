@@ -26,7 +26,7 @@ bind the tiff header
 m.header_fields = {
 	'byte_order',
 	'id',
-	'ifd0'
+	'ifd0_off'
 }
 -- "interesting" tags, i.e. those used in a CHDK dng
 m.tags = {
@@ -47,13 +47,18 @@ m.tags_map = {
 	SamplesPerPixel				=0x115,
 	RowsPerStrip				=0x116,
 	StripByteCounts				=0x117,
+	XResolution					=0x11a,
+	YResolution					=0x11b,
 	PlanarConfiguration			=0x11c,
+	ResolutionUnit				=0x128,
 	Software					=0x131,
 	DateTime					=0x132,
 	Artist						=0x13b,
 
 	SubIFDs						=0x14a,
 
+	CFARepeatPatternDim			=0x828d,
+	CFAPattern					=0x828e,
 	Copyright					=0x8298,
 	ExifIFD						=0x8769, -- from CHDK dng source
 
@@ -62,6 +67,10 @@ m.tags_map = {
 	DNGVersion					=0xc612,
 	DNGBackwardVersion			=0xc613,
 	UniqueCameraModel			=0xc614,
+	BlackLevel					=0xc61a,
+	WhiteLevel					=0xc61d,
+	DefaultCropOrigin			=0xc61f,
+	DefaultCropSize				=0xc620,
 	ColorMatrix1				=0xc621,
 	AnalogBalance				=0xc627,
 	AsShotNeutral				=0xc628,
@@ -71,6 +80,8 @@ m.tags_map = {
 	LinearResponseLimit			=0xc62e,
 	LenseInfo					=0xc630,
 	CalibrationIlluminant1		=0xc65a,
+	ActiveArea					=0xc68d,
+	OpcodeList1					=0xc740,
 
 }
 
@@ -118,7 +129,7 @@ init_tag_types()
 function m.bind_header(d)
 	d:bind_u16('byte_order')
 	d:bind_u16('id')
-	d:bind_u32('ifd0')
+	d:bind_u32('ifd0_off')
 end
 
 local ifd_entry_methods = {
@@ -183,45 +194,80 @@ function m.bind_ifd_entry(d,ifd,i)
 	return e
 end
 
-function m.bind_ifds(d)
-	d.ifds={}
-	local ifd_off = d.ifd0
+-- ifds
+function m.bind_ifds(d,ifd_off,ifd_list)
+	-- for sub, we may be appending
+	if not ifd_list then
+		ifd_list={}
+	end
 	repeat
 		if ifd_off >= d._lb:len() then
 			error('ifd outside of data')
 		end
 		local n_entries = d._lb:get_u16(ifd_off)
-		local ifd = {off=ifd_off,n_entries=n_entries,entries={}}
+		local ifd = {
+			index=#ifd_list,
+			off=ifd_off,
+			n_entries=n_entries,
+			entries={},
+		}
 		for i=0, n_entries-1 do
 			local e = m.bind_ifd_entry(d,ifd,i)
 			table.insert(ifd.entries,e)
-			-- TODO SubIFDs
+			if e.tag == m.tags_map.SubIFDs then
+				ifd.sub={}
+				-- sub ifds could point to a list of offsets, which could in turn each be chained (???)
+				for i=1,e.count do
+					m.bind_ifds(d,e.valoff+(i-1)*e:type().elsize,ifd.sub)
+				end
+			end
 		end
-		table.insert(d.ifds,ifd)
+		table.insert(ifd_list,ifd)
 		ifd_off = d._lb:get_u32(ifd_off + n_entries * 12 + 2)
 	until ifd_off == 0
+	return ifd_list
 end
 
 local dng_methods={}
+
+function dng_methods.print_ifd(self,ifd,path)
+	if not path then
+		path = {}
+	end
+	-- before insert, want 0 for top level
+	local indent = string.rep(' ',#path)
+	table.insert(path,ifd.index)
+
+	local pathstr = table.concat(path,'.')
+	printf('%sifd%s offset=0x%x entries=%d\n',indent,pathstr,ifd.off,ifd.n_entries)
+	for j, e in ipairs(ifd.entries) do
+		local vdesc = 'offset'
+		if e:is_inline() then
+			vdesc = ' value'
+		end
+		printf('%s %-30s tag=0x%04x type=%-10s count=%07d %s=0x%08x\n',
+					indent,
+					e:tagname(),
+					e.tag,
+					e:type().name,
+					e.count,
+					vdesc,
+					e.valoff)
+	end
+	if ifd.sub then
+		for i, subifd in ipairs(ifd.sub) do
+			self:print_ifd(subifd,path)
+		end
+	end
+	table.remove(path)
+end
+
 function dng_methods.print_info(self)
 	for i,fname in ipairs(m.header_fields) do
 		printf('%s 0x%x\n',fname,self[fname])
 	end
 	for i, ifd in ipairs(self.ifds) do 
-		printf('ifd%d offset=0x%x entries=%d\n',i-1,ifd.off,ifd.n_entries)
-		for j, e in ipairs(ifd.entries) do
-			local vdesc = 'offset'
-			if e:is_inline() then
-				vdesc = ' value'
-			end
-			printf(' %-30s tag=0x%04x type=%-10s count=%07d %s=0x%08x\n',
-						e:tagname(),
-						e.tag,
-						e:type().name,
-						e.count,
-						vdesc,
-						e.valoff)
-		end
+		self:print_ifd(ifd)
 	end
 end
 
@@ -242,7 +288,7 @@ function m.load(filename)
 	if d.id ~= 42 then
 		return false, string.format('invalid id %d, expected 42',d.id)
 	end
-	m.bind_ifds(d)
+	d.ifds = m.bind_ifds(d,d.ifd0_off)
 	return d
 end
 return m
