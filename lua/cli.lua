@@ -1504,13 +1504,13 @@ cli:add_commands{
 
 			local lstart=0
 			local lcount=0
-			if args.s or args.l then
+			if args.s or args.c then
 				if args.dng or args.raw then
 					if args.s then
 						lstart = tonumber(args.s)
 					end
-					if args.l then
-						lcount = tonumber(args.l)
+					if args.c then
+						lcount = tonumber(args.c)
 					end
 				else
 					util.warnf('subimage without raw ignored\n')
