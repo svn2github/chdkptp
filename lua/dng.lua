@@ -64,7 +64,7 @@ m.tags_map = {
 	ExposureTime				=0x829a,
 	FNumber						=0x829d,
 
-	ExifIFD						=0x8769, -- from CHDK dng source
+	ExifIFD						=0x8769,
 
 	ExposureProgram				=0x8822,
 	ISOSpeedRatings				=0x8827,
@@ -146,7 +146,7 @@ local function init_tag_types()
 end
 init_tag_types()
 
-function m.bind_header(d)
+function m.bind_tiff_header(d)
 	d:bind_u16('byte_order')
 	d:bind_u16('id')
 	d:bind_u32('ifd0_off')
@@ -176,6 +176,9 @@ local ifd_entry_methods = {
 	for rational, numerator and denominator are retuned in an array
 	--]]
 	getel = function(self,index)
+		if not index then
+			index = 0
+		end
 		if index >= self.count then
 			return nil
 		end
@@ -230,6 +233,8 @@ function m.bind_ifds(d,ifd_off,ifd_list)
 			off=ifd_off,
 			n_entries=n_entries,
 			entries={},
+			bytag={},
+			byname={},
 		}
 		for i=0, n_entries-1 do
 			local e = m.bind_ifd_entry(d,ifd,i)
@@ -250,7 +255,11 @@ function m.bind_ifds(d,ifd_off,ifd_list)
 					util.warnf('multiple exif IFDs per IFD not supported')
 				end
 			end
-
+			ifd.bytag[e.tag] = e
+			-- avoid including unk_xxx names
+			if m.tags_map[e.tag] then
+				ifd.byname[e.tagname()] = e
+			end
 		end
 		table.insert(ifd_list,ifd)
 		ifd_off = d._lb:get_u32(ifd_off + n_entries * 12 + 2)
@@ -260,6 +269,7 @@ end
 
 local dng_methods={}
 
+-- TODO path needs to be set manually if not printing recursively
 function dng_methods.print_ifd(self,ifd,path)
 	if not path then
 		path = {}
@@ -312,14 +322,42 @@ function dng_methods.print_info(self)
 	end
 end
 
-function m.load(filename)
-	local lb,err=lbu.loadfile(filename)
-	if not lb then
-		return false, err
+--[[
+return ifd specified by "path", or nil
+path: table of 0 based ifd numbers
+{0,0}
+]]
+function dng_methods.get_ifd(self,path)
+	local cur_list = self.ifds
+	local cur
+	for _,index in ipairs(path) do
+		if not cur_list then
+			return nil
+		end
+		if type(index) == 'number' then
+			if not cur_list[index+1] then
+				return
+			end
+			cur = cur_list[index+1]
+			cur_list = cur.sub
+		elseif index == 'exif' then
+			if not cur.exif then
+				return nil
+			end
+			-- assume only one exif
+			cur = cur.exif[1]
+			cur_list = nil
+		else
+			error('invalid path')
+		end
 	end
+	return cur
+end
+
+function m.bind_header(lb)
 	local d=lbu.wrap(lb)
 	util.extend_table(d,dng_methods)
-	m.bind_header(d)
+	m.bind_tiff_header(d)
 	if d.byte_order ~= 0x4949 then
 		if d.byte_order == 0x4d4d then
 			return false, 'big endian unsupported'
@@ -331,5 +369,13 @@ function m.load(filename)
 	end
 	d.ifds = m.bind_ifds(d,d.ifd0_off)
 	return d
+end
+
+function m.load(filename)
+	local lb,err=lbu.loadfile(filename)
+	if not lb then
+		return false, err
+	end
+	return m.bind_header(lb)
 end
 return m
