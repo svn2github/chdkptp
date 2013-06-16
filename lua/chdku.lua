@@ -788,28 +788,107 @@ chdku.remotecap_dtypes={
 }
 
 --[[
+return a handler that stores collected chunks into an array or using a function
+]]
+function chdku.rc_handler_store(store)
+	return function(lcon,hdata) 
+		local chunk
+		local n_chunks = 0
+		if not store then
+			store = hdata.store_return
+		end
+		repeat
+			cli.dbgmsg('rc chunk get %d %d\n',hdata.id,n_chunks)
+			chunk,err=lcon:rcgetchunk(hdata.id)	
+			if not chunk then
+				return false,err
+			end
+			cli.dbgmsg('rc chunk size:%d offset:%s last:%s\n',
+						chunk.size,
+						tostring(chunk.offset),
+						tostring(chunk.last))
+
+			if type(store) == 'table' then
+				table.insert(store,chunk)
+			elseif type(store) == 'function' then
+				local status,errr = store(chunk)
+				if not status then
+					return false,err
+				end
+			end
+			n_chunks = n_chunks + 1
+		until chunk.last or n_chunks > hdata.max_chunks
+		if n_chunks > hdata.max_chunks then
+			return false, 'exceeded max_chunks'
+		end
+		return true
+	end
+end
+
+function chdku.rc_build_path(hdata,dir,filename,ext)
+	if not filename then
+		filename,err = hdata.remotename()
+		if not filename then
+			return false, err
+		end
+	end
+
+	if ext then
+		filename = filename..'.'..ext
+	else
+		filename = filename..'.'..hdata.ext
+	end
+
+	if dir then
+		filename = fsutil.joinpath(dir,filename)
+	end
+	return filename
+end
+--[[
+return a raw handler that will take a previously received dng header and build a DNG file
+]]
+function chdku.rc_handler_raw_dng_file(dir,filename,ext,dng_info)
+	return function(lcon,hdata)
+		local filename,err = chdku.rc_build_path(hdata,dir,filename,'dng')
+		if not filename then
+			return false, err
+		end
+		if not dng_info then
+			return false, 'missing dng_info'
+		end
+		if not dng_info.hdr[1] then
+			return false, 'missing dng_hdr'
+		end
+
+		cli.dbgmsg('rc file %s %d\n',filename,hdata.id)
+		
+		local fh,err=io.open(filename,'wb')
+		if not fh then
+			return false, err
+		end
+
+		dng_info.hdr[1].data:fwrite(fh)
+		fh:write(string.rep('\0',128*96*3)) -- TODO fake thumb
+		local raw,err=lcon:rcgetchunk(hdata.id)	
+		if not raw then
+			return false, err
+		end
+		raw.data:reverse_bytes()
+		raw.data:fwrite(fh)
+		fh:close()
+		return true
+	end
+end
+--[[
 return a handler function that just downloads the data to a file
 TODO should stream to disk in C code like download
 ]]
-function con_methods:rc_handler_file(dir,filename,ext)
+function chdku.rc_handler_file(dir,filename,ext)
 	return function(lcon,hdata)
 		local err
-		-- if not specified, use remote
+		filename,err = chdku.rc_build_path(hdata,dir,filename,ext)
 		if not filename then
-			filename,err = hdata.remotename()
-			if not filename then
-				return false, err
-			end
-		end
-
-		if ext then
-			filename = filename..'.'..ext
-		else
-			filename = filename..'.'..hdata.ext
-		end
-
-		if dir then
-			filename = fsutil.joinpath(dir,filename)
+			return false, err
 		end
 		cli.dbgmsg('rc file %s %d\n',filename,hdata.id)
 		
@@ -848,7 +927,7 @@ function con_methods:rc_handler_file(dir,filename,ext)
 end
 --[[
 fetch remote capture data
-status,errmsg=con:get_remotecap_data(opts)
+rets,errmsg=con:get_remotecap_data(opts)
 opts:
 	timeout, initwait, poll, pollstart -- passed to wait_status
 	jpg=handler,
@@ -861,6 +940,10 @@ handler_data:
 	id  -- data type number
 	opts -- options passed to get_remotecap_data
 	remotename() -- returns remote name, requesting only if needed
+	store_return() -- a function that can be used to store values for the return value of get_remotecap_data
+rets
+	false on error
+	true or array of store_return[bitnum][value] values on success
 ]]
 function con_methods:get_remotecap_data(opts)
 	opts=util.extend_table({
@@ -897,6 +980,8 @@ function con_methods:get_remotecap_data(opts)
 		end
 		return remotename
 	end
+	-- table to return chunks (or other values) sent by hdata.store_return
+	local rets = {}
 
 	local done
 	while not done do
@@ -921,6 +1006,14 @@ function con_methods:get_remotecap_data(opts)
 				local hdata = util.extend_table({
 					remotename=getremotename,
 					opts=opts,
+					store_return=function(val)
+						if rets[i] then
+							table.insert(rets,val)
+						else
+							rets[i] = {val}
+						end
+						return true
+					end,
 				},chdku.remotecap_dtypes[i])
 
 				local status, err = handlers[i](self,hdata)
@@ -936,6 +1029,9 @@ function con_methods:get_remotecap_data(opts)
 		if n_toget == 0 then
 			done = true
 		end
+	end
+	if #rets then
+		return rets
 	end
 	return true
 end

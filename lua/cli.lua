@@ -1532,64 +1532,22 @@ cli:add_commands{
 
 			local rcopts={}
 			if args.jpg then
-				rcopts.jpg=con:rc_handler_file(dst_dir,dst)
+				rcopts.jpg=chdku.rc_handler_file(dst_dir,dst)
 			end
 			if args.dng then
-				local dng_hdr
-				rcopts.dng_hdr = function(lcon,hdata)
-					local err
-					dng_hdr,err=lcon:rcgetchunk(hdata.id)	
-					if not dng_hdr then
-						return false, err
-					end
-					return true
-				end
-				-- handle raw data, write 
-				rcopts.raw = function(lcon,hdata)
-					-- TODO copy/ paste from rc_handler_file
-					local dir = dst_dir
-					local filename = dst
-
-					if not filename then
-						filename,err = hdata.remotename()
-						if not filename then
-							return false, err
-						end
-					end
-
-					if ext then
-						filename = filename..'.'..ext
-					else
-						filename = filename..'.dng'
-					end
-
-					if dir then
-						filename = fsutil.joinpath(dir,filename)
-					end
-					cli.dbgmsg('rc file %s %d\n',filename,hdata.id)
-					
-					local fh,err=io.open(filename,'wb')
-					if not fh then
-						return false, err
-					end
-
-					dng_hdr.data:fwrite(fh)
-					fh:write(string.rep('\0',128*96*3)) -- TODO fake thumb
-					local raw,err=lcon:rcgetchunk(hdata.id)	
-					if not raw then
-						return false, err
-					end
-					raw.data:reverse_bytes()
-					raw.data:fwrite(fh)
-					fh:close()
-					return true
-				end
+				local dng_info = {
+					lstart=lstart,
+					lcount=lcount,
+					hdr={}
+				}
+				rcopts.dng_hdr = chdku.rc_handler_store(dng_info.hdr)
+				rcopts.raw = chdku.rc_handler_raw_dng_file(dst_dir,dst,'dng',dng_info)
 			else
 				if args.raw then
-					rcopts.raw=con:rc_handler_file(dst_dir,dst)
+					rcopts.raw=chdku.rc_handler_file(dst_dir,dst)
 				end
 				if args.dnghdr then
-					rcopts.dng_hdr=con:rc_handler_file(dst_dir,dst)
+					rcopts.dng_hdr=chdku.rc_handler_file(dst_dir,dst)
 				end
 			end
 
