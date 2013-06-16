@@ -792,12 +792,22 @@ return a handler that stores collected chunks into an array or using a function
 ]]
 function chdku.rc_handler_store(store)
 	return function(lcon,hdata) 
+		local store_fn
+		if not store then
+			store_fn = hdata.store_return
+		elseif type(store) == 'function' then
+			store_fn = store
+		elseif type(store) == 'table' then
+			store_fn = function(val)
+				table.insert(store,val)
+			end
+		else
+			return false,'invalid store target'
+		end
 		local chunk
 		local n_chunks = 0
-		if not store then
-			store = hdata.store_return
-		end
 		repeat
+			local err
 			cli.dbgmsg('rc chunk get %d %d\n',hdata.id,n_chunks)
 			chunk,err=lcon:rcgetchunk(hdata.id)	
 			if not chunk then
@@ -808,13 +818,9 @@ function chdku.rc_handler_store(store)
 						tostring(chunk.offset),
 						tostring(chunk.last))
 
-			if type(store) == 'table' then
-				table.insert(store,chunk)
-			elseif type(store) == 'function' then
-				local status,errr = store(chunk)
-				if not status then
-					return false,err
-				end
+			local status,err = store_fn(chunk)
+			if status==false then -- allow nil so simple functions don't need to return a value
+				return false,err
 			end
 			n_chunks = n_chunks + 1
 		until chunk.last or n_chunks > hdata.max_chunks
@@ -1012,7 +1018,6 @@ function con_methods:get_remotecap_data(opts)
 						else
 							rets[i] = {val}
 						end
-						return true
 					end,
 				},chdku.remotecap_dtypes[i])
 
