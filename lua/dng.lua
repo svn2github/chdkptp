@@ -60,10 +60,30 @@ m.tags_map = {
 	CFARepeatPatternDim			=0x828d,
 	CFAPattern					=0x828e,
 	Copyright					=0x8298,
+
+	ExposureTime				=0x829a,
+	FNumber						=0x829d,
+
 	ExifIFD						=0x8769, -- from CHDK dng source
 
-	TIFF_EPStandardID			=0x9216,
+	ExposureProgram				=0x8822,
+	ISOSpeedRatings				=0x8827,
+	ExifVersion					=0x9000,
+	ShutterSpeedValue			=0x9201,
+	ApertureValue				=0x9202,
+	ExposureBiasValue			=0x9204,
+	MaxApertureValue			=0x9205,
+	MeteringMode				=0x9207,
+	Flash						=0x9209,
+	FocalLength					=0x920A,
 
+	TIFFEPStandardID			=0x9216,
+
+	SubsecTime					=0x9290,
+	SubsecTimeOriginal			=0x9291,
+	FocalLenghtIn35mmFilm		=0xa405,
+
+	-- DNG
 	DNGVersion					=0xc612,
 	DNGBackwardVersion			=0xc613,
 	UniqueCameraModel			=0xc614,
@@ -220,7 +240,17 @@ function m.bind_ifds(d,ifd_off,ifd_list)
 				for i=1,e.count do
 					m.bind_ifds(d,e.valoff+(i-1)*e:type().elsize,ifd.sub)
 				end
+			elseif e.tag == m.tags_map.ExifIFD then
+				ifd.exif={ }
+				-- assume there is only one
+				if e.count == 1 then
+					m.bind_ifds(d,e.valoff,ifd.exif)
+					ifd.exif[1].is_exif=true
+				else
+					util.warnf('multiple exif IFDs per IFD not supported')
+				end
 			end
+
 		end
 		table.insert(ifd_list,ifd)
 		ifd_off = d._lb:get_u32(ifd_off + n_entries * 12 + 2)
@@ -238,7 +268,13 @@ function dng_methods.print_ifd(self,ifd,path)
 	local indent = string.rep(' ',#path)
 	table.insert(path,ifd.index)
 
-	local pathstr = table.concat(path,'.')
+	local pathstr
+	if ifd.is_exif then
+		pathstr = table.concat(path,'.',1,#path-1)
+		pathstr = pathstr..'.exif'
+	else
+		pathstr = table.concat(path,'.')
+	end
 	printf('%sifd%s offset=0x%x entries=%d\n',indent,pathstr,ifd.off,ifd.n_entries)
 	for j, e in ipairs(ifd.entries) do
 		local vdesc = 'offset'
@@ -256,6 +292,11 @@ function dng_methods.print_ifd(self,ifd,path)
 	end
 	if ifd.sub then
 		for i, subifd in ipairs(ifd.sub) do
+			self:print_ifd(subifd,path)
+		end
+	end
+	if ifd.exif then
+		for i, subifd in ipairs(ifd.exif) do
 			self:print_ifd(subifd,path)
 		end
 	end
