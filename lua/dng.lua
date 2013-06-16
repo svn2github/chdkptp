@@ -81,7 +81,7 @@ m.tags_map = {
 
 	SubsecTime					=0x9290,
 	SubsecTimeOriginal			=0x9291,
-	FocalLenghtIn35mmFilm		=0xa405,
+	FocalLengthIn35mmFilm		=0xa405,
 
 	-- DNG
 	DNGVersion					=0xc612,
