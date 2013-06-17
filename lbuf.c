@@ -424,6 +424,11 @@ static int lbuf_fill(lua_State *L) {
 	if(fill_len > fill_bytes) {
 		fill_len = fill_bytes;
 	}
+	// no bytes to fill
+	if(fill_bytes == 0) {
+		lua_pushnumber(L,0);
+		return 1;
+	}
 	char *p = buf->bytes + offset;
 	// memset is more efficient
 	if(fill_len == 1) {
