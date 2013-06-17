@@ -353,9 +353,11 @@ static int lbuf_fwrite(lua_State *L) {
 	if(!*pf) {
 		return luaL_error(L,"attempt to access closed file");
 	}
-	size_t r = fwrite(buf->bytes,buf->len,1,*pf);
-	if(r != 1) {
-		return luaL_error(L,"write failed");
+	if(buf->len > 0) {
+		size_t r = fwrite(buf->bytes,buf->len,1,*pf);
+		if(r != 1) {
+			return luaL_error(L,"write failed");
+		}
 	}
 	lua_pushboolean(L,1);
 	return 1;
