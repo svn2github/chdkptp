@@ -850,6 +850,35 @@ function chdku.rc_build_path(hdata,dir,filename,ext)
 	end
 	return filename
 end
+
+function chdku.rc_process_dng(dng_info,raw)
+	raw.data:reverse_bytes()
+	-- values are assumed to be valid
+	-- sub-image, pad
+	if dng_info.lstart ~= 0 or dng_info.lcount ~= 0 then
+		local dnglib=require'dng'
+		local hdr=dnglib.bind_header(dng_info.hdr)
+		-- TODO makes assumptions about header layout
+		local ifd=hdr:get_ifd{0,0} -- assume main image is first subifd of first ifd
+		if not ifd then 
+			return false, 'ifd 0.0 not found'
+		end
+
+		-- TODO assume a single strip with full data
+		local fullraw = lbuf.new(ifd.byname.StripByteCounts:getel())
+		local bpp = ifd.byname.BitsPerSample:getel()
+		local offset = (ifd.byname.ImageWidth:getel() * dng_info.lstart * bpp)/8;
+		--local blacklevel = ifd.byname.BlackLevel:getel()
+		-- filling with blacklevel would be nicer but max doesn't care about byte order
+		fullraw:fill(string.char(0xff),0,offset) -- fill up to data
+		-- copy 
+		fullraw:fill(raw.data,offset,1)
+		fullraw:fill(string.char(0xff),offset+raw.data:len()) -- fill remainder
+		-- replace original data
+		raw.data=fullraw
+	end
+	return true
+end
 --[[
 return a raw handler that will take a previously received dng header and build a DNG file
 dng_info:
@@ -878,8 +907,6 @@ function chdku.rc_handler_raw_dng_file(dir,filename,ext,dng_info)
 			return false, err
 		end
 
-		dng_info.hdr:fwrite(fh)
-		fh:write(string.rep('\0',128*96*3)) -- TODO fake thumb
 		cli.dbgmsg('rc chunk get %s %d\n',filename,hdata.id)
 		local raw,err=lcon:rcgetchunk(hdata.id)	
 		if not raw then
@@ -889,7 +916,9 @@ function chdku.rc_handler_raw_dng_file(dir,filename,ext,dng_info)
 						raw.size,
 						tostring(raw.offset),
 						tostring(raw.last))
-		raw.data:reverse_bytes()
+		dng_info.hdr:fwrite(fh)
+		fh:write(string.rep('\0',128*96*3)) -- TODO fake thumb
+		chdku.rc_process_dng(dng_info,raw)
 		raw.data:fwrite(fh)
 		fh:close()
 		return true
