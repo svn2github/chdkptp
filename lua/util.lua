@@ -334,6 +334,28 @@ function util.bit_unpackstr(str)
 	return r
 end
 
+function util.bit_unpacked_fmt(t)
+	local b = {}
+	local r = {}
+	local bi=0
+	for i=0,#t do
+		table.insert(b,t[i])
+		bi = bi + 1
+		if bi==8 then
+			table.insert(r,string.reverse(table.concat(b)))
+			b={}
+			bi=0
+		end
+	end
+	if #b ~= 0 then
+		for i=#b,7 do
+			table.insert(b,'-')
+		end
+		table.insert(r,string.reverse(table.concat(b)))
+	end
+	return table.concat(r,' ')
+end
+
 --[[
 concatinate numeric indexed elements of dst onto the end of src
 ]]
