@@ -265,10 +265,13 @@ end
 --[[
 --turn an integer into a zero based array of bits
 --]]
-function util.bit_unpack(n)
+function util.bit_unpack(n,limit)
+	if not limit then
+		limit = 31
+	end
 	local t={}
 	n=math.floor(n)
-	for i=0,31 do
+	for i=0,limit do
 		t[i]=n%2
 		n=math.floor(n/2)
 	end
@@ -277,8 +280,56 @@ end
 
 function util.bit_packu(bits)
 	local r=0
-	for i=0,31 do
+	local limit = #bits
+	if limit > 31 then
+		limit = 31
+	end
+	for i=0,limit do
 		r = r + bits[i]*2^i
+	end
+	return r
+end
+--[[
+--pack a 0 based array of bits into a string
+--]]
+function util.bit_packstr(bits)
+	local bpos = 0
+	local bitval = 1
+	local byte = 0
+	local i = 0
+	local out = {}
+	while bits[i] do
+		if bits[i] == 1 then
+			byte = byte + bitval
+		end
+		if bpos < 7 then
+			bpos = bpos + 1
+			bitval = bitval*2
+		else
+			table.insert(out,string.char(byte))
+			bpos = 0
+			bitval = 1
+			byte = 0
+		end
+		i = i + 1
+	end
+	-- final incomplete value, will be padded with 0s
+	if bpos ~= 0 then
+		table.insert(out,string.char(byte))
+	end
+	return table.concat(out)
+end
+
+function util.bit_unpackstr(str)
+	local bytes = {string.byte(str,1,-1)}
+	local r = {}
+	local o = 0
+	for _,b in ipairs(bytes) do
+		bits = util.bit_unpack(b,7)
+		for j=0,7 do
+			r[o]=bits[j]
+			o = o + 1
+		end
 	end
 	return r
 end

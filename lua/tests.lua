@@ -315,6 +315,31 @@ t.extend_table = function()
 	assert(util.compare_values(util.extend_table({a='a'},t,{keys={1,2,'a'}}),{1,2,a='a'}))
 end
 
+t.bit_util = function()
+	local b=util.bit_unpack(0)
+	assert(#b==31)
+	assert(b[0] == 0)
+	assert(b[1] == 0)
+	assert(b[31] == 0)
+	assert(util.bit_packu(b) == 0)
+	local b=util.bit_unpack(0x80000000)
+	assert(b[0] == 0)
+	assert(b[31] == 1)
+	assert(util.bit_packu(b) == 0x80000000)
+	assert(util.bit_packu(util.bit_unpack(15,2)) == 7)
+	assert(util.bit_packstr(util.bit_unpackstr('hello world')) == 'hello world')
+	local v=util.bit_packu({[0]=1,0,1})
+	assert(v==5)
+	local v=util.bit_packstr({[0]=1,0,0,0,1,1})
+	assert(v=='1')
+	local b=util.bit_unpackstr('hello world')
+	local b2 = {[0]=1,0,0,0,1,1}
+	for i=0,#b2 do
+		table.insert(b,b2[i])
+	end
+	assert(util.bit_packstr(b)=='hello world1')
+end
+
 function m:run(name)
 	-- TODO side affects galore
 	printf('%s:start\n',name)
