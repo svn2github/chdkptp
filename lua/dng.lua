@@ -257,8 +257,8 @@ function m.bind_ifds(d,ifd_off,ifd_list)
 			end
 			ifd.bytag[e.tag] = e
 			-- avoid including unk_xxx names
-			if m.tags_map[e.tag] then
-				ifd.byname[e.tagname()] = e
+			if m.tags[e.tag] then
+				ifd.byname[e:tagname()] = e
 			end
 		end
 		table.insert(ifd_list,ifd)
