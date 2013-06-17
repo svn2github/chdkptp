@@ -335,6 +335,41 @@ function util.bit_unpackstr(str)
 end
 
 --[[
+concatinate numeric indexed elements of dst onto the end of src
+]]
+function util.array_cat(dst,src,opts)
+	opts = util.extend_table({
+		start=1,
+		last=#src,
+		dststart=#dst+1,
+	},opts)
+	local di = opts.dststart
+	for i=opts.start,opts.last do
+		dst[di] = src[i]
+		di = di+1
+	end
+	return dst
+end
+
+--[[
+return a slice of numeric indexed elements of an array
+]]
+function util.array_slice(t,opts)
+	opts = util.extend_table({
+		start=1,
+		last=#t,
+		rstart=1,
+	},opts)
+	local r={}
+	local ri = opts.rstart
+	for i=opts.start,opts.last do
+		r[ri] = t[i]
+		ri = ri+1
+	end
+	return r
+end
+
+--[[
 very simple meta-table inheritance
 ]]
 function util.mt_inherit(t,base)
