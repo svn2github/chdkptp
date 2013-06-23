@@ -319,9 +319,8 @@ static int lbuf_set_u8(lua_State *L) {
 
 
 /*
-bool=lbuf:fread(file)
-read lbuf from file (using existing size)
-TODO may added partial read with size+offset later
+bool=lbuf:fread(file[,offset[,count]])
+read count bytes into lbuf starting at offset
 */
 static int lbuf_fread(lua_State *L) {
 	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
@@ -329,7 +328,17 @@ static int lbuf_fread(lua_State *L) {
 	if(!*pf) {
 		return luaL_error(L,"attempt to access closed file");
 	}
-	size_t r = fread(buf->bytes,buf->len,1,*pf);
+	unsigned offset = luaL_optnumber(L,3,0);
+	if(offset >= buf->len) {
+		return luaL_error(L,"invalid offset");
+	}
+	unsigned count = luaL_optnumber(L,4,buf->len - offset);
+
+	// TODO maybe should just clamp
+	if(count > buf->len - offset) {
+		return luaL_error(L,"invalid count");
+	}
+	size_t r = fread(buf->bytes+offset,count,1,*pf);
 	if(r != 1) {
 		// TODO might want to check if would run off the end
 		if(feof(*pf)) {
@@ -343,9 +352,8 @@ static int lbuf_fread(lua_State *L) {
 }
 
 /*
-bool=lbuf:fwrite(file)
-write lbuf to file
-TODO may added partial write with size+offset later
+bool=lbuf:fwrite(file[,offset[,count]])
+write count bytes of lbuf starting at offset to file
 */
 static int lbuf_fwrite(lua_State *L) {
 	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
@@ -353,8 +361,18 @@ static int lbuf_fwrite(lua_State *L) {
 	if(!*pf) {
 		return luaL_error(L,"attempt to access closed file");
 	}
+	unsigned offset = luaL_optnumber(L,3,0);
+	if(offset >= buf->len) {
+		return luaL_error(L,"invalid offset");
+	}
+	unsigned count = luaL_optnumber(L,4,buf->len - offset);
+
+	// TODO maybe should just clamp
+	if(count > buf->len - offset) {
+		return luaL_error(L,"invalid count");
+	}
 	if(buf->len > 0) {
-		size_t r = fwrite(buf->bytes,buf->len,1,*pf);
+		size_t r = fwrite(buf->bytes+offset,count,1,*pf);
 		if(r != 1) {
 			return luaL_error(L,"write failed");
 		}
