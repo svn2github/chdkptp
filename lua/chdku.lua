@@ -887,9 +887,9 @@ dng_info:
 	hdr=<lbuf> dng header lbuf
 
 ]]
-function chdku.rc_handler_raw_dng_file(dir,filename,ext,dng_info)
+function chdku.rc_handler_raw_dng_file(dir,filename_base,ext,dng_info)
 	return function(lcon,hdata)
-		local filename,err = chdku.rc_build_path(hdata,dir,filename,'dng')
+		local filename,err = chdku.rc_build_path(hdata,dir,filename_base,'dng')
 		if not filename then
 			return false, err
 		end
@@ -928,10 +928,9 @@ end
 return a handler function that just downloads the data to a file
 TODO should stream to disk in C code like download
 ]]
-function chdku.rc_handler_file(dir,filename,ext)
+function chdku.rc_handler_file(dir,filename_base,ext)
 	return function(lcon,hdata)
-		local err
-		filename,err = chdku.rc_build_path(hdata,dir,filename,ext)
+		local filename,err = chdku.rc_build_path(hdata,dir,filename_base,ext)
 		if not filename then
 			return false, err
 		end

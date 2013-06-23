@@ -1449,6 +1449,7 @@ cli:add_commands{
 			dnghdr=false,
 			s=false,
 			c=false,
+			cont=false,
 		},
 		help_detail=[[
  [local]       local destination directory or filename (w/o extension!)
@@ -1459,6 +1460,7 @@ cli:add_commands{
   -dnghdr      save DNG header to a seperate file, ignored with -dng
   -s=<start>   first line of for subimage raw
   -c=<count>   number of lines for subimage
+  -cont=<num>  shoot num shots in continuous mode
 ]],
 		func=function(self,args)
 			local dst = args[1]
@@ -1481,53 +1483,62 @@ cli:add_commands{
 					dst = nil
 				end
 			end
+			local opts = {
+				fformat=0,
+				lstart=0,
+				lcount=0,
+			}
 			-- fformat required for init
-			local fformat=0
 			if args.jpg then
-				fformat = fformat + 1
+				opts.fformat = opts.fformat + 1
 			end
 			if args.dng then
-				fformat = fformat + 6
+				opts.fformat = opts.fformat + 6
 			else
 				if args.raw then
-					fformat = fformat + 2
+					opts.fformat = opts.fformat + 2
 				end
 				if args.dnghdr then
-					fformat = fformat + 4
+					opts.fformat = opts.fformat + 4
 				end
 			end
 			-- default to jpeg TODO won't be supported on cams without raw hook
-			if fformat == 0 then
-				fformat = 1
+			if opts.fformat == 0 then
+				opts.fformat = 1
 				args.jpg = true
 			end
 
-			local lstart=0
-			local lcount=0
 			if args.s or args.c then
 				if args.dng or args.raw then
 					if args.s then
-						lstart = tonumber(args.s)
+						opts.lstart = tonumber(args.s)
 					end
 					if args.c then
-						lcount = tonumber(args.c)
+						opts.lcount = tonumber(args.c)
 					end
 				else
 					util.warnf('subimage without raw ignored\n')
 				end
 			end
-
-			local status,rstatus,rerr = con:execwait('return rs_shoot('..serialize({
-				fformat=fformat,
-				lstart=lstart,
-				lcount=lcount,
-			})..')',{libs={'rs_shoot'}})
-			-- rs_shoot should not initialize remotecap if there's an error, so no need to clear
+			if args.cont then
+				opts.cont = tonumber(args.cont)
+			end
+			local opts_s = serialize(opts)
+			cli.dbgmsg('rs_init\n')
+			local status,rstatus,rerr = con:execwait('return rs_init('..opts_s..')',{libs={'rs_shoot'}})
 			if not status then
 				return false,rstatus
 			end
 			if not rstatus then
 				return false,rerr
+			end
+
+			cli.dbgmsg('rs_shoot\n')
+			-- TODO script errors will not get picked up here
+			local status,err = con:exec('rs_shoot('..opts_s..')',{libs={'rs_shoot'}})
+			-- rs_shoot should not initialize remotecap if there's an error, so no need to uninit
+			if not status then
+				return false,err
 			end
 
 			local rcopts={}
@@ -1536,8 +1547,8 @@ cli:add_commands{
 			end
 			if args.dng then
 				local dng_info = {
-					lstart=lstart,
-					lcount=lcount,
+					lstart=opts.lstart,
+					lcount=opts.lcount,
 				}
 				rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
 				rcopts.raw = chdku.rc_handler_raw_dng_file(dst_dir,dst,'dng',dng_info)
@@ -1550,7 +1561,20 @@ cli:add_commands{
 				end
 			end
 
-			local status,err = con:get_remotecap_data(rcopts)
+			local nshots
+			-- TOOO add options for repeated shots not in cont mode
+			if opts.cont then
+				shot_count = opts.cont
+			else
+				shot_count = 1
+			end
+			local status,err
+			local shot = 1
+			repeat 
+				cli.dbgmsg('get data %d\n',shot)
+				status,err = con:get_remotecap_data(rcopts)
+				shot = shot + 1
+			until shot > shot_count or not status
 
 			local ustatus, uerr = con:exec('init_remotecap(0)') -- try to uninit
 			-- if uninit failed, combine with previous status

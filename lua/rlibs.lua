@@ -988,7 +988,7 @@ starts shoot, doesn't wait for it to finish
 {
 	name='rs_shoot',
 	code=[[
-function rs_shoot(opts)
+function rs_init(opts)
 	local rec,vid = get_mode()
 	if not rec then
 		return false,'not in rec mode'
@@ -1002,13 +1002,40 @@ function rs_shoot(opts)
 	if not init_remotecap(opts.fformat,opts.lstart,opts.lcount) then
 		return false, 'init failed'
 	end
+	if opts.cont then
+		if get_prop(require'propcase'.DRIVE_MODE) ~= 1 then
+			return false, 'not in continuous mode'
+		end
+		if opts.cont <= 0 then
+			return false, 'invalid shot count'
+		end
+	end
+	return true
+end
+function rs_shoot_single()
 	press('shoot_half')
 	repeat
 		sleep(10)
 	until get_shooting()
 	click('shoot_full')
-
-	return true
+end
+function rs_shoot_cont(opts)
+	local last = get_exp_count() + opts.cont
+	press('shoot_half')
+	repeat
+		sleep(10)
+	until get_shooting()
+	press('shoot_full')
+	repeat
+		sleep(10)
+	until get_exp_count() >= last
+end
+function rs_shoot(opts)
+	if opts.cont then
+		rs_shoot_cont(opts)
+	else
+		rs_shoot_single()
+	end
 end
 	]],
 },
