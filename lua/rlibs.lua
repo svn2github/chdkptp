@@ -735,7 +735,11 @@ function find_files(paths,opts,func)
 		end,
 		ff_bwrite=function(self,data)
 			if not self.ff_batcher then
-				self.ff_batcher = msg_batcher({batchsize=opts.batchsize})
+				self.ff_batcher = msg_batcher({
+					batchsize=opts.batchsize,
+					batchpause=opts.batchpause,
+					batchgc=opts.batchgc,
+					dbgmem=opts.dbgmem})
 			end
 			return self.ff_batcher:write(data)
 		end,
