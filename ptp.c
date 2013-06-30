@@ -1893,11 +1893,11 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
  * Preliminary remote capture over USB code. Corresponding CHDK code is in the ptp-remote-capture-test
  * This is under development and should not be included in builds for general distribution
  */
-#if (PTP_CHDK_VERSION_MINOR >= 107)
+#if (PTP_CHDK_VERSION_MINOR >= 108)
 /*
  * isready: 0: not ready, lowest 2 bits: available image formats, 0x10000000: error
  */
-int ptp_chdk_rcisready(PTPParams* params, int *isready)
+int ptp_chdk_rcisready(PTPParams* params, int *isready,int *imgnum)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -1914,37 +1914,7 @@ int ptp_chdk_rcisready(PTPParams* params, int *isready)
       return 0;
   }
   *isready=ptp.Param1;
-  return 1;
-}
-
-/*
- * name: will point to the buffer (caller needs to free the allocation)
- * length: name length (might not be needed?)
- */
-int ptp_chdk_rcgetname(PTPParams* params, char **name, int *length)
-{
-  uint16_t ret;
-  PTPContainer ptp;
-
-
-  PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
-  ptp.Nparam=2;
-  ptp.Param1=PTP_CHDK_RemoteCaptureGetData;
-  ptp.Param2=0; //get name
-
-  ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, name); //is this OK?
-  if ( ret != 0x2001 )
-  {
-      ptp_error(params,"RemoteCaptureGetData(name): unexpected return code 0x%x",ret);
-      return 0;
-  }
-  if ( name == NULL )
-  {
-      ptp_error(params,"RemoteCaptureGetData(name): NULL buffer, params: 0x%x, 0x%x",ptp.Param1,ptp.Param2);
-      return 0;
-  }
-  *length=ptp.Param1;
+  *imgnum=ptp.Param2;
   return 1;
 }
 

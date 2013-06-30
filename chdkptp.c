@@ -996,12 +996,14 @@ static int chdk_download(lua_State *L) {
 	return 1;
 }
 
-#if (PTP_CHDK_VERSION_MINOR >= 107)
+#if (PTP_CHDK_VERSION_MINOR >= 108)
 /*
-isready[,errmsg]=con:rcisready()
+isready,imgnum|errmsg=con:rcisready()
 isready: 
 	false: local error in errmsg
 	0: not ready, lowest 3 bits: available image formats, 0x10000000: error
+imgnum:
+	image number, or 0 on remote error
 */
 static int chdk_rcisready(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
@@ -1011,41 +1013,20 @@ static int chdk_rcisready(lua_State *L) {
 		return 2;
 	}
 	int isready = 0;
-	if ( !ptp_chdk_rcisready(params,&isready) ) {
+	int imgnum = 0;
+	if ( !ptp_chdk_rcisready(params,&isready,&imgnum) ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"rcisready failed");
 		return 2;
 	}
-	lua_pushinteger(L,isready); //to be evaluated on the lua side
-	return 1;
-}
-
-/*
-name[,errmsg]=con:rcgetname()
-name: filename without path and extension, or false on error
-*/
-static int chdk_rcgetname(lua_State *L) {
-	CHDK_CONNECTION_METHOD;
-	if (!ptp_usb->connected) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
-	char *name = NULL;
-	int nlength;
-	if ( !ptp_chdk_rcgetname(params,&name,&nlength) ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"rcgetname failed");
-		return 2;
-	}
-	lua_pushstring(L,name); // returned name is null terminated
-	free(name);
-	return 1;
+	lua_pushinteger(L,isready);
+	lua_pushinteger(L,imgnum);
+	return 2;
 }
 
 /*
 chunk[,errmsg]=con:rcgetchunk(fmt)
-fmt: image format (1: jpeg, 2: raw)
+fmt: image format (1: jpeg, 2: raw, 4:dng header)
 chunk:
 false or
 {
@@ -1588,9 +1569,9 @@ static const luaL_Reg chdkconnection[] = {
   {"get_ptp_devinfo", chdk_get_ptp_devinfo},
   {"get_usb_devinfo", chdk_get_usb_devinfo}, // does not need to be connected, returns bus and dev at minimum
   {"get_live_data",chdk_get_live_data},
-#if (PTP_CHDK_VERSION_MINOR >= 107)
+#if (PTP_CHDK_VERSION_MINOR >= 108)
   {"rcisready", chdk_rcisready},
-  {"rcgetname", chdk_rcgetname},
+//  {"rcgetname", chdk_rcgetname},
   {"rcgetchunk", chdk_rcgetchunk},
 #endif 
   {"reset_counters",chdk_reset_counters},

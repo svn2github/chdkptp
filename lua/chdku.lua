@@ -818,6 +818,7 @@ function chdku.rc_handler_store(store)
 						tostring(chunk.offset),
 						tostring(chunk.last))
 
+			chunk.imgnum = hdata.imgnum -- for convenience, store image number in chunk
 			local status,err = store_fn(chunk)
 			if status==false then -- allow nil so simple functions don't need to return a value
 				return false,err
@@ -833,10 +834,7 @@ end
 
 function chdku.rc_build_path(hdata,dir,filename,ext)
 	if not filename then
-		filename,err = hdata.remotename()
-		if not filename then
-			return false, err
-		end
+		filename = string.format('IMG_%04d',hdata.imgnum)
 	end
 
 	if ext then
@@ -983,7 +981,7 @@ handler_data:
 	ext -- extension from remotecap dtypes
 	id  -- data type number
 	opts -- options passed to get_remotecap_data
-	remotename() -- returns remote name, requesting only if needed
+	imgnum -- image number
 	store_return() -- a function that can be used to store values for the return value of get_remotecap_data
 rets
 	false on error
@@ -1012,18 +1010,6 @@ function con_methods:get_remotecap_data(opts)
 		handlers[2] = opts.dng_hdr
 	end
 
-	-- function to return remote name if needed
-	local remotename
-	local getremotename = function()
-		if not remotename then
-			local err
-			remotename,err = self:rcgetname()
-			if not remotename then
-				return false, err
-			end
-		end
-		return remotename
-	end
 	-- table to return chunks (or other values) sent by hdata.store_return
 	local rets = {}
 
@@ -1048,8 +1034,8 @@ function con_methods:get_remotecap_data(opts)
 					return false, string.format('unexpected type %d',i)
 				end
 				local hdata = util.extend_table({
-					remotename=getremotename,
 					opts=opts,
+					imgnum=status.rsimgnum,
 					store_return=function(val)
 						if rets[i] then
 							table.insert(rets,val)
@@ -1119,7 +1105,7 @@ function con_methods:wait_status(opts)
 	-- if waiting on remotecap state, make sure it's supported
 	if opts.rsdata then
 		-- temp for development version
-		if self.apiver.MINOR < 107 then
+		if self.apiver.MINOR < 108 then
 			return false, 'camera does not support remotecap'
 		end
 		if type(self.rcisready) ~= 'function' then
@@ -1128,17 +1114,18 @@ function con_methods:wait_status(opts)
 	end
 
 	while true do
+		-- TODO shouldn't poll script status if only waiting on rsdata
 		local status,msg = self:script_status()
 		if not status then
 			return false,msg
 		end
-		-- TODO this should be available in script_status call
 		if opts.rsdata then
 			status.rsdata,msg = self:rcisready()
 			if not status.rsdata then
 				return false,msg
 			end
 			if status.rsdata ~= 0 then
+				status.rsimgnum = msg
 				return status
 			end
 		end
