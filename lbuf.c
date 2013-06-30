@@ -362,6 +362,7 @@ static int lbuf_fwrite(lua_State *L) {
 		return luaL_error(L,"attempt to access closed file");
 	}
 	unsigned offset = luaL_optnumber(L,3,0);
+	// TODO this prevents 0 sized writes
 	if(offset >= buf->len) {
 		return luaL_error(L,"invalid offset");
 	}
