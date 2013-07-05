@@ -234,6 +234,17 @@ shoot        [options]   : - shoot a picture with specified exposure
    -rm        remove file after shooting
   Any exposure paramters not set use camera defaults
 
+remoteshoot (rs) [local] [options]: - shoot and download without saving to SD (requires CHDK 1.2)
+ [local]       local destination directory or filename (w/o extension!)
+ options:
+  -jpg         jpeg, default if no other options (not supported on all cams)
+  -raw         framebuffer dump raw
+  -dng         DNG format raw
+  -dnghdr      save DNG header to a seperate file, ignored with -dng
+  -s=<start>   first line of for subimage raw
+  -c=<count>   number of lines for subimage
+  -cont=<num>  shoot num shots in continuous mode
+
 rec                      : - switch camera to shooting mode
 play                     : - switch camera to playback mode
 

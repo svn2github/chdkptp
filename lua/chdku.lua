@@ -108,6 +108,16 @@ function con_methods:match_ptp_info(match)
 end
 
 --[[
+check if connection API is major and >= minor
+todo might want to allow major >= in some cases
+]]
+function con_methods:is_ver_compatible(major,minor)
+	if self.apiver.MAJOR ~= major or self.apiver.MINOR < minor then
+		return false
+	end
+	return true
+end
+--[[
 return a list of remote directory contents
 dirlist[,err]=con:listdir(path,opts)
 path should be directory, without a trailing slash (except in the case of A/...)
@@ -967,9 +977,13 @@ function chdku.rc_handler_file(dir,filename_base,ext)
 		return true
 	end
 end
+function con_methods:capture_is_api_compatible()
+	return self:is_ver_compatible(2,5)
+end
+--
 --[[
 fetch remote capture data
-rets,errmsg=con:get_remotecap_data(opts)
+rets,errmsg=con:capture_get_data(opts)
 opts:
 	timeout, initwait, poll, pollstart -- passed to wait_status
 	jpg=handler,
@@ -980,14 +994,14 @@ handler:
 handler_data:
 	ext -- extension from remotecap dtypes
 	id  -- data type number
-	opts -- options passed to get_remotecap_data
+	opts -- options passed to capture_get_data
 	imgnum -- image number
-	store_return() -- a function that can be used to store values for the return value of get_remotecap_data
+	store_return() -- a function that can be used to store values for the return value of capture_get_data
 rets
 	false on error
 	true or array of store_return[bitnum][value] values on success
 ]]
-function con_methods:get_remotecap_data(opts)
+function con_methods:capture_get_data(opts)
 	opts=util.extend_table({
 		timeout=20000,
 	},opts)
@@ -995,6 +1009,11 @@ function con_methods:get_remotecap_data(opts)
 
 	local toget = {}
 	local handlers = {}
+	
+	if not self:capture_is_api_compatible() then
+		return false, "camera does not support remote capture"
+	end
+
 
 	-- TODO can probalby combine these
 	if opts.jpg then
@@ -1104,12 +1123,11 @@ function con_methods:wait_status(opts)
 	end
 	-- if waiting on remotecap state, make sure it's supported
 	if opts.rsdata then
-		-- temp for development version
-		if self.apiver.MAJOR ~= 2 or self.apiver.MINOR < 5 then
-			return false, 'camera does not support remotecap'
+		if not self:capture_is_api_compatible() then
+			return false, 'camera does not support remote capture'
 		end
 		if type(self.capture_ready) ~= 'function' then
-			return false, 'client does not support remotecap'
+			return false, 'client does not support remote capture'
 		end
 	end
 
@@ -1326,9 +1344,7 @@ NOTE this only tells if the CHDK protocol supports live view
 the live sub-protocol might not be fully compatible
 ]]
 function con_methods:live_is_api_compatible()
-	if con.apiver.MAJOR == 2 and con.apiver.MINOR >= 3 then
-		return true
-	end
+	return self:is_ver_compatible(2,3)
 end
 
 function con_methods:live_get_frame(what)

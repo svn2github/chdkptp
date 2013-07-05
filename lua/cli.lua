@@ -1399,10 +1399,11 @@ cli:add_commands{
 			return true
 		end,
 	},
-	-- TODO this should be combined with the shoot command
+	-- TODO this should be combined with the shoot command,
+	-- or at least make the syntax / options consistent
 	{
 		names={'remoteshoot','rs'},
-		help='execute remote capture (requires CHDK 1.2)',
+		help='shoot and download without saving to SD (requires CHDK 1.2)',
 		arghelp="[local] [options]",
 		args=argparser.create{
 			jpg=false,
@@ -1423,7 +1424,6 @@ cli:add_commands{
   -s=<start>   first line of for subimage raw
   -c=<count>   number of lines for subimage
   -cont=<num>  shoot num shots in continuous mode
- 
 ]],
 		func=function(self,args)
 			local dst = args[1]
@@ -1535,7 +1535,7 @@ cli:add_commands{
 			local shot = 1
 			repeat 
 				cli.dbgmsg('get data %d\n',shot)
-				status,err = con:get_remotecap_data(rcopts)
+				status,err = con:capture_get_data(rcopts)
 				shot = shot + 1
 			until shot > shot_count or not status
 
