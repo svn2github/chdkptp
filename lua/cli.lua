@@ -1576,7 +1576,7 @@ cli:add_commands{
 				shot = shot + 1
 			until shot > shot_count or not status
 
-			local ustatus, uerr = con:exec('init_remotecap(0)') -- try to uninit
+			local ustatus, uerr = con:exec('init_usb_capture(0)') -- try to uninit
 			-- if uninit failed, combine with previous status
 			if not ustatus then
 				uerr = 'uninit '..tostring(uerr)

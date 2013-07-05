@@ -997,14 +997,17 @@ function rs_init(opts)
 	if not rec then
 		return false,'not in rec mode'
 	end
-	if type(init_remotecap) ~= 'function' then
-		return false, 'remotecap not supported'
+	if type(init_usb_capture) ~= 'function' then
+		return false, 'usb capture not supported'
 	end
-	if bitand(get_remotecap_support(),opts.fformat) ~= opts.fformat then
+	if bitand(get_usb_capture_support(),opts.fformat) ~= opts.fformat then
 		return false, 'unsupported format'
 	end
-	if not init_remotecap(opts.fformat,opts.lstart,opts.lcount) then
+	if not init_usb_capture(opts.fformat,opts.lstart,opts.lcount) then
 		return false, 'init failed'
+	end
+	if opts.cap_timeout then
+		set_usb_capture_timeout(opts.cap_timeout)
 	end
 	if opts.cont then
 		if get_prop(require'propcase'.DRIVE_MODE) ~= 1 then
