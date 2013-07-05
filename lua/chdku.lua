@@ -809,7 +809,7 @@ function chdku.rc_handler_store(store)
 		repeat
 			local err
 			cli.dbgmsg('rc chunk get %d %d\n',hdata.id,n_chunks)
-			chunk,err=lcon:rcgetchunk(hdata.id)	
+			chunk,err=lcon:capture_get_chunk(hdata.id)	
 			if not chunk then
 				return false,err
 			end
@@ -906,7 +906,7 @@ function chdku.rc_handler_raw_dng_file(dir,filename_base,ext,dng_info)
 		end
 
 		cli.dbgmsg('rc chunk get %s %d\n',filename,hdata.id)
-		local raw,err=lcon:rcgetchunk(hdata.id)	
+		local raw,err=lcon:capture_get_chunk(hdata.id)	
 		if not raw then
 			return false, err
 		end
@@ -944,7 +944,7 @@ function chdku.rc_handler_file(dir,filename_base,ext)
 		-- note only jpeg has multiple chunks
 		repeat
 			cli.dbgmsg('rc chunk get %s %d %d\n',filename,hdata.id,n_chunks)
-			chunk,err=lcon:rcgetchunk(hdata.id)	
+			chunk,err=lcon:capture_get_chunk(hdata.id)	
 			if not chunk then
 				fh:close()
 				return false,err
@@ -1105,10 +1105,10 @@ function con_methods:wait_status(opts)
 	-- if waiting on remotecap state, make sure it's supported
 	if opts.rsdata then
 		-- temp for development version
-		if self.apiver.MINOR < 108 then
+		if self.apiver.MAJOR ~= 2 or self.apiver.MINOR < 5 then
 			return false, 'camera does not support remotecap'
 		end
-		if type(self.rcisready) ~= 'function' then
+		if type(self.capture_ready) ~= 'function' then
 			return false, 'client does not support remotecap'
 		end
 	end
@@ -1120,7 +1120,7 @@ function con_methods:wait_status(opts)
 			return false,msg
 		end
 		if opts.rsdata then
-			status.rsdata,msg = self:rcisready()
+			status.rsdata,msg = self:capture_ready()
 			if not status.rsdata then
 				return false,msg
 			end

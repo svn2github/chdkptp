@@ -1893,7 +1893,6 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
  * Preliminary remote capture over USB code. Corresponding CHDK code is in the ptp-remote-capture-test
  * This is under development and should not be included in builds for general distribution
  */
-#if (PTP_CHDK_VERSION_MINOR >= 108)
 /*
  * isready: 0: not ready, lowest 2 bits: available image formats, 0x10000000: error
  */
@@ -1946,7 +1945,6 @@ int ptp_chdk_rcgetchunk(PTPParams* params, int fmt, ptp_chdk_rc_chunk *chunk)
   	chunk->offset = ptp.Param3; //-1 for none
 	return 1;
 }
-#endif
 
 int ptp_chdk_exec_lua(PTPParams* params, char *script, int *script_id)
 {

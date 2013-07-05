@@ -873,7 +873,7 @@ const char* ptp_prop_getvalbyname
 
 // include CHDK ptp protocol definitions from a CHDK source tree
 #include <core/ptp.h>
-#if (PTP_CHDK_VERSION_MAJOR < 2 || (PTP_CHDK_VERSION_MAJOR == 2 && PTP_CHDK_VERSION_MINOR < 3))
+#if (PTP_CHDK_VERSION_MAJOR < 2 || (PTP_CHDK_VERSION_MAJOR == 2 && PTP_CHDK_VERSION_MINOR < 5))
 #error your chdk headers are too old, unset CHDK_SRC_DIR in config.mk
 #endif
 #include <core/live_view.h>

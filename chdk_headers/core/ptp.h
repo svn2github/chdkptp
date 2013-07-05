@@ -1,7 +1,15 @@
 #ifndef __CHDK_PTP_H
 #define __CHDK_PTP_H
+
+// CHDK PTP protocol interface (can also be used in client PTP progams)
+
+// Note: used in modules and platform independent code. 
+// Do not add platform dependent stuff in here (#ifdef/#endif compile options or camera dependent values)
+
 #define PTP_CHDK_VERSION_MAJOR 2  // increase only with backwards incompatible changes (and reset minor)
-#define PTP_CHDK_VERSION_MINOR 4  // increase with extensions of functionality
+#define PTP_CHDK_VERSION_MINOR 5  // increase with extensions of functionality
+                                  // minor > 1000 for development versions
+
 /*
 protocol version history
 0.1 - initial proposal from mweerden, + luar
@@ -12,17 +20,10 @@ protocol version history
 2.2 - live view (work in progress)
 2.3 - live view - released in 1.1
 2.4 - live view protocol 2.1
+2.5 - remote capture
 */
 
 #define PTP_OC_CHDK 0x9999
-
-// PTP constants - only need to be defined in CHDK, not PC side
-#ifndef PTP_RC_OK
-#define PTP_RC_OK 0x2001
-#define PTP_RC_GeneralError 0x2002
-#define PTP_RC_ParameterNotSupported 0x2006
-#define PTP_RC_InvalidParameter 0x201D
-#endif
 
 // N.B.: unused parameters should be set to 0
 enum ptp_chdk_command {
@@ -75,6 +76,21 @@ enum ptp_chdk_command {
                             //  return data is protocol information, frame buffer descriptions and selected display data
                             //  Currently a data phase is always returned. Future versions may define other behavior 
                             //  for values in currently unused parameters.
+  // Direct image capture over USB. - 
+  // Under development, subject to change, documentation incomplete
+  // Use lua get_remotecap_support for available data types, lua init_remotecap for setup
+  PTP_CHDK_RemoteCaptureIsReady, // Check if data is available
+                                 // return param1 is status 
+                                 //  0 = not ready
+                                 //  0x10000000 = remote capture not initialized
+                                 //  otherwise bitmask of PTP_CHDK_CAPTURE_* datatypes
+                                 // return param2 is image number
+  PTP_CHDK_RemoteCaptureGetData  // retrieve data
+                                 // param2 is bit indicating data type to get
+                                 // return param1 is length
+                                 // return param2 more chunks available?
+                                 //  0 = no more chunks of selected format
+                                 // return param3 seek required to pos (-1 = no seek)
 };
 
 // data types as used by ReadScriptMessage
@@ -106,6 +122,15 @@ enum ptp_chdk_script_data_type {
 // bit flags for scripting support
 #define PTP_CHDK_SCRIPT_SUPPORT_LUA  0x1
 
+// bit flags for remote capture
+// used to select and also to indicate available data in PTP_CHDK_RemoteCaptureIsReady
+#define PTP_CHDK_CAPTURE_JPG    0x1
+#define PTP_CHDK_CAPTURE_RAW    0x2
+#define PTP_CHDK_CAPTURE_DNGHDR 0x4
+
+// status from PTP_CHDK_RemoteCaptureIsReady if capture not enabled
+#define PTP_CHDK_CAPTURE_NOTSET 0x10000000
+
 // message types
 enum ptp_chdk_script_msg_type {
     PTP_CHDK_S_MSGTYPE_NONE = 0, // no messages waiting
@@ -129,4 +154,5 @@ enum ptp_chdk_script_msg_status {
     PTP_CHDK_S_MSGSTATUS_QFULL,  // queue is full
     PTP_CHDK_S_MSGSTATUS_BADID,  // specified ID is not running
 };
+
 #endif // __CHDK_PTP_H

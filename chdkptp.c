@@ -996,16 +996,15 @@ static int chdk_download(lua_State *L) {
 	return 1;
 }
 
-#if (PTP_CHDK_VERSION_MINOR >= 108)
 /*
-isready,imgnum|errmsg=con:rcisready()
+isready,imgnum|errmsg=con:capture_ready()
 isready: 
 	false: local error in errmsg
 	0: not ready, lowest 3 bits: available image formats, 0x10000000: error
 imgnum:
 	image number, or 0 on remote error
 */
-static int chdk_rcisready(lua_State *L) {
+static int chdk_capture_ready(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 	if (!ptp_usb->connected) {
 		lua_pushboolean(L,0);
@@ -1025,7 +1024,7 @@ static int chdk_rcisready(lua_State *L) {
 }
 
 /*
-chunk[,errmsg]=con:rcgetchunk(fmt)
+chunk[,errmsg]=con:capture_get_chunk(fmt)
 fmt: image format (1: jpeg, 2: raw, 4:dng header)
 chunk:
 false or
@@ -1036,7 +1035,7 @@ false or
 	data=lbuf
 }
 */
-static int chdk_rcgetchunk(lua_State *L) {
+static int chdk_capture_get_chunk(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 	if (!ptp_usb->connected) {
 		lua_pushboolean(L,0);
@@ -1065,7 +1064,6 @@ static int chdk_rcgetchunk(lua_State *L) {
 
 	return 1;
 }
-#endif
 
 /*
 r,msg=con:getmem(address,count[,dest])
@@ -1569,11 +1567,8 @@ static const luaL_Reg chdkconnection[] = {
   {"get_ptp_devinfo", chdk_get_ptp_devinfo},
   {"get_usb_devinfo", chdk_get_usb_devinfo}, // does not need to be connected, returns bus and dev at minimum
   {"get_live_data",chdk_get_live_data},
-#if (PTP_CHDK_VERSION_MINOR >= 108)
-  {"rcisready", chdk_rcisready},
-//  {"rcgetname", chdk_rcgetname},
-  {"rcgetchunk", chdk_rcgetchunk},
-#endif 
+  {"capture_ready", chdk_capture_ready},
+  {"capture_get_chunk", chdk_capture_get_chunk},
   {"reset_counters",chdk_reset_counters},
   {"get_counters",chdk_get_counters},
   {NULL, NULL}

@@ -1399,48 +1399,10 @@ cli:add_commands{
 			return true
 		end,
 	},
-	{
-		names={'rec'},
-		help='switch camera to shooting mode',
-		func=function(self,args) 
-			local status,rstatus,rerr = con:execwait([[
-if not get_mode() then
-	switch_mode_usb(1)
-	return true
-end
-return false,'already in rec'
-]])
-			if not status then
-				return false,rstatus
-			end
-			return rstatus,rerr
-		end,
-	},
-	{
-		names={'play'},
-		help='switch camera to playback mode',
-		func=function(self,args) 
-			local status,rstatus,rerr = con:execwait([[
-if get_mode() then
-	switch_mode_usb(0)
-	return true
-end
-return false,'already in play'
-]])
-			if not status then
-				return false,rstatus
-			end
-			return rstatus,rerr
-		end,
-	},
-}
-
--- TEMP only add remoteshoot commands if client build supports
-if type(chdk_connection.rcgetchunk) == 'function' then
-cli:add_commands{
+	-- TODO this should be combined with the shoot command
 	{
 		names={'remoteshoot','rs'},
-		help='execute remote shoot (under development, requires special CHDK build!)',
+		help='execute remote capture (requires CHDK 1.2)',
 		arghelp="[local] [options]",
 		args=argparser.create{
 			jpg=false,
@@ -1461,6 +1423,7 @@ cli:add_commands{
   -s=<start>   first line of for subimage raw
   -c=<count>   number of lines for subimage
   -cont=<num>  shoot num shots in continuous mode
+ 
 ]],
 		func=function(self,args)
 			local dst = args[1]
@@ -1590,8 +1553,42 @@ cli:add_commands{
 			return status, err
 		end,
 	},
-}
+	{
+		names={'rec'},
+		help='switch camera to shooting mode',
+		func=function(self,args) 
+			local status,rstatus,rerr = con:execwait([[
+if not get_mode() then
+	switch_mode_usb(1)
+	return true
 end
+return false,'already in rec'
+]])
+			if not status then
+				return false,rstatus
+			end
+			return rstatus,rerr
+		end,
+	},
+	{
+		names={'play'},
+		help='switch camera to playback mode',
+		func=function(self,args) 
+			local status,rstatus,rerr = con:execwait([[
+if get_mode() then
+	switch_mode_usb(0)
+	return true
+end
+return false,'already in play'
+]])
+			if not status then
+				return false,rstatus
+			end
+			return rstatus,rerr
+		end,
+	},
+}
+
 prefs._add('cli_time','boolean','show cli execution times')
 prefs._add('cli_xferstats','boolean','show cli data transfer stats')
 prefs._add('cli_verbose','number','control verbosity of cli',1)
