@@ -67,6 +67,15 @@ In a msys shell, go to the lua directory and type
 make mingw
 make local
 
+NOTE:
+it's very important that Lua be linked to exactly the same C runtime library
+as chdkptp itself. The lbuf file routines expect to be able to fread and fwrite on
+a FILE * opened by lua io.open()
+
+This condition probably won't be met if you use a pre-compiled Lua dll on windows.
+It's probably OK with a shared lua in typical linux environments. 
+If in doubt, build your own Lua with the same compiler you build chdkptp with.
+
 ==Installing LibUSB development package==
 TODO
 describe filter driver installation
@@ -99,6 +108,9 @@ See config-sample-*.mk for examples
 
 =Building=
 make
+
+=Testing your build=
+chdkptp -e"exec require'tests':runall()"
 
 =Running=
 See USAGE.TXT
