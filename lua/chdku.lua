@@ -1015,7 +1015,7 @@ function con_methods:capture_get_data(opts)
 	end
 
 
-	-- TODO can probalby combine these
+	-- TODO can probably combine these
 	if opts.jpg then
 		toget[0] = true
 		handlers[0] = opts.jpg
@@ -1092,13 +1092,23 @@ opts:
 	-- if not set, status of that item is ignored
 	msg=bool
 	run=bool
-	rsdata=bool -- if true, return when remote shoot data available, data in status.rsdata
+	rsdata=bool -- if true, return when remote capture data available, data in status.rsdata
 	timeout=<number> -- timeout in ms
 	poll=<number> -- polling interval in ms
 	pollstart=<number> -- if not false, start polling at pollstart, double interval each iteration until poll is reached
 	initwait=<number> -- wait N ms before first poll. If this is long enough for call to finish, saves round trip
 }
-status: table with msg and run set to last status, and timeout set if timeout expired, or false,errormessage on error
+
+status:
+false,errormessage on error, otherwise table:
+{
+	msg:bool -- message status
+	run:bool -- script status
+	rsdata:number -- available remote capture data format
+	rsimgnum:number -- remote capture image number
+	timeout:bool -- true if timed out
+}
+rs values are only set if rsdata is requested in opts
 TODO for gui, this should yield in lua, resume from timer or something
 ]]
 function con_methods:wait_status(opts)

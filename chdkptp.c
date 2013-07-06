@@ -1000,9 +1000,11 @@ static int chdk_download(lua_State *L) {
 isready,imgnum|errmsg=con:capture_ready()
 isready: 
 	false: local error in errmsg
-	0: not ready, lowest 3 bits: available image formats, 0x10000000: error
+	0: not ready
+	0x10000000: remotecap not initialized, or timed out
+	otherwise, lowest 3 bits: available data types.
 imgnum:
-	image number, or 0 on remote error
+	image number if data is available, otherwise 0
 */
 static int chdk_capture_ready(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
@@ -1025,7 +1027,8 @@ static int chdk_capture_ready(lua_State *L) {
 
 /*
 chunk[,errmsg]=con:capture_get_chunk(fmt)
-fmt: image format (1: jpeg, 2: raw, 4:dng header)
+fmt: data type (1: jpeg, 2: raw, 4:dng header)
+must be a single type reported as available by con:capture_ready()
 chunk:
 false or
 {
