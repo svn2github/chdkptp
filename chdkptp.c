@@ -1117,7 +1117,7 @@ static int chdk_setmem(lua_State *L) {
 }
 
 /*
-ret=con:call_function(ptr,arg1,arg2...arg10)
+ret=con:call_function(ptr,arg1,arg2...argN)
 call a pointer directly from ptp code.
 useful if lua is not available
 args must be numbers, or pointers set up on the cam by other means

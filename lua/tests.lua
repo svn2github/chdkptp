@@ -283,7 +283,6 @@ t.lbuff = function()
 	f=io.open('lbuftest.dat','rb')
 	l2:fread(f,9,2)
 	f:close()
-	print(l2:string())
 	assert(l2:string()=='world worwo')
 end
 
