@@ -1539,6 +1539,19 @@ cli:add_commands{
 				shot = shot + 1
 			until shot > shot_count or not status
 
+			local t0=ustime.new()
+			-- wait for shot script to end or timeout
+			local wstatus,werr=con:wait_status{
+				run=false,
+				timeout=30000,
+			}
+			if not wstatus then
+				warnf('error waiting for shot script %s\n',tostring(werr))
+			elseif wstatus.timeout then
+				warnf('timed out waiting for shot script\n')
+			end
+			printf("wait time %.4f\n",ustime.diff(t0)/1000000)
+
 			local ustatus, uerr = con:exec('init_usb_capture(0)') -- try to uninit
 			-- if uninit failed, combine with previous status
 			if not ustatus then
