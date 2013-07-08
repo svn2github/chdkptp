@@ -1020,11 +1020,7 @@ function rs_init(opts)
 	return true
 end
 function rs_shoot_single()
-	press('shoot_half')
-	repeat
-		sleep(10)
-	until get_shooting()
-	click('shoot_full')
+	shoot()
 end
 function rs_shoot_cont(opts)
 	local last = get_exp_count() + opts.cont
