@@ -328,6 +328,68 @@ function cli:run()
 	end
 end
 
+--[[
+process options common to shoot and remoteshoot
+]]
+local function get_shoot_common_opts(args)
+	if not util.in_table({'s','a','96'},args.u) then
+		return false,"invalid units"
+	end
+	local opts={}
+	if args.u == 's' then
+		if args.av then
+			opts.av=exp.f_to_av96(args.av)
+		end
+		if args.sv then
+			opts.sv=exp.iso_to_sv96(args.sv)
+		end
+		if args.tv then
+			local n,d = string.match(args.tv,'^([%d]+)/([%d.]+)$')
+			if n then
+				n = tonumber(n)
+				d = tonumber(d)
+				if not n or not d or n == 0 or d == 0 then
+					return false, 'invalid tv fraction'
+				end
+				opts.tv = exp.shutter_to_tv96(n/d)
+			else
+				n = tonumber(args.tv)
+				if not n then
+					return false, 'invalid tv value'
+				end
+				opts.tv = exp.shutter_to_tv96(n)
+			end
+		end
+	elseif args.u == 'a' then
+		if args.av then
+			opts.av = util.round(args.av*96)
+		end
+		if args.sv then
+			opts.sv = util.round(args.sv*96)
+		end
+		if args.tv then
+			opts.tv = util.round(args.tv*96)
+		end
+	else
+		if args.av then
+			opts.av=tonumber(args.av)
+		end
+		if args.sv then
+			opts.sv=tonumber(args.sv)
+		end
+		if args.tv then
+			opts.tv=tonumber(args.tv)
+		end
+	end
+
+	-- hack for CHDK override bug that ignores APEX 0
+	-- TODO only required for CHDK 1.1 and earlier
+	if opts.tv == 0 then
+		opts.tv = 1
+	end
+	return opts
+end
+
 cli:add_commands{
 	{
 		names={'help','h'},
@@ -1251,60 +1313,9 @@ cli:add_commands{
   Any exposure paramters not set use camera defaults
 ]],
 		func=function(self,args) 
-			if not util.in_table({'s','a','96'},args.u) then
-				return false,"invalid units"
-			end
-			local opts={}
-			if args.u == 's' then
-				if args.av then
-					opts.av=exp.f_to_av96(args.av)
-				end
-				if args.sv then
-					opts.sv=exp.iso_to_sv96(args.sv)
-				end
-				if args.tv then
-					local n,d = string.match(args.tv,'^([%d]+)/([%d.]+)$')
-					if n then
-						n = tonumber(n)
-						d = tonumber(d)
-						if not n or not d or n == 0 or d == 0 then
-							return false, 'invalid tv fraction'
-						end
-						opts.tv = exp.shutter_to_tv96(n/d)
-					else
-						n = tonumber(args.tv)
-						if not n then
-							return false, 'invalid tv value'
-						end
-						opts.tv = exp.shutter_to_tv96(n)
-					end
-				end
-			elseif args.u == 'a' then
-				if args.av then
-					opts.av = util.round(args.av*96)
-				end
-				if args.sv then
-					opts.sv = util.round(args.sv*96)
-				end
-				if args.tv then
-					opts.tv = util.round(args.tv*96)
-				end
-			else
-				if args.av then
-					opts.av=tonumber(args.av)
-				end
-				if args.sv then
-					opts.sv=tonumber(args.sv)
-				end
-				if args.tv then
-					opts.tv=tonumber(args.tv)
-				end
-			end
-
-			-- hack for CHDK override bug that ignores APEX 0
-			-- TODO only required for CHDK 1.1 and earlier
-			if opts.tv == 0 then
-				opts.tv = 1
+			local opts,err = get_shoot_common_opts(args)
+			if not opts then
+				return false,err
 			end
 			-- allow -dng
 			if args.dng == true then
@@ -1406,6 +1417,10 @@ cli:add_commands{
 		help='shoot and download without saving to SD (requires CHDK 1.2)',
 		arghelp="[local] [options]",
 		args=argparser.create{
+			u='s',
+			tv=false,
+			sv=false,
+			av=false,
 			jpg=false,
 			raw=false,
 			dng=false,
@@ -1417,6 +1432,13 @@ cli:add_commands{
 		help_detail=[[
  [local]       local destination directory or filename (w/o extension!)
  options:
+   -u=<s|a|96>
+      s   standard units (default)
+      a   APEX
+      96  APEX*96
+   -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
+   -sv=<v>    ISO value. In standard units, Canon "real" ISO
+   -av=<v>    Aperature value. In standard units, f number
   -jpg         jpeg, default if no other options (not supported on all cams)
   -raw         framebuffer dump raw
   -dng         DNG format raw
@@ -1446,11 +1468,17 @@ cli:add_commands{
 					dst = nil
 				end
 			end
-			local opts = {
+
+			local opts,err = get_shoot_common_opts(args)
+			if not opts then
+				return false,err
+			end
+
+			util.extend_table(opts,{
 				fformat=0,
 				lstart=0,
 				lcount=0,
-			}
+			})
 			-- fformat required for init
 			if args.jpg then
 				opts.fformat = opts.fformat + 1
@@ -1488,7 +1516,7 @@ cli:add_commands{
 			end
 			local opts_s = serialize(opts)
 			cli.dbgmsg('rs_init\n')
-			local status,rstatus,rerr = con:execwait('return rs_init('..opts_s..')',{libs={'rs_shoot'}})
+			local status,rstatus,rerr = con:execwait('return rs_init('..opts_s..')',{libs={'rs_shoot_init'}})
 			if not status then
 				return false,rstatus
 			end

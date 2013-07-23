@@ -927,14 +927,9 @@ end
 support for cli shoot command
 ]]
 {
-	name='rlib_shoot',
+	name='rlib_shoot_common',
 	code=[[
-function rlib_shoot(opts)
-	local rec,vid = get_mode()
-	if not rec then
-		return false,'not in rec mode'
-	end
-
+function rlib_shoot_init_exp(opts)
 	if opts.tv then
 		set_tv96_direct(opts.tv)
 	end
@@ -944,6 +939,21 @@ function rlib_shoot(opts)
 	if opts.av then
 		set_av96_direct(opts.av)
 	end
+end
+]],
+},
+{
+	name='rlib_shoot',
+	depend={'rlib_shoot_common'}, -- note require serialize_msgs if info
+	code=[[
+function rlib_shoot(opts)
+	local rec,vid = get_mode()
+	if not rec then
+		return false,'not in rec mode'
+	end
+
+	rlib_shoot_init_exp(opts)
+
 	local save_raw
 	if opts.raw then
 		save_raw=get_raw()
@@ -990,7 +1000,7 @@ support for cli remote capture shoot command
 starts shoot, doesn't wait for it to finish
 ]]
 {
-	name='rs_shoot',
+	name='rs_shoot_init',
 	code=[[
 function rs_init(opts)
 	local rec,vid = get_mode()
@@ -1019,6 +1029,12 @@ function rs_init(opts)
 	end
 	return true
 end
+]],
+},
+{
+	name='rs_shoot',
+	depend={'rlib_shoot_common'},
+	code=[[
 function rs_shoot_single()
 	shoot()
 end
@@ -1034,13 +1050,14 @@ function rs_shoot_cont(opts)
 	until get_exp_count() >= last
 end
 function rs_shoot(opts)
+	rlib_shoot_init_exp(opts)
 	if opts.cont then
 		rs_shoot_cont(opts)
 	else
 		rs_shoot_single()
 	end
 end
-	]],
+]],
 },
 
 --[[
