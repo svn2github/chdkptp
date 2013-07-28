@@ -32,9 +32,11 @@ If invoked with no options, the GUI will be started if available.  Otherwise,
 the CLI will be started.
 
 If started with options and neither -g nor -i is given, chdkptp will run in
-batch mode, exiting after performing the actions specified by in the options
+batch mode, exiting after performing the actions specified by the options.
 
-When using -e, -c or -r, you must quote any arguments that include spaces
+When using -e, -c or -r, the values must immediately follow the option, without
+any space, e.g. -rmyfile or -r=myfile, not -r myfile. If any arguments that 
+include spaces, they must be quoted.
 
 ==Startup files==
 Startup files can be used to automatically execute CLI commands at startup.
