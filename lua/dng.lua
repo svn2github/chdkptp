@@ -69,6 +69,7 @@ m.tags_map = {
 	ExposureProgram				=0x8822,
 	ISOSpeedRatings				=0x8827,
 	ExifVersion					=0x9000,
+	DateTimeOriginal			=0x9003,
 	ShutterSpeedValue			=0x9201,
 	ApertureValue				=0x9202,
 	ExposureBiasValue			=0x9204,
