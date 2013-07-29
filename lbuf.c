@@ -104,6 +104,36 @@ static int lbuf_string(lua_State *L) {
 }
 
 /*
+buf2=buf:sub([i[,j])
+return part or all of the buffer as a new lbuf. i and j behave like string.sub
+*/
+static int lbuf_sub(lua_State *L) {
+	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
+	int start=get_index_arg(L,buf,2,1);
+	int end=get_index_arg(L,buf,3,buf->len);
+	if(end > buf->len) {
+		end = buf->len;
+	}
+	if(!buf->len || end < start) {
+		lbuf_create(L,NULL,0,0);
+		return 1;
+	}
+	// convert 1 based index to offset, note lua string.sub accepts 0
+	if(start > 0) {
+		start--;
+	}
+	char *data = malloc(end-start);
+	if(!data) {
+		return luaL_error(L,"malloc failed");
+	}
+	memcpy(data, buf->bytes+start,end-start);
+	if(!lbuf_create(L,data,end-start,LBUF_FL_FREE)) {
+		return luaL_error(L,"lbuf_create failed");
+	}
+	return 1;
+}
+
+/*
 byte,...=buf:byte([i[,j])
 return bytes of buffer as numbers. i and j behave like string.byte
 for semantics of equivalent to get_i32 etc, use get_*8
@@ -472,6 +502,7 @@ static int lbuf_fill(lua_State *L) {
 static const luaL_Reg lbuf_methods[] = {
   {"len", lbuf_len},
   {"string", lbuf_string},
+  {"sub", lbuf_sub},
   {"byte", lbuf_byte},
   {"get_i32", lbuf_get_i32},
   {"get_u32", lbuf_get_u32},
@@ -494,7 +525,7 @@ static const luaL_Reg lbuf_methods[] = {
 
 /*
 lbuf=lbuf.new(<string|size>)
-TODO accept lbuf to clone ?
+use :sub to clone
 */
 static int lbuf_new(lua_State *L) {
 	size_t len;
