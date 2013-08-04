@@ -860,22 +860,28 @@ function chdku.rc_build_path(hdata,dir,filename,ext)
 end
 
 function chdku.rc_process_dng(dng_info,raw)
+	local dnglib=require'dng'
+	local hdr,err=dnglib.bind_header(dng_info.hdr)
+	if not hdr then
+		return false, err
+	end
+	-- TODO makes assumptions about header layout
+	local ifd=hdr:get_ifd{0,0} -- assume main image is first subifd of first ifd
+	if not ifd then 
+		return false, 'ifd 0.0 not found'
+	end
+
+	local bpp = ifd.byname.BitsPerSample:getel()
+
 	raw.data:reverse_bytes()
+	local width = ifd.byname.ImageWidth:getel()
+	
 	-- values are assumed to be valid
 	-- sub-image, pad
 	if dng_info.lstart ~= 0 or dng_info.lcount ~= 0 then
-		local dnglib=require'dng'
-		local hdr=dnglib.bind_header(dng_info.hdr)
-		-- TODO makes assumptions about header layout
-		local ifd=hdr:get_ifd{0,0} -- assume main image is first subifd of first ifd
-		if not ifd then 
-			return false, 'ifd 0.0 not found'
-		end
-
 		-- TODO assume a single strip with full data
 		local fullraw = lbuf.new(ifd.byname.StripByteCounts:getel())
-		local bpp = ifd.byname.BitsPerSample:getel()
-		local offset = (ifd.byname.ImageWidth:getel() * dng_info.lstart * bpp)/8;
+		local offset = (width * dng_info.lstart * bpp)/8;
 		--local blacklevel = ifd.byname.BlackLevel:getel()
 		-- filling with blacklevel would be nicer but max doesn't care about byte order
 		fullraw:fill(string.char(0xff),0,offset) -- fill up to data
@@ -884,6 +890,42 @@ function chdku.rc_process_dng(dng_info,raw)
 		fullraw:fill(string.char(0xff),offset+raw.data:len()) -- fill remainder
 		-- replace original data
 		raw.data=fullraw
+	end
+	dng_info.thumb = lbuf.new(128*96*3) -- TODO should get from exif
+
+	-- TODO temp VERY primitive thumb for testing
+	-- this should be a lib function
+	local get_pixel = rawimg['get_pixel_'..bpp..'b'];
+	if type(get_pixel) == 'function' then
+		cli.dbgmsg('creating thumb')
+		local rowbytes = (width * bpp)/8;
+		local height = ifd.byname.ImageLength:getel()
+		local w = width/128;
+		local h = height/96;
+		local min = 2^(bpp)
+		local max = 0
+		local total = 0
+		local count = 0
+		local off = 0
+		local pixel_scale = 2^(bpp - 8)
+
+		for y=0,height-1,h do
+			for x=0,width-1,w do
+				local v = get_pixel(raw.data,rowbytes,x,y)/pixel_scale
+				dng_info.thumb:set_u8(off,v,v,v)
+				if v > max then
+					max = v
+				end
+				if v < min then
+					min = v
+				end
+				total = total + v
+				count = count + 1
+				off = off + 3
+			end
+			cli.dbgmsg('.')
+		end
+		cli.dbgmsg('\nw=%d h=%d c=%d min %d max %d avg %d\n',w,h,count,min,max,total/count)
 	end
 	return true
 end
@@ -925,11 +967,14 @@ function chdku.rc_handler_raw_dng_file(dir,filename_base,ext,dng_info)
 						tostring(raw.offset),
 						tostring(raw.last))
 		dng_info.hdr:fwrite(fh)
-		fh:write(string.rep('\0',128*96*3)) -- TODO fake thumb
-		chdku.rc_process_dng(dng_info,raw)
-		raw.data:fwrite(fh)
+		--fh:write(string.rep('\0',128*96*3)) -- TODO fake thumb
+		local status, err = chdku.rc_process_dng(dng_info,raw)
+		if status then
+			dng_info.thumb:fwrite(fh)
+			raw.data:fwrite(fh)
+		end
 		fh:close()
-		return true
+		return status,err
 	end
 end
 --[[

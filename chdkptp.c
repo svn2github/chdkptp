@@ -81,6 +81,7 @@
 #include "lfs/lfs.h"
 #include "lbuf.h"
 #include "liveimg.h"
+#include "rawimg.h"
 
 /* some defines comes here */
 
@@ -1795,6 +1796,7 @@ int main(int argc, char ** argv)
 	luaL_openlibs(L);
 	luaopen_lfs(L);
 	lbuf_open(L);
+	rawimg_open(L);	
 	chdkptp_registerlibs(L);
 	exec_lua_string(L,"require('main')");
 	uninit_gui_libs(L);

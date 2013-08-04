@@ -323,6 +323,90 @@ function dng_methods.print_info(self)
 	end
 end
 
+function dng_methods.dump_thumb(self,dst)
+	local ifd=self:get_ifd{0} -- assume main image is first subifd of first ifd
+	local bpp = ifd.byname.BitsPerSample:getel() -- note has values for r,g,b
+	if bpp ~= 8 then
+		return false, 'only 8 bpp supported'
+	end
+
+	local width = ifd.byname.ImageWidth:getel()
+	local rowbytes = (width * bpp)/8;
+	local height = ifd.byname.ImageLength:getel()
+
+	local offset = ifd.byname.StripOffsets:getel() -- TODO in theory could be more than one
+
+	local data = self._lb:sub(offset+1,offset+ifd.byname.StripByteCounts:getel())
+
+	local fh,err = io.open(dst,'wb')
+	if not fh then
+		return false, 'open failed '..tostring(err)
+	end
+	data:fwrite(fh)
+	fh:close()
+	return true
+end
+
+--[[
+inefficient function to dump image data to 8bbp (truncated) grayscale
+]]
+function dng_methods.dump_image(self,dst,order)
+	-- TODO makes assumptions about header layout
+	local ifd=self:get_ifd{0,0} -- assume main image is first subifd of first ifd
+	if not ifd then 
+		return false, 'ifd 0.0 not found'
+	end
+	if not order then
+		order = 'b'
+	end
+	local bpp = ifd.byname.BitsPerSample:getel()
+	local get_pixel = rawimg['get_pixel_'..bpp..order]
+	if type(get_pixel) ~= 'function'  then
+		return false, 'unsupported format '..tostring(bpp)..' ' .. tostring(order)
+	end
+
+	local width = ifd.byname.ImageWidth:getel()
+	local rowbytes = (width * bpp)/8;
+	local height = ifd.byname.ImageLength:getel()
+
+	local offset = ifd.byname.StripOffsets:getel() -- TODO in theory could be more than one
+
+	local data = self._lb:sub(offset+1,offset+ifd.byname.StripByteCounts:getel())
+	-- for testing little endian functions
+	if order == 'l' then
+		data:reverse_bytes()
+	end
+	local out = lbuf.new(width*height)
+
+	local min = 2^bpp
+	local max = 0
+	local count = 0
+	local pixel_scale = 2^(bpp - 8)
+
+	for y=0,height-1 do
+		for x=0,width-1 do
+			local v = get_pixel(data,rowbytes,x,y)
+			out:set_u8(y*width + x,v/pixel_scale)
+			if v > max then
+				max = v
+			end
+			if v < min then
+				min = v
+			end
+			count = count + 1
+		end
+	end
+	printf('w=%d h=%d c=%d min %d max %d\n',width,height,count,min,max)
+
+	local fh,err = io.open(dst,'wb')
+	if not fh then
+		return false, 'open failed '..tostring(err)
+	end
+	out:fwrite(fh)
+	fh:close()
+	return true
+end
+
 --[[
 return ifd specified by "path", or nil
 path: table of 0 based ifd numbers

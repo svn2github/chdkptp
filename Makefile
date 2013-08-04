@@ -88,7 +88,7 @@ EXES=chdkptp$(EXE)
 
 all: $(EXES)
 
-SRCS=properties.c ptp.c chdkptp.c lbuf.c liveimg.c
+SRCS=properties.c ptp.c chdkptp.c lbuf.c liveimg.c rawimg.c
 OBJS=$(SRCS:.c=.o)
 
 chdkptp$(EXE): $(OBJS)
