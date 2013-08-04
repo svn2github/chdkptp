@@ -24,6 +24,56 @@ based on code from chdk tools/rawconvert.c and core/raw.c
 #include <lualib.h>
 #include <lauxlib.h>
 #include "lbuf.h"
+#include "rawimg.h"
+
+unsigned raw_get_pixel_10l(const uint8_t *addr, unsigned x);
+unsigned raw_get_pixel_10b(const uint8_t *addr, unsigned x);
+uint8_t* raw_get_block_addr_10l(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y);
+uint8_t* raw_get_block_addr_10b(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y);
+
+unsigned raw_get_pixel_12l(const uint8_t *addr, unsigned x);
+unsigned raw_get_pixel_12b(const uint8_t *addr, unsigned x);
+uint8_t* raw_get_block_addr_12l(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y);
+uint8_t* raw_get_block_addr_12b(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y);
+
+unsigned raw_get_pixel_14l(const uint8_t *addr, unsigned x);
+unsigned raw_get_pixel_14b(const uint8_t *addr, unsigned x);
+uint8_t* raw_get_block_addr_14l(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y);
+uint8_t* raw_get_block_addr_14b(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y);
+
+#define RAW_ENDIAN_l 0
+#define RAW_ENDIAN_b 1
+
+typedef unsigned (*get_pixel_func_t)(const uint8_t *p, unsigned x);
+typedef unsigned (*set_pixel_func_t)(uint8_t *p, unsigned x, unsigned value);
+typedef uint8_t * (*get_block_addr_func_t)(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y);
+
+typedef struct {
+	int bpp;
+	int endian;
+	get_pixel_func_t get_pixel;
+	get_block_addr_func_t get_block_addr;
+} raw_format_t;
+
+#define FMT_DEF_SINGLE(BPP,ENDIAN) \
+{ \
+	BPP, \
+	RAW_ENDIAN_##ENDIAN, \
+	raw_get_pixel_##BPP##ENDIAN, \
+	raw_get_block_addr_##BPP##ENDIAN, \
+}
+
+#define FMT_DEF(BPP) \
+	FMT_DEF_SINGLE(BPP,l), \
+	FMT_DEF_SINGLE(BPP,b)
+
+raw_format_t raw_formats[] = {
+	FMT_DEF(10),
+	FMT_DEF(12),
+	FMT_DEF(14),
+};
+
+static const int raw_num_formats = sizeof(raw_formats)/sizeof(raw_format_t);
 
 unsigned raw_get_pixel_10l(const uint8_t *addr, unsigned x)
 {
@@ -195,147 +245,86 @@ set 14 le
 /*
 get the starting address for the block of bytes that includes x,y rounded to the size of the smallest repeating pattern
 */
-static const uint8_t* get_block_addr_10l(const char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
+uint8_t* raw_get_block_addr_10l(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
 	unsigned offset = y * row_bytes + (x/8) * 10;
 	if(offset + 10 > len) {
 		return NULL;
 	}
-	return (const uint8_t *)buf + offset;
+	return (uint8_t *)buf + offset;
 }
 
-static const uint8_t* get_block_addr_10b(const char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
+uint8_t* raw_get_block_addr_10b(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
 	unsigned offset = y * row_bytes + (x/4) * 5;
 	if(offset + 5 > len) {
 		return NULL;
 	}
-	return (const uint8_t *)buf + offset;
+	return (uint8_t *)buf + offset;
 }
 
-static const uint8_t* get_block_addr_12l(const char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
+uint8_t* raw_get_block_addr_12l(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
 	unsigned offset = y * row_bytes + (x/4) * 6;
 	if(offset + 6 > len) {
 		return NULL;
 	}
-	return (const uint8_t *)buf + offset;
+	return (uint8_t *)buf + offset;
 }
 
-static const uint8_t* get_block_addr_12b(const char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
+uint8_t* raw_get_block_addr_12b(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
 	unsigned offset = y * row_bytes + (x/2) * 3;
 	if(offset + 3 > len) {
 		return NULL;
 	}
-	return (const uint8_t *)buf + offset;
+	return (uint8_t *)buf + offset;
 }
 
-static const uint8_t* get_block_addr_14l(const char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
+uint8_t* raw_get_block_addr_14l(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
 	unsigned offset = y * row_bytes + (x/8) * 14;
 	if(offset + 14 > len) {
 		return NULL;
 	}
-	return (const uint8_t *)buf + offset;
+	return (uint8_t *)buf + offset;
 }
 
-static const uint8_t* get_block_addr_14b(const char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
+uint8_t* raw_get_block_addr_14b(char *buf, unsigned len, unsigned row_bytes, unsigned x, unsigned y) {
 	unsigned offset = y * row_bytes + (x/4) * 7;
 	if(offset + 7 > len) {
 		return NULL;
 	}
-	return (const uint8_t *)buf + offset;
+	return (uint8_t *)buf + offset;
+}
+
+static int raw_get_pixel_lua(lua_State *L) {
+	raw_format_t* fmt = (raw_format_t *)lua_touserdata(L, lua_upvalueindex(1));
+	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
+	unsigned row_bytes = luaL_checknumber(L,2);
+	unsigned x = luaL_checknumber(L,3);
+	unsigned y = luaL_checknumber(L,4);
+	const uint8_t *addr = fmt->get_block_addr(buf->bytes,buf->len,row_bytes,x,y);
+	if(!addr) {
+		return luaL_error(L,"coordinates out of range");
+	}
+	lua_pushnumber(L,fmt->get_pixel(addr,x));
+	return 1;
 }
 
 /*
-TODO assumes image data is in it's own standalone lbuf, not including any header etc
-pixel=get_pixel_*(lbuf, rowbytes, x, y)
-*/
-static int l_get_pixel_10l(lua_State *L) {
-	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
-	unsigned row_bytes = luaL_checknumber(L,2);
-	unsigned x = luaL_checknumber(L,3);
-	unsigned y = luaL_checknumber(L,4);
-	const uint8_t *addr = get_block_addr_10l(buf->bytes,buf->len,row_bytes,x,y);
-	if(!addr) {
-		return luaL_error(L,"coordinates out of range");
-	}
-	lua_pushnumber(L,raw_get_pixel_10l(addr,x));
-	return 1;
-}
-
-static int l_get_pixel_10b(lua_State *L) {
-	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
-	unsigned row_bytes = luaL_checknumber(L,2);
-	unsigned x = luaL_checknumber(L,3);
-	unsigned y = luaL_checknumber(L,4);
-	const uint8_t *addr = get_block_addr_10b(buf->bytes,buf->len,row_bytes,x,y);
-	if(!addr) {
-		return luaL_error(L,"coordinates out of range");
-	}
-	lua_pushnumber(L,raw_get_pixel_10b(addr,x));
-	return 1;
-}
-
-static int l_get_pixel_12l(lua_State *L) {
-	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
-	unsigned row_bytes = luaL_checknumber(L,2);
-	unsigned x = luaL_checknumber(L,3);
-	unsigned y = luaL_checknumber(L,4);
-	const uint8_t *addr = get_block_addr_12l(buf->bytes,buf->len,row_bytes,x,y);
-	if(!addr) {
-		return luaL_error(L,"coordinates out of range");
-	}
-	lua_pushnumber(L,raw_get_pixel_12l(addr,x));
-	return 1;
-}
-
-static int l_get_pixel_12b(lua_State *L) {
-	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
-	unsigned row_bytes = luaL_checknumber(L,2);
-	unsigned x = luaL_checknumber(L,3);
-	unsigned y = luaL_checknumber(L,4);
-	const uint8_t *addr = get_block_addr_12b(buf->bytes,buf->len,row_bytes,x,y);
-	if(!addr) {
-		return luaL_error(L,"coordinates out of range");
-	}
-	lua_pushnumber(L,raw_get_pixel_12b(addr,x));
-	return 1;
-}
-
-static int l_get_pixel_14l(lua_State *L) {
-	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
-	unsigned row_bytes = luaL_checknumber(L,2);
-	unsigned x = luaL_checknumber(L,3);
-	unsigned y = luaL_checknumber(L,4);
-	const uint8_t *addr = get_block_addr_14l(buf->bytes,buf->len,row_bytes,x,y);
-	if(!addr) {
-		return luaL_error(L,"coordinates out of range");
-	}
-	lua_pushnumber(L,raw_get_pixel_14l(addr,x));
-	return 1;
-}
-
-static int l_get_pixel_14b(lua_State *L) {
-	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
-	unsigned row_bytes = luaL_checknumber(L,2);
-	unsigned x = luaL_checknumber(L,3);
-	unsigned y = luaL_checknumber(L,4);
-	const uint8_t *addr = get_block_addr_14b(buf->bytes,buf->len,row_bytes,x,y);
-	if(!addr) {
-		return luaL_error(L,"coordinates out of range");
-	}
-	lua_pushnumber(L,raw_get_pixel_14b(addr,x));
-	return 1;
-}
-
 static const luaL_Reg rawimg_methods[] = {
-	{"get_pixel_10l", l_get_pixel_10l},
-	{"get_pixel_10b", l_get_pixel_10b},
-	{"get_pixel_12l", l_get_pixel_12l},
-	{"get_pixel_12b", l_get_pixel_12b},
-	{"get_pixel_14l", l_get_pixel_14l},
-	{"get_pixel_14b", l_get_pixel_14b},
 	{NULL, NULL}
 };
+*/
 
 void rawimg_open(lua_State *L) {
-	luaL_register(L, "rawimg", rawimg_methods);  
-}
+//	luaL_register(L, "rawimg", rawimg_methods);  
+	lua_createtable(L, 0, raw_num_formats);
 
+	int i;
+	for(i=0; i<raw_num_formats; i++) {
+		char name[64];
+		raw_format_t *fmt = &raw_formats[i];
+		lua_pushlightuserdata( L, fmt );
+		lua_pushcclosure( L, raw_get_pixel_lua, 1 );
+		sprintf(name,"get_pixel_%d%c",fmt->bpp,(fmt->endian == RAW_ENDIAN_l)?'l':'b');
+		lua_setfield(L, -2, name);
+	}
+	lua_setglobal( L, "rawimg" );
+}
