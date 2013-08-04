@@ -93,6 +93,9 @@ m.tags_map = {
 	DefaultCropOrigin			=0xc61f,
 	DefaultCropSize				=0xc620,
 	ColorMatrix1				=0xc621,
+	ColorMatrix2				=0xc622,
+	CameraCalibration1			=0xc623,
+	CameraCalibration4			=0xc624,
 	AnalogBalance				=0xc627,
 	AsShotNeutral				=0xc628,
 	BaselineExposure			=0xc62a,
@@ -101,7 +104,10 @@ m.tags_map = {
 	LinearResponseLimit			=0xc62e,
 	LenseInfo					=0xc630,
 	CalibrationIlluminant1		=0xc65a,
+	CalibrationIlluminant2		=0xc65b,
 	ActiveArea					=0xc68d,
+	ForwardMatrix1				=0xc714,
+	ForwardMatrix2				=0xc715,
 	OpcodeList1					=0xc740,
 
 }
