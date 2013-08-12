@@ -1564,8 +1564,16 @@ cli:add_commands{
 			repeat 
 				cli.dbgmsg('get data %d\n',shot)
 				status,err = con:capture_get_data(rcopts)
+				if not status then
+					warnf('capture_get_data error %s\n',tostring(err))
+					break
+				end
 				shot = shot + 1
 			until shot > shot_count or not status
+			if opts.cont and not status then
+				cli.dbgmsg('sending stop message\n')
+				con:write_msg('stop')
+			end
 
 			local t0=ustime.new()
 			-- wait for shot script to end or timeout

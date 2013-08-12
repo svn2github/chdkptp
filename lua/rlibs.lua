@@ -1034,6 +1034,7 @@ end
 {
 	name='rs_shoot',
 	depend={'rlib_shoot_common'},
+	-- TODO cont doesn't handle exposure counter wrap!
 	code=[[
 function rs_shoot_single()
 	shoot()
@@ -1042,12 +1043,18 @@ function rs_shoot_cont(opts)
 	local last = get_exp_count() + opts.cont
 	press('shoot_half')
 	repeat
-		sleep(10)
-	until get_shooting()
+		m=read_usb_msg(10)
+	until get_shooting() or m == 'stop'
+	if m == 'stop' then
+		release('shoot_half')
+		return
+	end
+	sleep(20)
 	press('shoot_full')
 	repeat
-		sleep(10)
-	until get_exp_count() >= last
+		m=read_usb_msg(10)
+	until get_exp_count() >= last or m == 'stop'
+	release('shoot_full')
 end
 function rs_shoot(opts)
 	rlib_shoot_init_exp(opts)

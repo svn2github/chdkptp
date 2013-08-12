@@ -1012,7 +1012,12 @@ function chdku.rc_handler_file(dir,filename_base,ext)
 			if chunk.offset then
 				fh:seek('set',chunk.offset)
 			end
-			chunk.data:fwrite(fh)
+			if chunk.size ~= 0 then
+				chunk.data:fwrite(fh)
+			else
+				-- TODO zero size chunk could be valid but doesn't appear to show up in normal operation
+				util.warnf('ignoring zero size chunk\n')
+			end
 			n_chunks = n_chunks + 1
 		until chunk.last or n_chunks > hdata.max_chunks
 		fh:close()
@@ -1186,6 +1191,8 @@ function con_methods:wait_status(opts)
 		end
 	end
 
+	-- TODO timeout should be based on time, not adding up sleep times
+	-- local t0=ustime.new()
 	while true do
 		-- TODO shouldn't poll script status if only waiting on rsdata
 		local status,msg = self:script_status()
@@ -1194,6 +1201,8 @@ function con_methods:wait_status(opts)
 		end
 		if opts.rsdata then
 			status.rsdata,msg = self:capture_ready()
+			-- TODO debug
+			-- cli.dbgmsg('%4d rs poll %s %s\n',ustime.diff(t0)/1000,tostring(status.rsdata),tostring(msg))
 			if not status.rsdata then
 				return false,msg
 			end
