@@ -19,5 +19,6 @@
 
 #ifndef RAWIMG_H
 #define RAWIMG_H
+#define RAWIMG_META "rawimg.rawimg_meta"
 void rawimg_open(lua_State *L);
 #endif

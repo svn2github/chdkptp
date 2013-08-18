@@ -363,13 +363,9 @@ function dng_methods.dump_image(self,dst,order)
 		return false, 'ifd 0.0 not found'
 	end
 	if not order then
-		order = 'b'
+		order = 'big'
 	end
 	local bpp = ifd.byname.BitsPerSample:getel()
-	local get_pixel = rawimg['get_pixel_'..bpp..order]
-	if type(get_pixel) ~= 'function'  then
-		return false, 'unsupported format '..tostring(bpp)..' ' .. tostring(order)
-	end
 
 	local width = ifd.byname.ImageWidth:getel()
 	local rowbytes = (width * bpp)/8;
@@ -377,11 +373,14 @@ function dng_methods.dump_image(self,dst,order)
 
 	local offset = ifd.byname.StripOffsets:getel() -- TODO in theory could be more than one
 
-	local data = self._lb:sub(offset+1,offset+ifd.byname.StripByteCounts:getel())
+	local data = self._lb
 	-- for testing little endian functions
-	if order == 'l' then
+	if order == 'little' then
+		data = self._lb:sub(offset+1,offset+ifd.byname.StripByteCounts:getel())
+		offset = 0
 		data:reverse_bytes()
 	end
+	local img = rawimg.bind_lbuf(data, offset, width, height, bpp, order)
 	local out = lbuf.new(width*height)
 
 	local min = 2^bpp
@@ -391,7 +390,7 @@ function dng_methods.dump_image(self,dst,order)
 
 	for y=0,height-1 do
 		for x=0,width-1 do
-			local v = get_pixel(data,rowbytes,x,y)
+			local v = img:get_pixel(x,y)
 			out:set_u8(y*width + x,v/pixel_scale)
 			if v > max then
 				max = v

@@ -895,38 +895,40 @@ function chdku.rc_process_dng(dng_info,raw)
 
 	-- TODO temp VERY primitive thumb for testing
 	-- this should be a lib function
-	local get_pixel = rawimg['get_pixel_'..bpp..'b'];
-	if type(get_pixel) == 'function' then
-		cli.dbgmsg('creating thumb')
-		local rowbytes = (width * bpp)/8;
-		local height = ifd.byname.ImageLength:getel()
-		local w = width/128;
-		local h = height/96;
-		local min = 2^(bpp)
-		local max = 0
-		local total = 0
-		local count = 0
-		local off = 0
-		local pixel_scale = 2^(bpp - 8)
-
-		for y=0,height-1,h do
-			for x=0,width-1,w do
-				local v = get_pixel(raw.data,rowbytes,x,y)/pixel_scale
-				dng_info.thumb:set_u8(off,v,v,v)
-				if v > max then
-					max = v
-				end
-				if v < min then
-					min = v
-				end
-				total = total + v
-				count = count + 1
-				off = off + 3
-			end
-			cli.dbgmsg('.')
-		end
-		cli.dbgmsg('\nw=%d h=%d c=%d min %d max %d avg %d\n',w,h,count,min,max,total/count)
+	local height = ifd.byname.ImageLength:getel()
+	local status,img = pcall(rawimg.bind_lbuf,raw.data,0,width,height,bpp,'big')
+	if not status then
+		cli.dbgmsg('not creating thumb: %s',tostring(img))
+		return true -- thumb failure isn't fatal
 	end
+	cli.dbgmsg('creating thumb')
+
+	local w = width/128;
+	local h = height/96;
+	local min = 2^(bpp)
+	local max = 0
+	local total = 0
+	local count = 0
+	local off = 0
+	local pixel_scale = 2^(bpp - 8)
+
+	for y=0,height-1,h do
+		for x=0,width-1,w do
+			local v = img:get_pixel(x,y)/pixel_scale
+			dng_info.thumb:set_u8(off,v,v,v)
+			if v > max then
+				max = v
+			end
+			if v < min then
+				min = v
+			end
+			total = total + v
+			count = count + 1
+			off = off + 3
+		end
+		cli.dbgmsg('.')
+	end
+	cli.dbgmsg('\nw=%d h=%d c=%d min %d max %d avg %d\n',w,h,count,min,max,total/count)
 	return true
 end
 --[[
