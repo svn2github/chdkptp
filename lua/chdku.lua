@@ -896,11 +896,18 @@ function chdku.rc_process_dng(dng_info,raw)
 	-- TODO temp VERY primitive thumb for testing
 	-- this should be a lib function
 	local height = ifd.byname.ImageLength:getel()
-	local status,img = pcall(rawimg.bind_lbuf,raw.data,0,width,height,bpp,'big')
+	local status,img = pcall(rawimg.bind_lbuf,{
+		data=raw.data,
+		width=width,
+		height=height,
+		bpp=bpp,
+		endian='big',
+	})
 	if not status then
 		cli.dbgmsg('not creating thumb: %s',tostring(img))
 		return true -- thumb failure isn't fatal
 	end
+	cli.dbgmsg('got image %dx%d@%d\n',img:width(),img:height(),img:bpp())
 	cli.dbgmsg('creating thumb')
 
 	local w = width/128;

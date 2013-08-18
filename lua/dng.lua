@@ -361,6 +361,9 @@ function dng_methods.dump_image(self,dst)
 	if not img then
 		return false, 'image data not set'
 	end
+	local width=img:width()
+	local height=img:height()
+	local bpp=img:bpp()
 	local out = lbuf.new(width*height)
 
 	local min = 2^bpp
@@ -420,14 +423,14 @@ function dng_methods.set_data(self,data_lb,offset,order)
 	end
 
 
-	local bpp = ifd.byname.BitsPerSample:getel()
-	local width = ifd.byname.ImageWidth:getel()
-	local height = ifd.byname.ImageLength:getel()
-	
-	local status, img = pcall(rawimg.bind_lbuf, data, offset, width, height, bpp, order)
-	if not status then
-		return false, img
-	end
+	local img = rawimg.bind_lbuf{
+		data=data,
+		data_offset=offset,
+		width=ifd.byname.ImageWidth:getel(),
+		height=ifd.byname.ImageLength:getel(),
+		bpp=ifd.byname.BitsPerSample:getel(),
+		endian=order,
+	}
 	self.img = img
 	return true
 end

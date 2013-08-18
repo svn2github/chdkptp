@@ -43,6 +43,12 @@ unsigned raw_get_pixel_14b(const uint8_t *p, unsigned row_bytes, unsigned x, uns
 #define RAW_ENDIAN_l 0
 #define RAW_ENDIAN_b 1
 
+static const char *endian_strings[] = {
+	"little",
+	"big",
+	NULL,
+};
+
 #define RAW_BLOCK_BYTES_10l 10
 #define RAW_BLOCK_BYTES_10b 5
 
@@ -55,11 +61,13 @@ unsigned raw_get_pixel_14b(const uint8_t *p, unsigned row_bytes, unsigned x, uns
 typedef unsigned (*get_pixel_func_t)(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
 typedef unsigned (*set_pixel_func_t)(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 
+#define RAW_BAYER_NONE 0
+
 typedef struct {
-	int bpp;
-	int endian;
-	int block_bytes;
-	int block_pixels;
+	unsigned bpp;
+	unsigned endian;
+	unsigned block_bytes;
+	unsigned block_pixels;
 	get_pixel_func_t get_pixel;
 } raw_format_t;
 
@@ -68,6 +76,11 @@ typedef struct {
 	unsigned row_bytes;
 	unsigned width;
 	unsigned height;
+	uint32_t bayer;
+	unsigned active_x1;
+	unsigned active_y1;
+	unsigned active_x2;
+	unsigned active_y2;
 	uint8_t *data;
 } raw_image_t;
 
@@ -313,7 +326,7 @@ static int rawimg_lua_get_endian(lua_State *L) {
 	return 1;
 }
 
-static raw_format_t* rawimg_find_format(int bpp, int endian) {
+static raw_format_t* rawimg_find_format(unsigned bpp, unsigned endian) {
 	int i;
 	for(i=0; i<raw_num_formats; i++) {
 		raw_format_t *fmt = &raw_formats[i];
@@ -323,9 +336,70 @@ static raw_format_t* rawimg_find_format(int bpp, int endian) {
 	}
 	return NULL;
 }
+
 /*
-img = rawimg.bind_lbuf(lbuf, offset, width, height, bpp, endian)
-TODO bayer?
+helper functions to get args from a table
+should be a standalone utility library
+throw error on incorrect type, return C value and pop off the stack
+*/
+static void *table_checkudata(lua_State *L, int narg, const char *fname, const char *tname) {
+	lua_getfield(L, narg, fname);
+	void *r = luaL_checkudata(L,-1,tname);
+	lua_pop(L,1);
+	return r;
+}
+
+static lua_Number table_checknumber(lua_State *L, int narg, const char *fname) {
+	lua_getfield(L, narg, fname);
+	lua_Number r = luaL_checknumber(L,-1);
+	lua_pop(L,1);
+	return r;
+}
+
+static lua_Number table_optnumber(lua_State *L, int narg, const char *fname, lua_Number d) {
+	lua_getfield(L, narg, fname);
+	lua_Number r = luaL_optnumber(L,-1,d);
+	lua_pop(L,1);
+	return r;
+}
+
+/*
+static const char *table_checkstring(lua_State *L, int narg, const char *fname) {
+	lua_getfield(L, narg, fname);
+	const char *r = luaL_checkstring(L,-1);
+	lua_pop(L,1);
+	return r;
+}
+*/
+static int table_checkoption(lua_State *L, int narg, const char *fname, const char *def, const char *lst[]) {
+	lua_getfield(L, narg, fname);
+	int r = luaL_checkoption(L,-1, def, lst);
+	lua_pop(L,1);
+	return r;
+}
+
+/*
+img = rawimg.bind_lbuf(imgspec)
+imgspec {
+-- required fields
+	data:lbuf
+	width:number
+	height:number
+	bpp:number
+	endian:string "little"|"big"
+-- optional fields
+	data_offset:number -- offset into data lbuf, default 0
+	-- TODO
+	bayer:number -- DNG style integer for now, default = 0, bayer related functions will error)
+	active_area: {
+		x1:number
+		y1:number
+		x2:number
+		y2:number
+	} : default 0,0,width,height
+	color_matrix: -- TODO
+}
+
 */
 static int rawimg_lua_bind_lbuf(lua_State *L) {
 	raw_image_t *img = (raw_image_t *)lua_newuserdata(L,sizeof(raw_image_t));
@@ -333,25 +407,22 @@ static int rawimg_lua_bind_lbuf(lua_State *L) {
 		return luaL_error(L,"failed to create userdata");;
 	}
 
-	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
-	unsigned offset = luaL_checknumber(L,2);
-
-	img->width = luaL_checknumber(L,3);
-	img->height = luaL_checknumber(L,4);
-
-	int bpp = luaL_checknumber(L,5);
-
-	const char *endian_str = luaL_checkstring(L,6);
-	int endian;
-
-	if(strcmp(endian_str,"little") == 0) {
-		endian = RAW_ENDIAN_l;
-	} else if(strcmp(endian_str,"big") == 0) {
-		endian = RAW_ENDIAN_b;
-	} else {
-		return luaL_error(L,"invalid endian");
+	if(!lua_istable(L,1)) {
+		return luaL_error(L,"expected table");;
 	}
-	
+
+	lBuf_t *buf = (lBuf_t *)table_checkudata(L,1,"data",LBUF_META);
+
+	unsigned offset = table_optnumber(L,1,"data_offset",0);
+
+	img->width = table_checknumber(L,1,"width");
+	img->height = table_checknumber(L,1,"height");
+	unsigned bpp = table_checknumber(L,1,"bpp");
+
+	unsigned endian = table_checkoption(L,1,"endian",NULL,endian_strings);
+
+	img->bayer = table_optnumber(L,1,"bayer",RAW_BAYER_NONE); // TODO
+
 	img->fmt = rawimg_find_format(bpp,endian);
 	if(!img->fmt) {
 		return luaL_error(L,"unknown format");
