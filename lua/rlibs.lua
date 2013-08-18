@@ -924,7 +924,8 @@ end
 ]],
 },
 --[[
-support for cli shoot command
+support for cli shoot command, set exposure params
+TODO could check that ISO mode gets set, esp for 1.2 which ignores unknown values
 ]]
 {
 	name='rlib_shoot_common',
@@ -936,8 +937,14 @@ function rlib_shoot_init_exp(opts)
 	if opts.sv then
 		set_sv96(opts.sv)
 	end
+	if opts.isomode then
+		set_iso_mode(opts.isomode)
+	end
 	if opts.av then
 		set_av96_direct(opts.av)
+	end
+	if opts.nd then
+		set_nd_filter(opts.nd)
 	end
 end
 ]],

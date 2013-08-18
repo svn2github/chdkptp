@@ -332,6 +332,9 @@ end
 process options common to shoot and remoteshoot
 ]]
 local function get_shoot_common_opts(args)
+	if not con:is_connected() then
+		return false, 'not connected'
+	end
 	if not util.in_table({'s','a','96'},args.u) then
 		return false,"invalid units"
 	end
@@ -381,10 +384,23 @@ local function get_shoot_common_opts(args)
 			opts.tv=tonumber(args.tv)
 		end
 	end
+	if args.isomode then
+		if opts.sv then
+			return false,'set sv or isomode, not both!'
+		end
+		opts.isomode = tonumber(args.isomode)
+	end
+	if args.nd then
+		local val = ({['in']=1,out=2})[args.nd]
+		if not val then
+			return false,'invalid ND state '..tostring(args.nd)
+		end
+		opts.nd = val
+	end
 
 	-- hack for CHDK override bug that ignores APEX 0
-	-- TODO only required for CHDK 1.1 and earlier
-	if opts.tv == 0 then
+	-- only used for CHDK 1.1 (API 2.4 and earlier)
+	if  opts.tv == 0 and not con:is_ver_compatible(2,5) then
 		opts.tv = 1
 	end
 	return opts
@@ -1287,6 +1303,8 @@ cli:add_commands{
 			tv=false,
 			sv=false,
 			av=false,
+			isomode=false,
+			nd=false,
 			raw=false,
 			dng=false,
 			pretend=false,
@@ -1304,6 +1322,8 @@ cli:add_commands{
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value. In standard units, Canon "real" ISO
    -av=<v>    Aperature value. In standard units, f number
+   -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
+   -nd=<in|out> set ND filter state
    -raw[=1|0] Force raw on or off, defaults to current camera setting
    -dng[=1|0] Force DNG on or off, implies raw if on, default current camera setting
    -pretend   print actions instead of running them
@@ -1421,6 +1441,8 @@ cli:add_commands{
 			tv=false,
 			sv=false,
 			av=false,
+			isomode=false,
+			nd=false,
 			jpg=false,
 			raw=false,
 			dng=false,
@@ -1439,13 +1461,15 @@ cli:add_commands{
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value. In standard units, Canon "real" ISO
    -av=<v>    Aperature value. In standard units, f number
-  -jpg         jpeg, default if no other options (not supported on all cams)
-  -raw         framebuffer dump raw
-  -dng         DNG format raw
-  -dnghdr      save DNG header to a seperate file, ignored with -dng
-  -s=<start>   first line of for subimage raw
-  -c=<count>   number of lines for subimage
-  -cont=<num>  shoot num shots in continuous mode
+   -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
+   -nd=<in|out> set ND filter state
+   -jpg         jpeg, default if no other options (not supported on all cams)
+   -raw         framebuffer dump raw
+   -dng         DNG format raw
+   -dnghdr      save DNG header to a seperate file, ignored with -dng
+   -s=<start>   first line of for subimage raw
+   -c=<count>   number of lines for subimage
+   -cont=<num>  shoot num shots in continuous mode
 ]],
 		func=function(self,args)
 			local dst = args[1]
