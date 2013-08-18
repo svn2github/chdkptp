@@ -283,6 +283,36 @@ static int rawimg_lua_get_pixel(lua_State *L) {
 	return 1;
 }
 
+static int rawimg_lua_get_width(lua_State *L) {
+	raw_image_t* img = (raw_image_t *)luaL_checkudata(L, 1, RAWIMG_META);
+	lua_pushnumber(L,img->width);
+	return 1;
+}
+
+static int rawimg_lua_get_height(lua_State *L) {
+	raw_image_t* img = (raw_image_t *)luaL_checkudata(L, 1, RAWIMG_META);
+	lua_pushnumber(L,img->height);
+	return 1;
+}
+
+static int rawimg_lua_get_bpp(lua_State *L) {
+	raw_image_t* img = (raw_image_t *)luaL_checkudata(L, 1, RAWIMG_META);
+	lua_pushnumber(L,img->fmt->bpp);
+	return 1;
+}
+
+static int rawimg_lua_get_endian(lua_State *L) {
+	raw_image_t* img = (raw_image_t *)luaL_checkudata(L, 1, RAWIMG_META);
+	if(img->fmt->endian == RAW_ENDIAN_l) {
+		lua_pushstring(L,"little");
+	} else if(img->fmt->endian == RAW_ENDIAN_b) {
+		lua_pushstring(L,"big");
+	} else {
+		return luaL_error(L,"invalid endian");
+	}
+	return 1;
+}
+
 static raw_format_t* rawimg_find_format(int bpp, int endian) {
 	int i;
 	for(i=0; i<raw_num_formats; i++) {
@@ -372,11 +402,11 @@ static const luaL_Reg rawimg_methods[] = {
 	{"get_pixel",rawimg_lua_get_pixel},
 	/*
 	{"set_pixel",rawimg_set_pixel},
-	{"width",rawimg_get_width},
-	{"height",rawimg_get_height},
-	{"bpp",rawimg_get_bpp},
-	{"endian",rawimg_get_endian},
 	*/
+	{"width",rawimg_lua_get_width},
+	{"height",rawimg_lua_get_height},
+	{"bpp",rawimg_lua_get_bpp},
+	{"endian",rawimg_lua_get_endian},
 	{NULL, NULL}
 };
 

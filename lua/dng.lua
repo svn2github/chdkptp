@@ -356,31 +356,11 @@ end
 --[[
 inefficient function to dump image data to 8bbp (truncated) grayscale
 ]]
-function dng_methods.dump_image(self,dst,order)
-	-- TODO makes assumptions about header layout
-	local ifd=self:get_ifd{0,0} -- assume main image is first subifd of first ifd
-	if not ifd then 
-		return false, 'ifd 0.0 not found'
+function dng_methods.dump_image(self,dst)
+	local img = self.img
+	if not img then
+		return false, 'image data not set'
 	end
-	if not order then
-		order = 'big'
-	end
-	local bpp = ifd.byname.BitsPerSample:getel()
-
-	local width = ifd.byname.ImageWidth:getel()
-	local rowbytes = (width * bpp)/8;
-	local height = ifd.byname.ImageLength:getel()
-
-	local offset = ifd.byname.StripOffsets:getel() -- TODO in theory could be more than one
-
-	local data = self._lb
-	-- for testing little endian functions
-	if order == 'little' then
-		data = self._lb:sub(offset+1,offset+ifd.byname.StripByteCounts:getel())
-		offset = 0
-		data:reverse_bytes()
-	end
-	local img = rawimg.bind_lbuf(data, offset, width, height, bpp, order)
 	local out = lbuf.new(width*height)
 
 	local min = 2^bpp
@@ -409,6 +389,46 @@ function dng_methods.dump_image(self,dst,order)
 	end
 	out:fwrite(fh)
 	fh:close()
+	return true
+end
+
+--[[
+set image data, either to internal data or an external lbuf
+initializes dng.img
+order is only for testing external data in little endian format
+]]
+function dng_methods.set_data(self,data_lb,offset,order)
+	-- TODO makes assumptions about header layout
+	local ifd=self:get_ifd{0,0} -- assume main image is first subifd of first ifd
+	if not ifd then 
+		return false, 'ifd 0.0 not found'
+	end
+
+	if not order then
+		order = 'big'
+	end
+
+	if not offset then
+		offset = 0
+	end
+
+	-- no data, use internal
+	if not data_lb then
+		data = self._lb
+		offset = ifd.byname.StripOffsets:getel() -- TODO in theory could be more than one
+		-- order should always be big for embedded data
+	end
+
+
+	local bpp = ifd.byname.BitsPerSample:getel()
+	local width = ifd.byname.ImageWidth:getel()
+	local height = ifd.byname.ImageLength:getel()
+	
+	local status, img = pcall(rawimg.bind_lbuf, data, offset, width, height, bpp, order)
+	if not status then
+		return false, img
+	end
+	self.img = img
 	return true
 end
 
@@ -466,6 +486,14 @@ function m.load(filename)
 	if not lb then
 		return false, err
 	end
-	return m.bind_header(lb)
+	local d,err = m.bind_header(lb)
+	if not d then
+		return false, err
+	end
+	local status, err = d:set_data()
+	if not status then
+		return false, err
+	end
+	return d
 end
 return m
