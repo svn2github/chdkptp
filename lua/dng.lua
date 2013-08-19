@@ -418,6 +418,58 @@ function dng_methods.dump_image(self,dst)
 	return true
 end
 
+function dng_methods.test_set_pixel(self)
+	local img = self.img
+	if not img then
+		return false, 'image data not set'
+	end
+	local width=img:width()
+	local height=img:height()
+	local bpp=img:bpp()
+
+	local bad = 0
+	for y=200,400 do
+		for x=200,1200 do
+			-- assumes get has already been validated
+			local v=img:get_pixel(x,y)
+			img:set_pixel(x,y,v)
+			if v ~= img:get_pixel(x,y) then
+				bad = bad + 1
+			end
+		end
+	end
+	if bad > 0 then
+		printf("big mismatched %d\n",bad)
+	else
+		printf("big ok\n",bad)
+	end
+
+	local ifd=self:get_ifd{0,0}
+	local offset = ifd.byname.StripOffsets:getel()
+	local ldata = self._lb:sub(offset+1,offset+ifd.byname.StripByteCounts:getel())
+	ldata:reverse_bytes()
+	self:set_data(ldata,0,'little')
+	img = self.img
+
+	local bad = 0
+	for y=200,400 do
+		for x=200,1200 do
+			-- assumes get has already been validated
+			local v=img:get_pixel(x,y)
+			img:set_pixel(x,y,v)
+			if v ~= img:get_pixel(x,y) then
+				bad = bad + 1
+			end
+		end
+	end
+	if bad > 0 then
+		printf("little mismatched %d\n",bad)
+	else
+		printf("little ok\n",bad)
+	end
+	self:set_data() -- restore default data
+end
+
 --[[
 set image data, either to internal data or an external lbuf
 initializes dng.img

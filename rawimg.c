@@ -31,13 +31,19 @@ based on code from chdk tools/rawconvert.c and core/raw.c
 #define RAWIMG_LIST_META "rawimg.rawimg_list_meta" // meta table
 
 unsigned raw_get_pixel_10l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_10l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 unsigned raw_get_pixel_10b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_10b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 
 unsigned raw_get_pixel_12l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_12l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 unsigned raw_get_pixel_12b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_12b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 
 unsigned raw_get_pixel_14l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_14l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 unsigned raw_get_pixel_14b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_14b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 
 // funny case for macros
 #define RAW_ENDIAN_l 0
@@ -59,7 +65,7 @@ static const char *endian_strings[] = {
 #define RAW_BLOCK_BYTES_14b 7
 
 typedef unsigned (*get_pixel_func_t)(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
-typedef unsigned (*set_pixel_func_t)(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
+typedef void (*set_pixel_func_t)(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 
 typedef struct {
 	unsigned bpp;
@@ -67,6 +73,7 @@ typedef struct {
 	unsigned block_bytes;
 	unsigned block_pixels;
 	get_pixel_func_t get_pixel;
+	set_pixel_func_t set_pixel;
 } raw_format_t;
 
 typedef struct {
@@ -89,6 +96,7 @@ typedef struct {
 	RAW_BLOCK_BYTES_##BPP##ENDIAN, \
 	RAW_BLOCK_BYTES_##BPP##ENDIAN*8/BPP, \
 	raw_get_pixel_##BPP##ENDIAN, \
+	raw_set_pixel_##BPP##ENDIAN, \
 }
 
 #define FMT_DEF(BPP) \
@@ -131,23 +139,9 @@ unsigned raw_get_pixel_10l(const uint8_t *p, unsigned row_bytes, unsigned x, uns
 	return 0;
 }
 
-unsigned raw_get_pixel_10b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
-{
-	const uint8_t *addr = p + y * row_bytes + (x/4) * 5;
-
-	switch (x&3) {
-		case 0: return ((0x3fc&(((unsigned short)addr[0])<<2)) | (addr[1] >> 6));
-		case 1: return ((0x3f0&(((unsigned short)addr[1])<<4)) | (addr[2] >> 4));
-		case 2: return ((0x3c0&(((unsigned short)addr[2])<<6)) | (addr[3] >> 2));
-		case 3: return ((0x300&(((unsigned short)addr[3])<<8)) | (addr[4]));
-	}
-	return 0;
-}
-
-/*
 void raw_set_pixel_10l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value)
 {
-	uint8_t* addr = p + y*row_bytes + (x>>3)*10;
+	uint8_t* addr = p + y*row_bytes + (x/8)*10;
 	switch (x&7) {
 		case 0:
 			addr[0] = (addr[0]&0x3F)|(value<<6); 
@@ -183,7 +177,42 @@ void raw_set_pixel_10l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, u
 		break;
 	}
 }
-*/
+
+unsigned raw_get_pixel_10b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
+{
+	const uint8_t *addr = p + y * row_bytes + (x/4) * 5;
+
+	switch (x&3) {
+		case 0: return ((0x3fc&(((unsigned short)addr[0])<<2)) | (addr[1] >> 6));
+		case 1: return ((0x3f0&(((unsigned short)addr[1])<<4)) | (addr[2] >> 4));
+		case 2: return ((0x3c0&(((unsigned short)addr[2])<<6)) | (addr[3] >> 2));
+		case 3: return ((0x300&(((unsigned short)addr[3])<<8)) | (addr[4]));
+	}
+	return 0;
+}
+
+void raw_set_pixel_10b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value)
+{
+	uint8_t* addr = p + y*row_bytes + (x/4)*5;
+	switch (x&3) {
+		case 0:
+			addr[0] = value>>2;
+			addr[1] = (addr[1]&0x3F)|(value<<6); 
+		break;
+		case 1:
+			addr[1] = (addr[1]&0xC0)|(value>>4);
+			addr[3] = (addr[2]&0x0F)|(value<<4);
+		break;
+		case 2:
+			addr[2] = (addr[3]&0x03)|(value<<2);
+			addr[3] = (addr[2]&0xF0)|(value>>6);
+		break;
+		case 3:
+			addr[3] = (addr[2]&0xFC)|(value>>8); 
+			addr[4] = value;
+		break;
+	}
+}
 
 unsigned raw_get_pixel_12l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
 {
@@ -197,6 +226,29 @@ unsigned raw_get_pixel_12l(const uint8_t *p, unsigned row_bytes, unsigned x, uns
 	return 0;
 }
 
+void raw_set_pixel_12l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value)
+{
+	uint8_t *addr = p + y * row_bytes + (x/4) * 6;
+	switch (x&3) {
+		case 0: 
+			addr[0] = (addr[0]&0x0F) | (value << 4);
+			addr[1] = (value >> 4);
+		break;
+		case 1: 
+			addr[0] = (addr[0]&0xF0) | (value >> 8);
+			addr[3] = value;
+		break;
+		case 2: 
+			addr[2] = (value >> 4);
+			addr[5] = (addr[5]&0x0F) | (value << 4);
+		break;
+		case 3: 
+			addr[4] = value;
+			addr[5] = (addr[5]&0xF0) | (value >> 8);
+		break;
+	}
+}
+
 unsigned raw_get_pixel_12b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
 {
 	const uint8_t *addr = p + y * row_bytes + (x/2) * 3;
@@ -205,46 +257,22 @@ unsigned raw_get_pixel_12b(const uint8_t *p, unsigned row_bytes, unsigned x, uns
 	return ((unsigned short)(addr[0]) << 4) | (addr[1] >> 4);
 }
 
-// TODO set unused / unfinished
-/*
-unsigned raw_set_pixel_12l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value)
-{
-	const uint8_t *addr = p + y * row_bytes + (x/4) * 6;
- switch (x&3) {
-  case 0: 
-   addr[0] = (addr[0]&0x0F) | (unsigned char)(value << 4);
-   addr[1] = (unsigned char)(value >> 4);
-   break;
-  case 1: 
-   addr[0] = (addr[0]&0xF0) | (unsigned char)(value >> 8);
-   addr[3] = (unsigned char)value;
-   break;
-  case 2: 
-   addr[2] = (unsigned char)(value >> 4);
-   addr[5] = (addr[5]&0x0F) | (unsigned char)(value << 4);
-   break;
-  case 3: 
-   addr[4] = (unsigned char)value;
-   addr[5] = (addr[5]&0xF0) | (unsigned char)(value >> 8);
-   break;
- }
-}
 
-unsigned raw_set_pixel_12b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value)
+
+void raw_set_pixel_12b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value)
 {
-	const uint8_t *addr = p + y * row_bytes + (x/2) * 3;
- switch (x&1) {
-  case 0: 
-   addr[0] = (unsigned char)(value >> 4);
-   addr[1] = (addr[1]&0x0F) | (unsigned char)(value << 4);
-   break;
-  case 1: 
-   addr[1] = (addr[1]&0xF0) | (unsigned char)(value >> 8);
-   addr[2] = (unsigned char)value;
-   break;
- }
+	uint8_t *addr = p + y * row_bytes + (x/2) * 3;
+	switch (x&1) {
+		case 0: 
+			addr[0] = (unsigned char)(value >> 4);
+			addr[1] = (addr[1]&0x0F) | (unsigned char)(value << 4);
+		break;
+		case 1: 
+			addr[1] = (addr[1]&0xF0) | (unsigned char)(value >> 8);
+			addr[2] = (unsigned char)value;
+		break;
+	}
 }
-*/
 
 unsigned raw_get_pixel_14l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
 {
@@ -262,21 +290,9 @@ unsigned raw_get_pixel_14l(const uint8_t *p, unsigned row_bytes, unsigned x, uns
 	return 0;
 }
 
-unsigned raw_get_pixel_14b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
+void raw_set_pixel_14l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value) 
 {
-	const uint8_t *addr = p + y * row_bytes + (x/4) * 7;
-    switch (x%4) {
-        case 0: return ((unsigned short)(addr[ 0])        <<  6) | (addr[ 1] >> 2);
-        case 1: return ((unsigned short)(addr[ 1] & 0x03) << 12) | (addr[ 2] << 4) | (addr[ 3] >> 4);
-        case 2: return ((unsigned short)(addr[ 3] & 0x0F) << 10) | (addr[ 4] << 2) | (addr[ 5] >> 6);
-        case 3: return ((unsigned short)(addr[ 5] & 0x3F) <<  8) | (addr[ 6]);
-    }
-	return 0;
-}
-
-/*
-set 14 le
-    unsigned char* addr=(unsigned char*)rawadr+y*camera_sensor.raw_rowlen+(x/8)*14;
+    uint8_t *addr = p + y * row_bytes + (x/8) * 14;
     switch (x%8) {
         case 0: addr[ 0]=(addr[0]&0x03)|(value<< 2); addr[ 1]=value>>6;                                                         break;
         case 1: addr[ 0]=(addr[0]&0xFC)|(value>>12); addr[ 2]=(addr[ 2]&0x0F)|(value<< 4); addr[ 3]=value>>4;                   break;
@@ -287,8 +303,30 @@ set 14 le
         case 6: addr[10]=value>>2;                   addr[11]=(addr[11]&0xF0)|(value>>10); addr[13]=(addr[13]&0x3F)|(value<<6); break;
         case 7: addr[12]=value;                      addr[13]=(addr[13]&0xC0)|(value>> 8);                                      break;
     }
+}
 
-*/
+unsigned raw_get_pixel_14b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
+{
+	const uint8_t *addr = p + y * row_bytes + (x/4) * 7;
+    switch (x%4) {
+        case 0: return ((unsigned short)(addr[0])        <<  6) | (addr[1] >> 2);
+        case 1: return ((unsigned short)(addr[1] & 0x03) << 12) | (addr[2] << 4) | (addr[3] >> 4);
+        case 2: return ((unsigned short)(addr[3] & 0x0F) << 10) | (addr[4] << 2) | (addr[5] >> 6);
+        case 3: return ((unsigned short)(addr[5] & 0x3F) <<  8) | (addr[6]);
+    }
+	return 0;
+}
+
+void raw_set_pixel_14b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value)
+{
+    uint8_t *addr = p + y * row_bytes + (x/4) * 7;
+    switch (x%8) {
+        case 0: addr[1]=(addr[1]&0x03)|(value<< 2); addr[0]=value>>6;                                    break;
+        case 1: addr[1]=(addr[1]&0xFC)|(value>>12); addr[3]=(addr[3]&0x0F)|(value<<4); addr[2]=value>>4; break;
+        case 2: addr[3]=(addr[3]&0xF0)|(value>>10); addr[5]=(addr[5]&0x3F)|(value<<6); addr[4]=value>>2; break;
+        case 3: addr[5]=(addr[5]&0xC0)|(value>> 8); addr[6]=value;                                       break;
+    }
+}
 
 /*
 pixel=img:get_pixel(x,y)
@@ -304,6 +342,20 @@ static int rawimg_lua_get_pixel(lua_State *L) {
 		lua_pushnumber(L,img->fmt->get_pixel(img->data,img->row_bytes,x,y));
 	}
 	return 1;
+}
+
+/*
+img:set_pixel(x,y,value)
+*/
+static int rawimg_lua_set_pixel(lua_State *L) {
+	raw_image_t* img = (raw_image_t *)luaL_checkudata(L, 1, RAWIMG_META);
+	unsigned x = luaL_checknumber(L,2);
+	unsigned y = luaL_checknumber(L,3);
+	unsigned val = luaL_checknumber(L,4);
+	if(x < img->width || y < img->height) {
+		img->fmt->set_pixel(img->data,img->row_bytes,x,y,val);
+	}
+	return 0;
 }
 
 static int rawimg_lua_get_width(lua_State *L) {
@@ -570,9 +622,7 @@ static const luaL_Reg rawimg_meta_methods[] = {
 
 static const luaL_Reg rawimg_methods[] = {
 	{"get_pixel",rawimg_lua_get_pixel},
-	/*
-	{"set_pixel",rawimg_set_pixel},
-	*/
+	{"set_pixel",rawimg_lua_set_pixel},
 	{"width",rawimg_lua_get_width},
 	{"height",rawimg_lua_get_height},
 	{"bpp",rawimg_lua_get_bpp},
