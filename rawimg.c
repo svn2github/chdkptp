@@ -61,8 +61,6 @@ static const char *endian_strings[] = {
 typedef unsigned (*get_pixel_func_t)(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
 typedef unsigned (*set_pixel_func_t)(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 
-#define RAW_BAYER_NONE 0
-
 typedef struct {
 	unsigned bpp;
 	unsigned endian;
@@ -76,11 +74,11 @@ typedef struct {
 	unsigned row_bytes;
 	unsigned width;
 	unsigned height;
-	uint32_t bayer;
-	unsigned active_x1;
-	unsigned active_y1;
-	unsigned active_x2;
-	unsigned active_y2;
+	uint8_t cfa_pattern[4];
+	unsigned active_top;
+	unsigned active_left;
+	unsigned active_bottom;
+	unsigned active_right;
 	uint8_t *data;
 } raw_image_t;
 
@@ -104,6 +102,18 @@ raw_format_t raw_formats[] = {
 };
 
 static const int raw_num_formats = sizeof(raw_formats)/sizeof(raw_format_t);
+
+static raw_format_t* rawimg_find_format(unsigned bpp, unsigned endian) {
+	int i;
+	for(i=0; i<raw_num_formats; i++) {
+		raw_format_t *fmt = &raw_formats[i];
+		if(fmt->endian == endian && fmt->bpp == bpp) {
+			return fmt;
+		}
+	}
+	return NULL;
+}
+
 
 unsigned raw_get_pixel_10l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
 {
@@ -326,15 +336,62 @@ static int rawimg_lua_get_endian(lua_State *L) {
 	return 1;
 }
 
-static raw_format_t* rawimg_find_format(unsigned bpp, unsigned endian) {
+static int rawimg_lua_get_cfa_pattern(lua_State *L) {
+	raw_image_t* img = (raw_image_t *)luaL_checkudata(L, 1, RAWIMG_META);
+	lua_pushlstring(L, (const char *)img->cfa_pattern,4);
+	return 1;
+}
+
+/*
+make a simple, low quality thumbnail image
+thumb=img:make_rgb_thumb(width,height)
+*/
+static int rawimg_lua_make_rgb_thumb(lua_State *L) {
+	raw_image_t* img = (raw_image_t *)luaL_checkudata(L, 1, RAWIMG_META);
+	unsigned width=luaL_checknumber(L,2);
+	unsigned height=luaL_checknumber(L,3);
+
+	// TODO active area or not should be optional
+	// image active area width
+	unsigned iw = img->active_right - img->active_left;
+	unsigned ih = img->active_bottom - img->active_top;
+	if(width > iw || height > ih) {
+		return luaL_error(L,"thumb cannot be larger than active area");
+	}
+	if(!width  || !height) {
+		return luaL_error(L,"zero dimensions not allowed");
+	}
+	unsigned size = width*height*3;
+	uint8_t *thumb = malloc(size);
+	if(!thumb) {
+		return luaL_error(L,"malloc failed for thumb");
+	}
+
+	int rx=0,ry=0,gx=0,gy=0,bx=0,by=0;
 	int i;
-	for(i=0; i<raw_num_formats; i++) {
-		raw_format_t *fmt = &raw_formats[i];
-		if(fmt->endian == endian && fmt->bpp == bpp) {
-			return fmt;
+	for(i=0;i<4;i++) {
+		switch(img->cfa_pattern[i]) {
+			case 0: rx = i&1; ry = (i&2)>>1; break;
+			case 1: gx = i&1; gy = (i&2)>>1; break; // will get hit twice, doesn't matter
+			case 2: bx = i&1; by = (i&2)>>1; break;
 		}
 	}
-	return NULL;
+	unsigned tx,ty;
+	uint8_t *p = thumb;
+	unsigned shift = img->fmt->bpp - 8;
+	for(ty=0;ty<height;ty++) {
+		for(tx=0;tx<width;tx++) {
+			unsigned ix = (img->active_left + tx*iw/width)&~1;
+			unsigned iy = (img->active_top + ty*ih/height)&~1;
+			*p++=img->fmt->get_pixel(img->data,img->row_bytes,ix+rx,iy+ry)>>shift;
+			*p++=img->fmt->get_pixel(img->data,img->row_bytes,ix+gx,iy+gy)>>shift;
+			*p++=img->fmt->get_pixel(img->data,img->row_bytes,bx+gx,iy+by)>>shift;
+		}
+	}
+	if(!lbuf_create(L, thumb, size, LBUF_FL_FREE)) {
+		return luaL_error(L,"failed to create lbuf");
+	}
+	return 1;
 }
 
 /*
@@ -378,6 +435,13 @@ static int table_checkoption(lua_State *L, int narg, const char *fname, const ch
 	return r;
 }
 
+static const char *table_optlstring(lua_State *L, int narg, const char *fname, const char *d, size_t *l) {
+	lua_getfield(L, narg, fname);
+	const char *r = luaL_optlstring(L,-1,d,l);
+	lua_pop(L,1);
+	return r;
+}
+
 /*
 img = rawimg.bind_lbuf(imgspec)
 imgspec {
@@ -389,14 +453,13 @@ imgspec {
 	endian:string "little"|"big"
 -- optional fields
 	data_offset:number -- offset into data lbuf, default 0
-	-- TODO
-	bayer:number -- DNG style integer for now, default = 0, bayer related functions will error)
-	active_area: {
-		x1:number
-		y1:number
-		x2:number
-		y2:number
-	} : default 0,0,width,height
+	cfa_pattern:string -- 4 byte string
+	active_area: { -- default 0,0,height,width
+		top:number
+		left:number
+		bottom:number
+		right:number
+	} 
 	color_matrix: -- TODO
 }
 
@@ -421,7 +484,43 @@ static int rawimg_lua_bind_lbuf(lua_State *L) {
 
 	unsigned endian = table_checkoption(L,1,"endian",NULL,endian_strings);
 
-	img->bayer = table_optnumber(L,1,"bayer",RAW_BAYER_NONE); // TODO
+	size_t cfa_size;
+	const char *cfa_pattern = table_optlstring(L,1,"cfa_pattern",NULL,&cfa_size);
+	if(!cfa_pattern) {
+		memset(img->cfa_pattern,0,4);
+	} else if(cfa_size != 4) {
+		return luaL_error(L,"unknown cfa pattern");
+	} else {
+		memcpy(img->cfa_pattern,cfa_pattern,4);
+	}
+
+	// active area
+	lua_getfield(L, 1, "active_area");
+	if(lua_istable(L,-1)) {
+		// if table present, all required
+		img->active_top = table_checknumber(L,-1,"top");
+		img->active_left = table_checknumber(L,-1,"left");
+		img->active_bottom = table_checknumber(L,-1,"bottom");
+		img->active_right = table_checknumber(L,-1,"right");
+		if(img->active_top >= img->active_bottom) {
+			return luaL_error(L,"active top >= bottom");
+		}
+		if(img->active_left >= img->active_right) {
+			return luaL_error(L,"active left >= right");
+		}
+		if(img->active_left > img->width) {
+			return luaL_error(L,"active right > width");
+		}
+		if(img->active_bottom > img->height) {
+			return luaL_error(L,"active bottom > height");
+		}
+	} else {
+		img->active_top = img->active_left = 0;
+		img->active_right = img->width;
+		img->active_bottom = img->height;
+	}
+	lua_pop(L,1); // pop off active area or nil
+	
 
 	img->fmt = rawimg_find_format(bpp,endian);
 	if(!img->fmt) {
@@ -478,6 +577,8 @@ static const luaL_Reg rawimg_methods[] = {
 	{"height",rawimg_lua_get_height},
 	{"bpp",rawimg_lua_get_bpp},
 	{"endian",rawimg_lua_get_endian},
+	{"cfa_pattern",rawimg_lua_get_cfa_pattern},
+	{"make_rgb_thumb",rawimg_lua_make_rgb_thumb},
 	{NULL, NULL}
 };
 

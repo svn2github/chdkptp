@@ -870,11 +870,18 @@ function chdku.rc_process_dng(dng_info,raw)
 	if not ifd then 
 		return false, 'ifd 0.0 not found'
 	end
-
-	local bpp = ifd.byname.BitsPerSample:getel()
+	local ifd0=hdr:get_ifd{0} -- assume thumb is first ifd
+	if not ifd0 then 
+		return false, 'ifd 0 not found'
+	end
 
 	raw.data:reverse_bytes()
+
+	local bpp = ifd.byname.BitsPerSample:getel()
 	local width = ifd.byname.ImageWidth:getel()
+	local height = ifd.byname.ImageLength:getel()
+
+	cli.dbgmsg('dng %dx%dx%d\n',width,height,bpp)
 	
 	-- values are assumed to be valid
 	-- sub-image, pad
@@ -891,51 +898,23 @@ function chdku.rc_process_dng(dng_info,raw)
 		-- replace original data
 		raw.data=fullraw
 	end
-	dng_info.thumb = lbuf.new(128*96*3) -- TODO should get from exif
 
-	-- TODO temp VERY primitive thumb for testing
-	-- this should be a lib function
-	local height = ifd.byname.ImageLength:getel()
-	local status,img = pcall(rawimg.bind_lbuf,{
-		data=raw.data,
-		width=width,
-		height=height,
-		bpp=bpp,
-		endian='big',
-	})
+	local twidth = ifd0.byname.ImageWidth:getel()
+	local theight = ifd0.byname.ImageLength:getel()
+
+	local status, err = pcall(hdr.set_data,hdr,raw.data)
 	if not status then
-		cli.dbgmsg('not creating thumb: %s',tostring(img))
+		cli.dbgmsg('not creating thumb: %s\n',tostring(err))
+		dng_info.thumb = lbuf.new(twidth*theight*3)
 		return true -- thumb failure isn't fatal
 	end
-	cli.dbgmsg('got image %dx%d@%d\n',img:width(),img:height(),img:bpp())
+	-- TODO optionally patch bad pixels
 	cli.dbgmsg('creating thumb')
+	cli.dbgmsg(' %dx%d\n',twidth,theight)
 
-	local w = width/128;
-	local h = height/96;
-	local min = 2^(bpp)
-	local max = 0
-	local total = 0
-	local count = 0
-	local off = 0
-	local pixel_scale = 2^(bpp - 8)
-
-	for y=0,height-1,h do
-		for x=0,width-1,w do
-			local v = img:get_pixel(x,y)/pixel_scale
-			dng_info.thumb:set_u8(off,v,v,v)
-			if v > max then
-				max = v
-			end
-			if v < min then
-				min = v
-			end
-			total = total + v
-			count = count + 1
-			off = off + 3
-		end
-		cli.dbgmsg('.')
-	end
-	cli.dbgmsg('\nw=%d h=%d c=%d min %d max %d avg %d\n',w,h,count,min,max,total/count)
+	-- TODO assumes header is set up for RGB uncompressed
+	-- TODO could make a better / larger thumb than default and adjust entries
+	dng_info.thumb = hdr.img:make_rgb_thumb(twidth,theight)
 	return true
 end
 --[[

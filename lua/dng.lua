@@ -178,6 +178,16 @@ local ifd_entry_methods = {
 		return (self.count * self:type().size <= 4)
 	end,
 	--[[
+	return the offset of the data within the lbuf, either inline in the ifd entry or in body
+	]]
+	get_data_off = function(self) 
+		if self:is_inline() then
+			return self.off + 8 -- short tag + short type + long count
+		else
+			return self.valoff
+		end
+	end,
+	--[[
 	get a numeric elements of a value
 	for ASCII, bytes are returned
 	for rational, numerator and denominator are retuned in an array
@@ -195,13 +205,7 @@ local ifd_entry_methods = {
 		if t.name == 'unk' then
 			return nil
 		end
-		local v_off
-		if self:is_inline() then
-			v_off = self.off + 8 -- short tag + short type + long count
-		else
-			v_off = self.valoff
-		end
-		v_off = v_off + t.size*index
+		local v_off = self:get_data_off() + t.size*index
 		if not t.lb_get then
 			return nil
 		end
@@ -209,6 +213,11 @@ local ifd_entry_methods = {
 			return {t.lb_get(self._lb,v_off,2)}
 		end
 		return t.lb_get(self._lb,v_off)
+	end,
+	-- get bytes as a lua string
+	get_byte_str = function(self)
+		local v_off = self:get_data_off()
+		return self._lb:string(v_off+1,v_off+self:type().size*self.count)
 	end,
 }
 function m.bind_ifd_entry(d,ifd,i)
@@ -329,6 +338,20 @@ function dng_methods.print_info(self)
 	end
 end
 
+function dng_methods.print_img_info(self)
+	local img = self.img
+	if not img then
+		printf("no image\n")
+		return
+	end
+	printf("%dx%dx%d %s endian ",img:width(),img:height(),img:bpp(),img:endian())
+	local cfa={img:cfa_pattern():byte(1,-1)}
+	for i,v in ipairs(cfa) do
+		printf("%s",tostring(({[0]='R','G','B'})[v]))
+	end
+	printf("\n")
+end
+
 function dng_methods.dump_thumb(self,dst)
 	local ifd=self:get_ifd{0} -- assume main image is first subifd of first ifd
 	local bpp = ifd.byname.BitsPerSample:getel() -- note has values for r,g,b
@@ -400,11 +423,11 @@ set image data, either to internal data or an external lbuf
 initializes dng.img
 order is only for testing external data in little endian format
 ]]
-function dng_methods.set_data(self,data_lb,offset,order)
+function dng_methods.set_data(self,data,offset,order)
 	-- TODO makes assumptions about header layout
 	local ifd=self:get_ifd{0,0} -- assume main image is first subifd of first ifd
 	if not ifd then 
-		return false, 'ifd 0.0 not found'
+		error('ifd 0.0 not found')
 	end
 
 	if not order then
@@ -416,12 +439,11 @@ function dng_methods.set_data(self,data_lb,offset,order)
 	end
 
 	-- no data, use internal
-	if not data_lb then
+	if not data then
 		data = self._lb
 		offset = ifd.byname.StripOffsets:getel() -- TODO in theory could be more than one
 		-- order should always be big for embedded data
 	end
-
 
 	local img = rawimg.bind_lbuf{
 		data=data,
@@ -430,6 +452,13 @@ function dng_methods.set_data(self,data_lb,offset,order)
 		height=ifd.byname.ImageLength:getel(),
 		bpp=ifd.byname.BitsPerSample:getel(),
 		endian=order,
+		cfa_pattern=ifd.byname.CFAPattern:get_byte_str(),
+		active_area={
+			top=ifd.byname.ActiveArea:getel(0),
+			left=ifd.byname.ActiveArea:getel(1),
+			bottom=ifd.byname.ActiveArea:getel(2),
+			right=ifd.byname.ActiveArea:getel(3),
+		}
 	}
 	self.img = img
 	return true
