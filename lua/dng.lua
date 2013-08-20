@@ -581,6 +581,7 @@ function m.load(filename)
 	if not d then
 		return false, err
 	end
+	d.filename = filename
 	local status, err = d:set_data()
 	if not status then
 		return false, err

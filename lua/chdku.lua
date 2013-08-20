@@ -860,8 +860,7 @@ function chdku.rc_build_path(hdata,dir,filename,ext)
 end
 
 function chdku.rc_process_dng(dng_info,raw)
-	local dnglib=require'dng'
-	local hdr,err=dnglib.bind_header(dng_info.hdr)
+	local hdr,err=dng.bind_header(dng_info.hdr)
 	if not hdr then
 		return false, err
 	end

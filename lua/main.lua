@@ -22,6 +22,7 @@ prefs=require('prefs')
 chdku=require('chdku')
 cli=require('cli')
 exp=require('exposure')
+dng=require('dng')
 --[[
 Command line arguments
 --]]
