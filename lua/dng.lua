@@ -418,6 +418,39 @@ function dng_methods.dump_image(self,dst)
 	return true
 end
 
+local function do_set_pixel_test(img)
+	local bad = 0
+	local bad_b = 0
+	local bad_a = 0
+	for y=200,400 do
+		for x=200,1200 do
+			-- assumes get has already been validated
+			-- check neighbors since packing set can affect both
+			local v={
+				img:get_pixel(x-2,y),
+				img:get_pixel(x-1,y),
+				img:get_pixel(x,y),
+				img:get_pixel(x+1,y),
+				img:get_pixel(x+2,y),
+			}
+			img:set_pixel(x,y,v[3])
+			if v[3] ~= img:get_pixel(x,y) then
+				bad = bad + 1
+			end
+			if v[1] ~= img:get_pixel(x-2,y) or v[2] ~= img:get_pixel(x-1,y) then
+				bad_b = bad_b + 1
+			end
+			if v[4] ~= img:get_pixel(x+1,y) or v[5] ~= img:get_pixel(x+2,y)then
+				bad_a = bad_a + 1
+			end
+		end
+	end
+	if bad > 0 or bad_b > 0 or bad_a > 0 then
+		printf("mismatched %d before %d after %d\n",bad, bad_b, bad_a)
+	else
+		printf("ok\n",bad)
+	end
+end
 function dng_methods.test_set_pixel(self)
 	local img = self.img
 	if not img then
@@ -427,22 +460,8 @@ function dng_methods.test_set_pixel(self)
 	local height=img:height()
 	local bpp=img:bpp()
 
-	local bad = 0
-	for y=200,400 do
-		for x=200,1200 do
-			-- assumes get has already been validated
-			local v=img:get_pixel(x,y)
-			img:set_pixel(x,y,v)
-			if v ~= img:get_pixel(x,y) then
-				bad = bad + 1
-			end
-		end
-	end
-	if bad > 0 then
-		printf("big mismatched %d\n",bad)
-	else
-		printf("big ok\n",bad)
-	end
+	printf('testing big endian\n')
+	do_set_pixel_test(img)
 
 	local ifd=self:get_ifd{0,0}
 	local offset = ifd.byname.StripOffsets:getel()
@@ -451,22 +470,9 @@ function dng_methods.test_set_pixel(self)
 	self:set_data(ldata,0,'little')
 	img = self.img
 
-	local bad = 0
-	for y=200,400 do
-		for x=200,1200 do
-			-- assumes get has already been validated
-			local v=img:get_pixel(x,y)
-			img:set_pixel(x,y,v)
-			if v ~= img:get_pixel(x,y) then
-				bad = bad + 1
-			end
-		end
-	end
-	if bad > 0 then
-		printf("little mismatched %d\n",bad)
-	else
-		printf("little ok\n",bad)
-	end
+	printf('testing little endian\n')
+	do_set_pixel_test(img)
+
 	self:set_data() -- restore default data
 end
 
@@ -504,6 +510,7 @@ function dng_methods.set_data(self,data,offset,order)
 		height=ifd.byname.ImageLength:getel(),
 		bpp=ifd.byname.BitsPerSample:getel(),
 		endian=order,
+		black_level=ifd.byname.BlackLevel:getel(),
 		cfa_pattern=ifd.byname.CFAPattern:get_byte_str(),
 		active_area={
 			top=ifd.byname.ActiveArea:getel(0),

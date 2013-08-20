@@ -64,6 +64,10 @@ static const char *endian_strings[] = {
 #define RAW_BLOCK_BYTES_14l 14
 #define RAW_BLOCK_BYTES_14b 7
 
+#define CFA_RED   0
+#define CFA_GREEN 1
+#define CFA_BLUE  2
+
 typedef unsigned (*get_pixel_func_t)(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
 typedef void (*set_pixel_func_t)(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 
@@ -86,6 +90,7 @@ typedef struct {
 	unsigned active_left;
 	unsigned active_bottom;
 	unsigned active_right;
+	unsigned black_level;
 	uint8_t *data;
 } raw_image_t;
 
@@ -122,6 +127,12 @@ static raw_format_t* rawimg_find_format(unsigned bpp, unsigned endian) {
 	return NULL;
 }
 
+/*
+return color for given x,y
+*/
+static unsigned cfa_color(raw_image_t *img, unsigned x, unsigned y) {
+	return img->cfa_pattern[(x&1) + (y&1)*2];
+}
 
 unsigned raw_get_pixel_10l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
 {
@@ -201,14 +212,14 @@ void raw_set_pixel_10b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, u
 		break;
 		case 1:
 			addr[1] = (addr[1]&0xC0)|(value>>4);
-			addr[3] = (addr[2]&0x0F)|(value<<4);
+			addr[2] = (addr[2]&0x0F)|(value<<4);
 		break;
 		case 2:
-			addr[2] = (addr[3]&0x03)|(value<<2);
-			addr[3] = (addr[2]&0xF0)|(value>>6);
+			addr[3] = (addr[3]&0x03)|(value<<2);
+			addr[2] = (addr[2]&0xF0)|(value>>6);
 		break;
 		case 3:
-			addr[3] = (addr[2]&0xFC)|(value>>8); 
+			addr[3] = (addr[3]&0xFC)|(value>>8); 
 			addr[4] = value;
 		break;
 	}
@@ -446,6 +457,60 @@ static int rawimg_lua_make_rgb_thumb(lua_State *L) {
 	return 1;
 }
 
+static unsigned rawimg_get_pixel_safe(raw_image_t *img, unsigned x, unsigned y) {
+	if(x >= img->width || y >= img->height) {
+		return 0;
+	}
+	return img->fmt->get_pixel(img->data,img->row_bytes,x,y);
+}
+/*
+interpolate over a pixel, using non-blacklevel neighbors of the same color
+*/
+static void rawimg_patch_pixel(raw_image_t *img,unsigned x, unsigned y) {
+	unsigned c = cfa_color(img,x,y);
+	unsigned neigh[4];
+	if(c == CFA_GREEN) {
+		neigh[0] = rawimg_get_pixel_safe(img,x-1,y-1);
+		neigh[1] = rawimg_get_pixel_safe(img,x+1,y-1);
+		neigh[2] = rawimg_get_pixel_safe(img,x-1,y+1);
+		neigh[3] = rawimg_get_pixel_safe(img,x+1,y+1);
+	} else {
+		neigh[0] = rawimg_get_pixel_safe(img,x-2,y);
+		neigh[1] = rawimg_get_pixel_safe(img,x+2,y);
+		neigh[2] = rawimg_get_pixel_safe(img,x,y-2);
+		neigh[3] = rawimg_get_pixel_safe(img,x,y+2);
+	}
+	unsigned i,total = 0,count = 0;
+	for(i=0;i<4;i++) {
+		if(neigh[i] > img->black_level) {
+			total += neigh[i];
+			count++;
+		}
+	}
+	if(count) {
+		img->fmt->set_pixel(img->data,img->row_bytes,x,y,total/count);
+	} else {
+	}
+}
+/*
+patch pixels with value below a threshold
+img:patch_pixels(v)
+*/
+static int rawimg_lua_patch_pixels(lua_State *L) {
+	raw_image_t* img = (raw_image_t *)luaL_checkudata(L, 1, RAWIMG_META);
+	unsigned badval=luaL_checknumber(L,2);
+	int x,y;
+	for(y=img->active_top;y<img->active_bottom;y++) {
+		for(x=img->active_left;x<img->active_right;x++) {
+			unsigned val = img->fmt->get_pixel(img->data,img->row_bytes,x,y);
+			if(val <= badval) {
+				rawimg_patch_pixel(img,x,y);
+			}
+		}
+	}
+	return 0;
+}
+
 /*
 helper functions to get args from a table
 should be a standalone utility library
@@ -505,6 +570,7 @@ imgspec {
 	endian:string "little"|"big"
 -- optional fields
 	data_offset:number -- offset into data lbuf, default 0
+	blacklevel -- default 0
 	cfa_pattern:string -- 4 byte string
 	active_area: { -- default 0,0,height,width
 		top:number
@@ -536,13 +602,17 @@ static int rawimg_lua_bind_lbuf(lua_State *L) {
 
 	unsigned endian = table_checkoption(L,1,"endian",NULL,endian_strings);
 
+	img->black_level = table_optnumber(L,1,"black_level",0);
+
 	size_t cfa_size;
+	// TODO DNG cfa is relative to active area, should shift if top or left is odd
 	const char *cfa_pattern = table_optlstring(L,1,"cfa_pattern",NULL,&cfa_size);
 	if(!cfa_pattern) {
 		memset(img->cfa_pattern,0,4);
 	} else if(cfa_size != 4) {
 		return luaL_error(L,"unknown cfa pattern");
 	} else {
+		// TODO should verify contains only R,G,B
 		memcpy(img->cfa_pattern,cfa_pattern,4);
 	}
 
@@ -629,6 +699,7 @@ static const luaL_Reg rawimg_methods[] = {
 	{"endian",rawimg_lua_get_endian},
 	{"cfa_pattern",rawimg_lua_get_cfa_pattern},
 	{"make_rgb_thumb",rawimg_lua_make_rgb_thumb},
+	{"patch_pixels",rawimg_lua_patch_pixels},
 	{NULL, NULL}
 };
 
