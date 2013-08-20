@@ -899,6 +899,7 @@ function chdku.rc_process_dng(dng_info,raw)
 		raw.data=fullraw
 	end
 
+
 	local twidth = ifd0.byname.ImageWidth:getel()
 	local theight = ifd0.byname.ImageLength:getel()
 
@@ -908,10 +909,13 @@ function chdku.rc_process_dng(dng_info,raw)
 		dng_info.thumb = lbuf.new(twidth*theight*3)
 		return true -- thumb failure isn't fatal
 	end
-	-- TODO optionally patch bad pixels
-	cli.dbgmsg('creating thumb')
-	cli.dbgmsg(' %dx%d\n',twidth,theight)
+	if dng_info.badpix then
+		cli.dbgmsg('patching badpixels: ')
+		local bcount=hdr.img:patch_pixels() -- TODO should use values from opcodes
+		cli.dbgmsg('%d\n',bcount)
+	end
 
+	cli.dbgmsg('creating thumb: %dx%d\n',twidth,theight)
 	-- TODO assumes header is set up for RGB uncompressed
 	-- TODO could make a better / larger thumb than default and adjust entries
 	dng_info.thumb = hdr.img:make_rgb_thumb(twidth,theight)

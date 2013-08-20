@@ -1450,6 +1450,7 @@ cli:add_commands{
 			s=false,
 			c=false,
 			cont=false,
+			badpix=false,
 		},
 		help_detail=[[
  [local]       local destination directory or filename (w/o extension!)
@@ -1470,6 +1471,7 @@ cli:add_commands{
    -s=<start>   first line of for subimage raw
    -c=<count>   number of lines for subimage
    -cont=<num>  shoot num shots in continuous mode
+   -badpix      interpolate over zero value pixels (dng only)
 ]],
 		func=function(self,args)
 			local dst = args[1]
@@ -1523,6 +1525,10 @@ cli:add_commands{
 				args.jpg = true
 			end
 
+			if args.badpix and not args.dng then
+				util.warnf('badpix without dng ignored\n')
+			end
+
 			if args.s or args.c then
 				if args.dng or args.raw then
 					if args.s then
@@ -1564,6 +1570,7 @@ cli:add_commands{
 				local dng_info = {
 					lstart=opts.lstart,
 					lcount=opts.lcount,
+					badpix=args.badpix,
 				}
 				rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
 				rcopts.raw = chdku.rc_handler_raw_dng_file(dst_dir,dst,'dng',dng_info)

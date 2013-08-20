@@ -465,8 +465,9 @@ static unsigned rawimg_get_pixel_safe(raw_image_t *img, unsigned x, unsigned y) 
 }
 /*
 interpolate over a pixel, using non-blacklevel neighbors of the same color
+returns 1 if patched, 0 if not
 */
-static void rawimg_patch_pixel(raw_image_t *img,unsigned x, unsigned y) {
+static int rawimg_patch_pixel(raw_image_t *img,unsigned x, unsigned y) {
 	unsigned c = cfa_color(img,x,y);
 	unsigned neigh[4];
 	if(c == CFA_GREEN) {
@@ -489,26 +490,31 @@ static void rawimg_patch_pixel(raw_image_t *img,unsigned x, unsigned y) {
 	}
 	if(count) {
 		img->fmt->set_pixel(img->data,img->row_bytes,x,y,total/count);
-	} else {
+		return 1;
 	}
+	return 0;
 }
 /*
 patch pixels with value below a threshold
-img:patch_pixels(v)
+count=img:patch_pixels([badval])
+badval: pixels <= this value will be patched, default 0
+count: number of pixels actually modified
 */
 static int rawimg_lua_patch_pixels(lua_State *L) {
 	raw_image_t* img = (raw_image_t *)luaL_checkudata(L, 1, RAWIMG_META);
-	unsigned badval=luaL_checknumber(L,2);
-	int x,y;
+	unsigned badval=luaL_optnumber(L,2,0);
+	unsigned x,y;
+	unsigned count=0;
 	for(y=img->active_top;y<img->active_bottom;y++) {
 		for(x=img->active_left;x<img->active_right;x++) {
 			unsigned val = img->fmt->get_pixel(img->data,img->row_bytes,x,y);
 			if(val <= badval) {
-				rawimg_patch_pixel(img,x,y);
+				count += rawimg_patch_pixel(img,x,y);
 			}
 		}
 	}
-	return 0;
+	lua_pushnumber(L,count);
+	return 1;
 }
 
 /*
