@@ -392,6 +392,49 @@ function util.array_slice(t,opts)
 end
 
 --[[
+split str delimited by pattern pat, or plain text if opts.plain
+empty pat splits chars
+trailing delimiters generate empty strings
+with func, iterate over split strings
+]]
+function util.string_split(str,pat,opts)
+	opts = util.extend_table({
+		plain=false,
+		start=1,
+	},opts)
+	local r = {}
+	local pos = opts.start
+	local s,e 
+	if not opts.func then
+		opts.func = function(v)
+			table.insert(r,v)
+		end
+	end
+	if string.len(pat) == 0 then
+		while true do
+			local c = string.sub(str,pos,pos)
+			if string.len(c) == 0 then
+				return r
+			end
+			pos = pos+1
+			opts.func(c)
+		end
+	end
+
+	while true do
+		s, e = string.find(str,pat,pos,opts.plain)
+		if not s then
+			opts.func(string.sub(str,pos,-1))
+			break
+		end
+		opts.func(string.sub(str,pos,s-1))
+		pos = e + 1
+	end
+
+	return r
+end
+
+--[[
 very simple meta-table inheritance
 ]]
 function util.mt_inherit(t,base)
