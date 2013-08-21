@@ -124,22 +124,65 @@ m.init_cli = function()
 		help='display information about a dng',
 		arghelp="[options]",
 		args=cli.argparser.create({
-			ifds=false,
+			s=false,
+			ifd=false,
+			h=false,
+			r=false,
+			v=false,
 		}),
-		-- TODO more ifd options
 		help_detail=[[
  options:
-   -ifds  display all ifds
+   -s   summary info, default if no other options given
+   -h   tiff header
+   -ifd[=<ifd>]
+   	   raw, exif, main, or 0, 0.0 etc. default 0
+   -r   recurse into sub-ifds
+   -v   display ifd values, except image data
 ]],
 		func=function(self,args) 
 			local d = m.selected
 			if not d then
 				return false, 'no file selected'
 			end
+			if not args.h and not args.ifd then
+				args.s = true
+			end
 			printf("%s:\n",d.filename)
-			d:print_img_info()
-			if args.ifds then
-				d:print_info()
+			if args.s then
+				d:print_summary()
+			end
+			if args.h then
+				d:print_header()
+			end
+			if args.ifd then
+				local ifd
+				if args.ifd == true then
+					ifd = d.main_ifd
+				elseif args.ifd == 'raw' then
+					ifd = d.raw_ifd
+				elseif args.ifd == 'main' then
+					ifd = d.main_ifd
+				elseif args.ifd == 'exif' then
+					ifd = d.exif_ifd
+				else
+					local path={}
+					util.string_split(args.ifd,'.',{
+						plain=true,
+						func=function(v)
+							local n=tonumber(v)
+							if n then
+								table.insert(path,n)
+							else
+								table.insert(path,v)
+							end
+						end
+					})
+					ifd = d:get_ifd(path)
+				end
+				if not ifd then
+					return false, 'could not find ifd ',tostring(args.ifd)
+				end
+				d:print_ifd(ifd,{recurse=args.r})
 			end
 			return true
 		end,
@@ -172,7 +215,7 @@ m.init_cli = function()
    dng number from dnglist to select
 ]],
 		func=function(self,args) 
-			local n = tonumber(args[0])
+			local n = tonumber(args[1])
 			if m.list[n] then
 				m.selected = m.list[n]
 				return true, string.format('selected %d: %s',n,m.selected.filename)
@@ -192,7 +235,7 @@ m.init_cli = function()
  options:
    -thumb   extract thumbnail raw rgb
    -raw     extract raw data
-   -fmt=<
+   -fmt=...
 ]],
 		func=function(self,args) 
 		end,
@@ -201,4 +244,3 @@ m.init_cli = function()
 end
 
 return m
-

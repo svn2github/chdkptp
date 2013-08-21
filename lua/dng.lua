@@ -178,6 +178,24 @@ local ifd_entry_methods = {
 		return (self.count * self:type().size <= 4)
 	end,
 	--[[
+	return a formatted text description of the tag (name, number, type, count, offset/value)
+	]]
+	describe = function(self)
+		local vdesc
+		if self:is_inline() then
+			vdesc = ' value'
+		else 
+			vdesc = 'offset'
+		end
+		return string.format('%-30s tag=0x%04x type=%-10s count=%07d %s=0x%08x',
+					self:tagname(),
+					self.tag,
+					self:type().name,
+					self.count,
+					vdesc,
+					self.valoff)
+	end,
+	--[[
 	return the offset of the data within the lbuf, either inline in the ifd entry or in body
 	]]
 	get_data_off = function(self) 
@@ -219,6 +237,24 @@ local ifd_entry_methods = {
 		local v_off = self:get_data_off()
 		return self._lb:string(v_off+1,v_off+self:type().size*self.count)
 	end,
+	-- get ascii string field ass array of strings
+	get_ascii_all = function(self)
+		if not self:type().string then
+			return nil
+		end
+		local bytes = self:get_byte_str()
+		local strings = {} -- every ascii field can theoretically contain multiple null terminated strings
+		for s in string.gmatch(bytes,'[^%z]+') do
+			table.insert(strings,s)
+		end
+		return strings
+	end,
+	get_ascii = function(self,index)
+		if not index then
+			index = 0
+		end
+		return (self:get_ascii_all())[index+1]
+	end,
 }
 function m.bind_ifd_entry(d,ifd,i)
 	local off = ifd.off + 2 + i*12 -- offset + entry count + index*sizeof(entry)
@@ -234,7 +270,7 @@ function m.bind_ifd_entry(d,ifd,i)
 end
 
 -- ifds
-function m.bind_ifds(d,ifd_off,ifd_list)
+function m.bind_ifds(d,ifd_off,ifd_list,parent)
 	-- for sub, we may be appending
 	if not ifd_list then
 		ifd_list={}
@@ -251,6 +287,7 @@ function m.bind_ifds(d,ifd_off,ifd_list)
 			entries={},
 			bytag={},
 			byname={},
+			parent=parent,
 		}
 		for i=0, n_entries-1 do
 			local e = m.bind_ifd_entry(d,ifd,i)
@@ -259,13 +296,13 @@ function m.bind_ifds(d,ifd_off,ifd_list)
 				ifd.sub={}
 				-- sub ifds could point to a list of offsets, which could in turn each be chained (???)
 				for i=1,e.count do
-					m.bind_ifds(d,e.valoff+(i-1)*e:type().elsize,ifd.sub)
+					m.bind_ifds(d,e.valoff+(i-1)*e:type().elsize,ifd.sub,ifd)
 				end
 			elseif e.tag == m.tags_map.ExifIFD then
 				ifd.exif={ }
 				-- assume there is only one
 				if e.count == 1 then
-					m.bind_ifds(d,e.valoff,ifd.exif)
+					m.bind_ifds(d,e.valoff,ifd.exif,ifd)
 					ifd.exif[1].is_exif=true
 				else
 					util.warnf('multiple exif IFDs per IFD not supported')
@@ -285,75 +322,105 @@ end
 
 local dng_methods={}
 
--- TODO path needs to be set manually if not printing recursively
-function dng_methods.print_ifd(self,ifd,path)
-	if not path then
-		path = {}
-	end
-	-- before insert, want 0 for top level
-	local indent = string.rep(' ',#path)
-	table.insert(path,ifd.index)
+function dng_methods.print_ifd(self,ifd,opts)
+	opts=util.extend_table({
+		depth=0,
+		maxvals=20,
+		recurse=false,
+	},opts)
 
+	local indent = string.rep(' ',opts.depth)
+	opts.depth = opts.depth+1
 	local pathstr
 	if ifd.is_exif then
-		pathstr = table.concat(path,'.',1,#path-1)
-		pathstr = pathstr..'.exif'
+		pathstr = 'exif'
 	else
-		pathstr = table.concat(path,'.')
+		pathstr = ifd.index
 	end
+	local p = ifd.parent
+	while p do
+		pathstr = p.index .. '.' .. pathstr
+		p = p.parent
+	end
+
 	printf('%sifd%s offset=0x%x entries=%d\n',indent,pathstr,ifd.off,ifd.n_entries)
 	for j, e in ipairs(ifd.entries) do
-		local vdesc = 'offset'
-		if e:is_inline() then
-			vdesc = ' value'
-		end
-		printf('%s %-30s tag=0x%04x type=%-10s count=%07d %s=0x%08x\n',
-					indent,
-					e:tagname(),
-					e.tag,
-					e:type().name,
-					e.count,
-					vdesc,
-					e.valoff)
+		printf('%s %s\n',indent,e:describe())
 	end
-	if ifd.sub then
-		for i, subifd in ipairs(ifd.sub) do
-			self:print_ifd(subifd,path)
+	if opts.recurse then
+		if ifd.sub then
+			for i, subifd in ipairs(ifd.sub) do
+				self:print_ifd(subifd,opts)
+			end
+		end
+		if ifd.exif then
+			for i, subifd in ipairs(ifd.exif) do
+				self:print_ifd(subifd,opts)
+			end
 		end
 	end
-	if ifd.exif then
-		for i, subifd in ipairs(ifd.exif) do
-			self:print_ifd(subifd,path)
-		end
-	end
-	table.remove(path)
+	opts.depth = opts.depth-1
 end
 
-function dng_methods.print_info(self)
+function m.cfa_bytes_to_str(cfa_bytes) 
+	local cfa={cfa_bytes:byte(1,-1)}
+	local r = ''
+	for i,v in ipairs(cfa) do
+		r= r.. tostring(({[0]='R','G','B'})[v])
+	end
+	return r
+end
+
+function m.dng_version_to_str(ver_bytes)
+	return string.format('%d.%d.%d.%d',ver_bytes:byte(1,-1))
+end
+
+function dng_methods.cfa_str(self)
+	return m.cfa_bytes_to_str(self.raw_ifd.byname.CFAPattern:get_byte_str())
+end
+
+function dng_methods.print_summary(self)
+	printf("%dx%dx%d %s DNG %s / %s %s %s\n",
+		self.raw_ifd.byname.ImageWidth:getel(),
+		self.raw_ifd.byname.ImageLength:getel(),
+		self.raw_ifd.byname.BitsPerSample:getel(),
+		self:cfa_str(),
+		m.dng_version_to_str(self.main_ifd.byname.DNGVersion:get_byte_str()),
+		m.dng_version_to_str(self.main_ifd.byname.DNGBackwardVersion:get_byte_str()),
+		self.main_ifd.byname.Software:get_ascii(),
+		self.main_ifd.byname.Model:get_ascii()
+	)
+end
+function dng_methods.print_header(self)
 	for i,fname in ipairs(m.header_fields) do
 		printf('%s 0x%x\n',fname,self[fname])
 	end
+end
+function dng_methods.print_info(self)
+	self:print_header()
 	for i, ifd in ipairs(self.ifds) do 
-		self:print_ifd(ifd)
+		self:print_ifd(ifd,{recurse=true})
 	end
 end
 
+-- for testing rawimg
 function dng_methods.print_img_info(self)
 	local img = self.img
 	if not img then
 		printf("no image\n")
 		return
 	end
-	printf("%dx%dx%d %s endian ",img:width(),img:height(),img:bpp(),img:endian())
-	local cfa={img:cfa_pattern():byte(1,-1)}
-	for i,v in ipairs(cfa) do
-		printf("%s",tostring(({[0]='R','G','B'})[v]))
-	end
-	printf("\n")
+	printf("%dx%dx%d %s endian %s\n",
+		img:width(),
+		img:height(),
+		img:bpp(),
+		img:endian(),
+		m.cfa_bytes_to_str(img:cfa_pattern())
+	)
 end
 
 function dng_methods.dump_thumb(self,dst)
-	local ifd=self:get_ifd{0} -- assume main image is first subifd of first ifd
+	local ifd=self.main_ifd -- assume thumb is in first ifd
 	local bpp = ifd.byname.BitsPerSample:getel() -- note has values for r,g,b
 	if bpp ~= 8 then
 		return false, 'only 8 bpp supported'
@@ -463,7 +530,7 @@ function dng_methods.test_set_pixel(self)
 	printf('testing big endian\n')
 	do_set_pixel_test(img)
 
-	local ifd=self:get_ifd{0,0}
+	local ifd=self.raw_ifd
 	local offset = ifd.byname.StripOffsets:getel()
 	local ldata = self._lb:sub(offset+1,offset+ifd.byname.StripByteCounts:getel())
 	ldata:reverse_bytes()
@@ -483,7 +550,7 @@ order is only for testing external data in little endian format
 ]]
 function dng_methods.set_data(self,data,offset,order)
 	-- TODO makes assumptions about header layout
-	local ifd=self:get_ifd{0,0} -- assume main image is first subifd of first ifd
+	local ifd=self.raw_ifd
 	if not ifd then 
 		error('ifd 0.0 not found')
 	end
@@ -569,6 +636,10 @@ function m.bind_header(lb)
 		return false, string.format('invalid id %d, expected 42',d.id)
 	end
 	d.ifds = m.bind_ifds(d,d.ifd0_off)
+	-- shortcuts to main IFDs of interest, could be smarter about finding them
+	d.main_ifd = d:get_ifd{0} -- thumb an overall information
+	d.raw_ifd = d:get_ifd{0,0} -- raw data
+	d.exif_ifd = d:get_ifd{0,'exif'} -- exif
 	return d
 end
 
@@ -582,6 +653,7 @@ function m.load(filename)
 		return false, err
 	end
 	d.filename = filename
+	-- TODO this will fail loading dngs that aren't in a format supported by rawimg
 	local status, err = d:set_data()
 	if not status then
 		return false, err
