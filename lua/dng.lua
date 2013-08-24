@@ -269,6 +269,44 @@ function m.bind_ifd_entry(d,ifd,i)
 	return e
 end
 
+local ifd_methods = {}
+
+--[[
+write image data, either to a file handle or name
+]]
+function ifd_methods.has_image(self)
+	if self.byname.StripOffsets == nil or self.byname.StripByteCounts == nil then
+		return false
+	end
+	return true
+end
+
+function ifd_methods.write_image_data(self,dst)
+	local fh
+	-- some ifds (e.g. exif) don't have image data
+	if not self:has_image() then
+		error('ifd does not contain image data')
+	end
+
+	if type(dst) == 'string' then
+		local err
+		fh, err = io.open(dst,'wb')
+		if not fh then
+			error('open failed '..tostring(err))
+		end
+	elseif type(dst) == 'userdata' and type(dst.read) == 'function' then
+		fh = dst
+	else
+		error('expected string or file')
+	end
+	for i=0,self.byname.StripOffsets.count - 1 do
+		self.dng._lb:fwrite(fh,self.byname.StripOffsets:getel(i),self.byname.StripByteCounts:getel(i))
+	end
+	if fh ~= dst then
+		fh:close()
+	end
+end
+
 -- ifds
 function m.bind_ifds(d,ifd_off,ifd_list,parent)
 	-- for sub, we may be appending
@@ -281,13 +319,14 @@ function m.bind_ifds(d,ifd_off,ifd_list,parent)
 		end
 		local n_entries = d._lb:get_u16(ifd_off)
 		local ifd = {
+			dng=d, -- DNG object this ifd belongs to
 			index=#ifd_list,
 			off=ifd_off,
 			n_entries=n_entries,
 			entries={},
 			bytag={},
 			byname={},
-			parent=parent,
+			parent=parent, -- parent ifd, if any
 		}
 		for i=0, n_entries-1 do
 			local e = m.bind_ifd_entry(d,ifd,i)
@@ -314,6 +353,7 @@ function m.bind_ifds(d,ifd_off,ifd_list,parent)
 				ifd.byname[e:tagname()] = e
 			end
 		end
+		util.extend_table(ifd,ifd_methods)
 		table.insert(ifd_list,ifd)
 		ifd_off = d._lb:get_u32(ifd_off + n_entries * 12 + 2)
 	until ifd_off == 0
@@ -419,30 +459,6 @@ function dng_methods.print_img_info(self)
 	)
 end
 
-function dng_methods.dump_thumb(self,dst)
-	local ifd=self.main_ifd -- assume thumb is in first ifd
-	local bpp = ifd.byname.BitsPerSample:getel() -- note has values for r,g,b
-	if bpp ~= 8 then
-		return false, 'only 8 bpp supported'
-	end
-
-	local width = ifd.byname.ImageWidth:getel()
-	local rowbytes = (width * bpp)/8;
-	local height = ifd.byname.ImageLength:getel()
-
-	local offset = ifd.byname.StripOffsets:getel() -- TODO in theory could be more than one
-
-	local data = self._lb:sub(offset+1,offset+ifd.byname.StripByteCounts:getel())
-
-	local fh,err = io.open(dst,'wb')
-	if not fh then
-		return false, 'open failed '..tostring(err)
-	end
-	data:fwrite(fh)
-	fh:close()
-	return true
-end
-
 --[[
 inefficient function to dump image data to 8bbp (truncated) grayscale
 ]]
@@ -518,6 +534,7 @@ local function do_set_pixel_test(img)
 		printf("ok\n",bad)
 	end
 end
+
 function dng_methods.test_set_pixel(self)
 	local img = self.img
 	if not img then
@@ -654,6 +671,7 @@ function m.load(filename)
 	end
 	d.filename = filename
 	-- TODO this will fail loading dngs that aren't in a format supported by rawimg
+	-- TODO also will prevent loading standalone headers
 	local status, err = d:set_data()
 	if not status then
 		return false, err

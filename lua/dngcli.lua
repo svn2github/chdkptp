@@ -32,6 +32,72 @@ m.get_index = function(to_find)
 	return nil
 end
 
+local function dngmod_single(d,args)
+	if args.patch then
+		if args.patch == true then
+			args.patch = 0
+		else
+			args.patch = tonumber(args.patch)
+		end
+		local count = d.img:patch_pixels(args.patch)
+		printf('patched %d pixels\n',count)
+	end
+end
+
+-- find_files callback
+local function dngmod_callback(self,opts)
+	if #self.rpath == 0 and self.cur.st.mode == 'directory' then
+		return true
+	end
+	if self.cur.name == '.' or self.cur.name == '..' then
+		return true
+	end
+	local dargs = opts.dngmod_args
+	local relpath
+	local src=self.cur.full
+	if #self.cur.path == 1 then
+		relpath = self.cur.name
+	else
+		if #self.cur.path == 2 then
+			relpath = self.cur.path[2]
+		else
+			relpath = fsutil.joinpath(unpack(self.cur.path,2))
+		end
+	end
+	local dst
+	if dargs.odir then
+		dst=fsutil.joinpath_cam(dargs.odir,relpath)
+	else
+		dst=src
+	end
+	if self.cur.st.mode == 'directory' then
+		return true
+	end
+	local dstdir = fsutil.dirname(dst)
+	fsutil.mkdir_m(dstdir)
+	if lfs.attributes(dst,'mode') == 'file' and not dargs.over then
+		warnf("%s exists, skipping\n",dst)
+		return true
+	end
+	printf("process %s->%s\n",src,dst)
+	if dargs.pretend then
+		return true
+	end
+	local d,err = dng.load(src)
+	-- TODO warn and continue?
+	if not d then 
+		return false, err
+	end
+	dngmod_single(d,dargs)
+	local fh, err = io.open(dst,'wb')
+	if not fh then
+		return false, err
+	end
+	local status, err = d._lb:fwrite(fh)
+	fh:close()
+	return status,err
+end
+
 m.init_cli = function()
 	cli:add_commands{
 	{
@@ -224,20 +290,89 @@ m.init_cli = function()
 		end,
 	},
 	{
+		names={'dngmod'},
+		help='modify dng',
+		arghelp="[options] [files]",
+		args=cli.argparser.create({
+			patch=false,
+			fmatch=false,
+			dmatch=false,
+			rmatch=false,
+			nodirs=false,
+			maxdepth=100,
+			pretend=false,
+			odir=false,
+			over=false,
+		}),
+		help_detail=[[
+ options:
+   -patch[=number]   patch bad pixels
+ file selection
+   -fmatch=<pattern> upload only file with path/name matching <pattern>
+   -dmatch=<pattern> only create directories with path/name matching <pattern>
+   -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
+   -nodirs           only create directories needed to upload file 
+   -maxdepth=n       only recurse into N levels of directory
+   -pretend          print actions instead of doing them
+   -over             overwrite existing
+]],
+		func=function(self,args) 
+			if #args == 0 then
+				local d = m.selected
+				if d then
+					do_modify(d,args)
+					return true
+				else
+					return false, 'no file selected'
+				end
+			end
+			local opts={
+				dirsfirst=true,
+				fmatch=args.fmatch,
+				dmatch=args.dmatch,
+				rmatch=args.rmatch,
+				dirs=not args.nodirs,
+				pretend=args.pretend,
+				maxdepth=tonumber(args.maxdepth),
+				dngmod_args=args,
+			}
+			return fsutil.find_files({unpack(args)},opts,dngmod_callback)
+		end,
+	},
+	{
 		names={'dngdump'},
 		help='extract data from dng',
 		arghelp="[options] [path]",
 		args=cli.argparser.create({
+			thumb=false,
+			raw=false,
 		}),
+		-- TODO filename handling
 		help_detail=[[
  path:
    path or filename to extract to
  options:
    -thumb   extract thumbnail raw rgb
    -raw     extract raw data
-   -fmt=...
 ]],
 		func=function(self,args) 
+			local d = m.selected
+			if not d then
+				return false, 'no file selected'
+			end
+			local outname = args[1]
+			if not outname then
+				outname = fsutil.remove_sfx(d.filename,'.dng')
+			elseif lfs.attributes(outname,'mode') == 'directory' then
+				outname = fsutil.joinpath(outname,fsutil.basename(d.filename,'.dng'))
+			end
+			if args.thumb then
+				d.main_ifd:write_image_data(outname .. '_thm.rgb')
+			end
+			if args.raw then
+				d.raw_ifd:write_image_data(outname .. '.raw')
+			end
+			return true
 		end,
 	},
 }
