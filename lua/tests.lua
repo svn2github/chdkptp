@@ -82,6 +82,8 @@ end
 t.basename = function()
 	assert(fsutil.basename('foo/bar')=='bar')
 	assert(fsutil.basename('foo/bar.txt','.txt')=='bar')
+	assert(fsutil.basename('foo/bar.TXT','.txt')=='bar')
+	assert(fsutil.basename('foo/bar.TXT','.txt',{ignorecase=false})=='bar.TXT')
 	assert(fsutil.basename('bar')=='bar')
 	assert(fsutil.basename('bar/')=='bar')
 	spoof_fsutil_ostype('Windows')

@@ -33,9 +33,25 @@ function fsutil.dir_sep_chars()
 end
 
 --[[
+remove suffix from a path if found
+opts {
+	ignorecase=bool -- is suffix case sensitive? default rue
+}
+]]
+function fsutil.remove_sfx(path,sfx,opts)
+	opts = util.extend_table({ignorecase=true},opts)
+	if string.len(sfx) < string.len(path) then
+		if (opts.ignorecase and string.lower(string.sub(path,-string.len(sfx))) == string.lower(sfx))
+				or string.sub(path,-string.len(sfx)) == sfx then
+			return string.sub(path,1,string.len(path) - string.len(sfx))
+		end
+	end
+	return path
+end
+--[[
 similar to unix basename
 ]]
-function fsutil.basename(path,sfx)
+function fsutil.basename(path,sfx,opts)
 	if not path then
 		return nil
 	end
@@ -47,9 +63,7 @@ function fsutil.basename(path,sfx)
 		return nil
 	end
 	if sfx and string.len(sfx) < string.len(bn) then
-		if string.sub(bn,-string.len(sfx)) == sfx then
-			bn=string.sub(bn,1,string.len(bn) - string.len(sfx))
-		end
+		bn = fsutil.remove_sfx(bn,sfx,opts)
 	end
 	return bn
 end
@@ -71,7 +85,7 @@ end
 --[[
 note A/=>nil
 ]]
-function fsutil.basename_cam(path,sfx)
+function fsutil.basename_cam(path,sfx,opts)
 	if not path then
 		return nil
 	end
@@ -82,10 +96,8 @@ function fsutil.basename_cam(path,sfx)
 	if not s then
 		return nil
 	end
-	if sfx and string.len(sfx) < string.len(bn) then
-		if string.sub(bn,-string.len(sfx)) == sfx then
-			bn=string.sub(bn,1,string.len(bn) - string.len(sfx))
-		end
+	if sfx then
+		bn = fsutil.remove_sfx(bn,sfx,opts)
 	end
 	return bn
 end
