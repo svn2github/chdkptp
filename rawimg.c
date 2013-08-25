@@ -30,20 +30,6 @@ based on code from chdk tools/rawconvert.c and core/raw.c
 #define RAWIMG_LIST "rawimg.rawimg_list" // keeps references to associated lbufs
 #define RAWIMG_LIST_META "rawimg.rawimg_list_meta" // meta table
 
-unsigned raw_get_pixel_10l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
-void raw_set_pixel_10l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
-unsigned raw_get_pixel_10b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
-void raw_set_pixel_10b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
-
-unsigned raw_get_pixel_12l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
-void raw_set_pixel_12l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
-unsigned raw_get_pixel_12b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
-void raw_set_pixel_12b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
-
-unsigned raw_get_pixel_14l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
-void raw_set_pixel_14l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
-unsigned raw_get_pixel_14b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
-void raw_set_pixel_14b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 
 // funny case for macros
 #define RAW_ENDIAN_l 0
@@ -54,6 +40,8 @@ static const char *endian_strings[] = {
 	"big",
 	NULL,
 };
+
+#define RAW_BLOCK_BYTES_8l 1
 
 #define RAW_BLOCK_BYTES_10l 10
 #define RAW_BLOCK_BYTES_10b 5
@@ -94,6 +82,26 @@ typedef struct {
 	uint8_t *data;
 } raw_image_t;
 
+// TODO endian doesn't matter, but needs suffix for macros
+unsigned raw_get_pixel_8l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_8l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
+
+unsigned raw_get_pixel_10l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_10l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
+unsigned raw_get_pixel_10b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_10b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
+
+unsigned raw_get_pixel_12l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_12l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
+unsigned raw_get_pixel_12b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_12b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
+
+unsigned raw_get_pixel_14l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_14l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
+unsigned raw_get_pixel_14b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_14b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
+
+
 #define FMT_DEF_SINGLE(BPP,ENDIAN) \
 { \
 	BPP, \
@@ -109,10 +117,12 @@ typedef struct {
 	FMT_DEF_SINGLE(BPP,b)
 
 raw_format_t raw_formats[] = {
+	FMT_DEF_SINGLE(8,l),
 	FMT_DEF(10),
 	FMT_DEF(12),
 	FMT_DEF(14),
 };
+
 
 static const int raw_num_formats = sizeof(raw_formats)/sizeof(raw_format_t);
 
@@ -120,7 +130,7 @@ static raw_format_t* rawimg_find_format(unsigned bpp, unsigned endian) {
 	int i;
 	for(i=0; i<raw_num_formats; i++) {
 		raw_format_t *fmt = &raw_formats[i];
-		if(fmt->endian == endian && fmt->bpp == bpp) {
+		if(fmt->bpp == bpp && (bpp == 8 || fmt->endian == endian) ) {
 			return fmt;
 		}
 	}
@@ -132,6 +142,16 @@ return color for given x,y
 */
 static unsigned cfa_color(raw_image_t *img, unsigned x, unsigned y) {
 	return img->cfa_pattern[(x&1) + (y&1)*2];
+}
+
+unsigned raw_get_pixel_8l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
+{
+	return p[y*row_bytes+x];
+}
+
+void raw_set_pixel_8l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value)
+{
+	p[y*row_bytes+x] = value;
 }
 
 unsigned raw_get_pixel_10l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
@@ -494,6 +514,7 @@ static int rawimg_patch_pixel(raw_image_t *img,unsigned x, unsigned y) {
 	}
 	return 0;
 }
+
 /*
 patch pixels with value below a threshold
 count=img:patch_pixels([badval])
@@ -528,6 +549,20 @@ static void *table_checkudata(lua_State *L, int narg, const char *fname, const c
 	lua_pop(L,1);
 	return r;
 }
+
+static void *table_optudata(lua_State *L, int narg, const char *fname, const char *tname, void *d) {
+	void *r;
+	lua_getfield(L, narg, fname);
+	if(lua_isnil(L,-1)) {
+		r=d;
+	}
+	else {
+		r = luaL_checkudata(L,-1,tname);
+	}
+	lua_pop(L,1);
+	return r;
+}
+
 
 static lua_Number table_checknumber(lua_State *L, int narg, const char *fname) {
 	lua_getfield(L, narg, fname);
@@ -566,6 +601,84 @@ static const char *table_optlstring(lua_State *L, int narg, const char *fname, c
 }
 
 /*
+convert image data to a different format, returning the result in an lbuf and new rawimg
+rawimg,lbuf=img:convert(options)
+options {
+	bpp:number
+	endian:string
+	-- TODO might want to allow active area only, or an arbitrary rectangle?
+	lbuf:[lbuf] -- optional lbuf to store data in
+}
+*/
+static int rawimg_lua_convert(lua_State *L) {
+	raw_image_t* img = (raw_image_t *)luaL_checkudata(L, 1, RAWIMG_META);
+	if(!lua_istable(L,2)) {
+		return luaL_error(L,"expected table");
+	}
+	unsigned bpp = table_checknumber(L,2,"bpp");
+	unsigned endian = table_checkoption(L,2,"endian",NULL,endian_strings);
+	unsigned new_size = img->width*img->height*bpp/8;
+	// shift for conversions to lower bpp
+	int shift = 0;
+	if(img->fmt->bpp > bpp) {
+		shift = (img->fmt->bpp - bpp);
+	}
+
+	raw_image_t *newimg = (raw_image_t *)lua_newuserdata(L,sizeof(raw_image_t));
+	if(!newimg) {
+		return luaL_error(L,"failed to create userdata");
+	}
+	memcpy(newimg,img,sizeof(raw_image_t));
+	newimg->fmt = rawimg_find_format(bpp,endian);
+	if(!newimg->fmt) {
+		return luaL_error(L,"unknown format");
+	}
+	newimg->row_bytes = newimg->width*bpp/8;
+	newimg->black_level = img->black_level >> shift;
+
+	luaL_getmetatable(L, RAWIMG_META);
+	lua_setmetatable(L, -2);
+
+	lBuf_t *lb = table_optudata(L,2,"lbuf",LBUF_META,NULL);
+	if(!lb) {
+		char *data = malloc(new_size);
+		if(!data) {
+			return luaL_error(L,"malloc failed");
+		}
+		if(!lbuf_create(L, data, new_size, LBUF_FL_FREE)) {
+			return luaL_error(L,"failed to create lbuf");
+		}
+		lb = luaL_checkudata(L,-1,LBUF_META);
+	} else {
+		if(lb->len != new_size) {
+			return luaL_error(L,"lbuf size mismatched");
+		}
+		lua_pushvalue(L,2); // ensure lbuf is on top of stack
+	}
+	newimg->data = (uint8_t *)lb->bytes;
+	// TODO this should be common code shared with bind_lbuf
+	// save a reference in the registry to keep lbuf from being collected until image goes away
+	lua_getfield(L,LUA_REGISTRYINDEX,RAWIMG_LIST);
+	lua_pushvalue(L, -2); // our user data, for use as key
+	lua_pushvalue(L, 1); // lbuf, the value
+	lua_settable(L, -3); //set t[img]=lbuf
+	lua_pop(L,1); // done with t
+	
+	// TODO could optimize the conversions where bpp or bpp and endian don't change
+	int y;
+	for(y=0;y<img->height;y++) {
+		int x;
+		for(x=0;x<img->width;x++) {
+			unsigned v = img->fmt->get_pixel(img->data,img->row_bytes,x,y);
+			newimg->fmt->set_pixel(newimg->data,newimg->row_bytes,x,y,v>>shift);
+		}
+	}
+
+	return 2;
+}
+
+
+/*
 img = rawimg.bind_lbuf(imgspec)
 imgspec {
 -- required fields
@@ -576,7 +689,7 @@ imgspec {
 	endian:string "little"|"big"
 -- optional fields
 	data_offset:number -- offset into data lbuf, default 0
-	blacklevel -- default 0
+	black_level -- default 0
 	cfa_pattern:string -- 4 byte string
 	active_area: { -- default 0,0,height,width
 		top:number
@@ -591,11 +704,11 @@ imgspec {
 static int rawimg_lua_bind_lbuf(lua_State *L) {
 	raw_image_t *img = (raw_image_t *)lua_newuserdata(L,sizeof(raw_image_t));
 	if(!img) {
-		return luaL_error(L,"failed to create userdata");;
+		return luaL_error(L,"failed to create userdata");
 	}
 
 	if(!lua_istable(L,1)) {
-		return luaL_error(L,"expected table");;
+		return luaL_error(L,"expected table");
 	}
 
 	lBuf_t *buf = (lBuf_t *)table_checkudata(L,1,"data",LBUF_META);
@@ -706,6 +819,7 @@ static const luaL_Reg rawimg_methods[] = {
 	{"cfa_pattern",rawimg_lua_get_cfa_pattern},
 	{"make_rgb_thumb",rawimg_lua_make_rgb_thumb},
 	{"patch_pixels",rawimg_lua_patch_pixels},
+	{"convert",rawimg_lua_convert},
 	{NULL, NULL}
 };
 

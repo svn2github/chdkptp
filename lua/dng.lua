@@ -460,43 +460,30 @@ function dng_methods.print_img_info(self)
 end
 
 --[[
-inefficient function to dump image data to 8bbp (truncated) grayscale
+function to dump image data converted to various bit depths and byte orders
+note: use ifd:write_image_data() for unconverted
 ]]
-function dng_methods.dump_image(self,dst)
+function dng_methods.dump_image(self,dst,bpp,endian)
 	local img = self.img
 	if not img then
 		return false, 'image data not set'
 	end
-	local width=img:width()
-	local height=img:height()
-	local bpp=img:bpp()
-	local out = lbuf.new(width*height)
-
-	local min = 2^bpp
-	local max = 0
-	local count = 0
-	local pixel_scale = 2^(bpp - 8)
-
-	for y=0,height-1 do
-		for x=0,width-1 do
-			local v = img:get_pixel(x,y)
-			out:set_u8(y*width + x,v/pixel_scale)
-			if v > max then
-				max = v
-			end
-			if v < min then
-				min = v
-			end
-			count = count + 1
-		end
+	if not bpp then
+		bpp = 8
 	end
-	printf('w=%d h=%d c=%d min %d max %d\n',width,height,count,min,max)
-
+	-- TODO might want to default to dng order for 10/12/14
+	if not endian then
+		endian = 'little'
+	end
+	local outimg,outlb = img:convert{
+		bpp=bpp,
+		endian=endian,
+	}
 	local fh,err = io.open(dst,'wb')
 	if not fh then
 		return false, 'open failed '..tostring(err)
 	end
-	out:fwrite(fh)
+	outlb:fwrite(fh)
 	fh:close()
 	return true
 end
