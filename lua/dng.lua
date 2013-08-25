@@ -463,25 +463,27 @@ end
 function to dump image data converted to various bit depths and byte orders
 note: use ifd:write_image_data() for unconverted
 ]]
-function dng_methods.dump_image(self,dst,bpp,endian)
+function dng_methods.dump_image(self,dst,opts)
 	local img = self.img
+	opts=util.extend_table({
+		bpp=8,
+		endian='little',
+	},opts)
 	if not img then
 		return false, 'image data not set'
 	end
-	if not bpp then
-		bpp = 8
+	-- TODO add 16
+	if opts.pgm and opts.bpp ~= 8 then
+		return false, 'only 8 bpp supported for pgm'
 	end
-	-- TODO might want to default to dng order for 10/12/14
-	if not endian then
-		endian = 'little'
-	end
-	local outimg,outlb = img:convert{
-		bpp=bpp,
-		endian=endian,
-	}
+	local outimg,outlb = img:convert(opts)
+
 	local fh,err = io.open(dst,'wb')
 	if not fh then
 		return false, 'open failed '..tostring(err)
+	end
+	if opts.pgm then
+		fh:write(string.format('P5\n%d\n%d\n%d\n',outimg:width(),outimg:height(),(2^outimg:bpp())-1))
 	end
 	outlb:fwrite(fh)
 	fh:close()

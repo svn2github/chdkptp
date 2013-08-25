@@ -32,6 +32,27 @@ m.get_index = function(to_find)
 	return nil
 end
 
+--[[
+make an output name from optional input name, replacing '.dng' with sfx if specified
+if name is directory, default to dng name in that directory
+if name not a string, default to dng name
+]]
+local function make_dst_name(d,name,sfx)
+	if type(name) == 'string' then
+		if lfs.attributes(name,'mode') == 'directory' then
+			name = fsutil.joinpath(name,fsutil.basename(d.filename))
+		else
+			return name -- name specified and not a dir, just return it
+		end
+	else
+		name = d.filename
+	end
+	if sfx then
+		name = fsutil.remove_sfx(name,'.dng') .. sfx
+	end
+	return name
+end
+
 local function dngmod_single(d,args)
 	if args.patch then
 		if args.patch == true then
@@ -132,7 +153,7 @@ m.init_cli = function()
 		}),
 		help_detail=[[
  file: file or directory to write to
-   defaults to loaded name. if directory, appends filename
+   defaults to loaded name. if directory, appends original filename
  options:
    -over  overwrite existing files
 ]],
@@ -296,9 +317,7 @@ m.init_cli = function()
 		args=cli.argparser.create({
 			patch=false,
 			fmatch=false,
-			dmatch=false,
 			rmatch=false,
-			nodirs=false,
 			maxdepth=100,
 			pretend=false,
 			odir=false,
@@ -308,10 +327,8 @@ m.init_cli = function()
  options:
    -patch[=number]   patch bad pixels
  file selection
-   -fmatch=<pattern> upload only file with path/name matching <pattern>
-   -dmatch=<pattern> only create directories with path/name matching <pattern>
+   -fmatch=<pattern> only file with path/name matching <pattern>
    -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
-   -nodirs           only create directories needed to upload file 
    -maxdepth=n       only recurse into N levels of directory
    -pretend          print actions instead of doing them
    -over             overwrite existing
@@ -320,7 +337,7 @@ m.init_cli = function()
 			if #args == 0 then
 				local d = m.selected
 				if d then
-					do_modify(d,args)
+					dngmod_single(d,args)
 					return true
 				else
 					return false, 'no file selected'
@@ -329,9 +346,7 @@ m.init_cli = function()
 			local opts={
 				dirsfirst=true,
 				fmatch=args.fmatch,
-				dmatch=args.dmatch,
 				rmatch=args.rmatch,
-				dirs=not args.nodirs,
 				pretend=args.pretend,
 				maxdepth=tonumber(args.maxdepth),
 				dngmod_args=args,
@@ -342,35 +357,63 @@ m.init_cli = function()
 	{
 		names={'dngdump'},
 		help='extract data from dng',
-		arghelp="[options] [path]",
+		arghelp="[options]",
 		args=cli.argparser.create({
-			thumb=false,
+			thm=false,
 			raw=false,
+			rfmt=false,
+			tfmt=false,
 		}),
 		-- TODO filename handling
 		help_detail=[[
- path:
-   path or filename to extract to
  options:
-   -thumb   extract thumbnail raw rgb
-   -raw     extract raw data
+   -thm[=name]   extract thumbnail to name, default dngname_thm.(rgb|ppm)
+   -raw[=name]   extract raw data to name, default dngname.(raw|pgm)
+   -rfmt=fmt raw format (default: unmodified from DNG)
+     format is <bpp>[l|b|pgm], e.g. 8pgm or 12l
+	 pgm is only valid with 8 (TODO add 16 bit support)
+	 byte order defaults to little
+   -tfmt=fmt thumb format (default, unmodified rgb)
+     ppm   8 bit rgb ppm
+    
 ]],
 		func=function(self,args) 
 			local d = m.selected
 			if not d then
 				return false, 'no file selected'
 			end
-			local outname = args[1]
-			if not outname then
-				outname = fsutil.remove_sfx(d.filename,'.dng')
-			elseif lfs.attributes(outname,'mode') == 'directory' then
-				outname = fsutil.joinpath(outname,fsutil.basename(d.filename,'.dng'))
-			end
-			if args.thumb then
-				d.main_ifd:write_image_data(outname .. '_thm.rgb')
+			if args.thm then
+				if not args.tfmt then
+					d.main_ifd:write_image_data(make_dst_name(d,args.thm,'_thm.rgb'))
+				elseif args.tfmt == 'ppm' then
+					-- TODO should check that it's actually an RGB8 thumb
+					local fh, err = io.open(make_dst_name(d,args.thm,'.ppm'),'wb')
+					if not fh then
+						return false,err
+					end
+					fh:write(string.format('P6\n%d\n%d\n%d\n',
+						d.main_ifd.byname.ImageWidth:getel(),
+						d.main_ifd.byname.ImageLength:getel(),255))
+					d.main_ifd:write_image_data(fh)
+					fh:close()
+				else
+					return false, 'invalid thumbnail format requested: '..tostring(args.tfmt)
+				end
 			end
 			if args.raw then
-				d.raw_ifd:write_image_data(outname .. '.raw')
+				if not args.rfmt then
+					d.raw_ifd:write_image_data(make_dst_name(d,args.raw,'.raw'))
+				else
+					local bpp,fmt=string.match(args.rfmt,'(%d+)(%a*)')
+					bpp = tonumber(bpp)
+					if fmt == 'pgm' then
+						return d:dump_image(make_dst_name(d,args.raw,'.pgm'),{bpp=bpp,pgm=true})
+					end
+					if fmt == '' then
+						fmt = 'l'
+					end
+					return d:dump_image(make_dst_name(d,args.raw,'.raw'),{bpp=bpp,endian=({l='little',b='big'})[fmt]})
+				end
 			end
 			return true
 		end,
