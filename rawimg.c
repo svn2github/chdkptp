@@ -53,6 +53,9 @@ static const char *endian_strings[] = {
 #define RAW_BLOCK_BYTES_14l 14
 #define RAW_BLOCK_BYTES_14b 7
 
+#define RAW_BLOCK_BYTES_16l 2
+#define RAW_BLOCK_BYTES_16b 2
+
 #define CFA_RED   0
 #define CFA_GREEN 1
 #define CFA_BLUE  2
@@ -102,6 +105,11 @@ void raw_set_pixel_14l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, u
 unsigned raw_get_pixel_14b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
 void raw_set_pixel_14b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
 
+unsigned raw_get_pixel_16l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_16l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
+unsigned raw_get_pixel_16b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y);
+void raw_set_pixel_16b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value);
+
 
 #define FMT_DEF_SINGLE(BPP,ENDIAN) \
 { \
@@ -122,6 +130,7 @@ raw_format_t raw_formats[] = {
 	FMT_DEF(10),
 	FMT_DEF(12),
 	FMT_DEF(14),
+	FMT_DEF(16),
 };
 
 
@@ -360,6 +369,27 @@ void raw_set_pixel_14b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, u
     }
 }
 
+unsigned raw_get_pixel_16l(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
+{
+	return *(unsigned short *)(p + y*row_bytes+x*2);
+}
+
+void raw_set_pixel_16l(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value)
+{
+	*(unsigned short *)(p + y*row_bytes+ x*2) = value;
+}
+
+unsigned raw_get_pixel_16b(const uint8_t *p, unsigned row_bytes, unsigned x, unsigned y)
+{
+	return p[y*row_bytes+x*2] << 8 | p[y*row_bytes+x*2+1];
+}
+
+void raw_set_pixel_16b(uint8_t *p, unsigned row_bytes, unsigned x, unsigned y, unsigned value)
+{
+	p[y*row_bytes+x*2] = value>>8;
+	p[y*row_bytes+x*2+1] = value;
+}
+
 /*
 pixel=img:get_pixel(x,y)
 nil if out of bounds
@@ -539,6 +569,19 @@ static int rawimg_lua_patch_pixels(lua_State *L) {
 	return 1;
 }
 
+// TODO these are identical for now
+static const char *valupmod_strings[] = {
+	"no",
+	"shift",
+	NULL,
+};
+
+static const char *valdownmod_strings[] = {
+	"no",
+	"shift",
+	NULL,
+};
+
 
 /*
 convert image data to a different format, returning the result in an lbuf and new rawimg
@@ -548,6 +591,8 @@ options {
 	endian:string
 	-- TODO might want to allow active area only, or an arbitrary rectangle?
 	lbuf:[lbuf] -- optional lbuf to store data in
+	valupmod:string -- 'shift' or 'no', default no
+	valdownmod:string -- 'shift' or 'no' default shift
 }
 */
 static int rawimg_lua_convert(lua_State *L) {
@@ -558,10 +603,18 @@ static int rawimg_lua_convert(lua_State *L) {
 	unsigned bpp = lu_table_checknumber(L,2,"bpp");
 	unsigned endian = lu_table_checkoption(L,2,"endian",NULL,endian_strings);
 	unsigned new_size = img->width*img->height*bpp/8;
+	unsigned valupmod = lu_table_checkoption(L,2,"valupmod","no",valupmod_strings);
+	unsigned valdownmod = lu_table_checkoption(L,2,"valdownmod","shift",valdownmod_strings);
 	// shift for conversions to lower bpp
 	int shift = 0;
 	if(img->fmt->bpp > bpp) {
-		shift = (img->fmt->bpp - bpp);
+		if(valdownmod == 1) {
+			shift = (img->fmt->bpp - bpp);
+		}
+	} else {
+		if(valupmod == 1) {
+			shift = (img->fmt->bpp - bpp);
+		}
 	}
 
 	raw_image_t *newimg = (raw_image_t *)lua_newuserdata(L,sizeof(raw_image_t));
@@ -610,7 +663,12 @@ static int rawimg_lua_convert(lua_State *L) {
 		int x;
 		for(x=0;x<img->width;x++) {
 			unsigned v = img->fmt->get_pixel(img->data,img->row_bytes,x,y);
-			newimg->fmt->set_pixel(newimg->data,newimg->row_bytes,x,y,v>>shift);
+			if(shift < 0) {
+				v = v<<-shift;
+			} else {
+				v = v>>shift;
+			}
+			newimg->fmt->set_pixel(newimg->data,newimg->row_bytes,x,y,v);
 		}
 	}
 

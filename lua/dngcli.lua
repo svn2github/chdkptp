@@ -370,9 +370,9 @@ m.init_cli = function()
    -thm[=name]   extract thumbnail to name, default dngname_thm.(rgb|ppm)
    -raw[=name]   extract raw data to name, default dngname.(raw|pgm)
    -rfmt=fmt raw format (default: unmodified from DNG)
-     format is <bpp>[l|b|pgm], e.g. 8pgm or 12l
-	 pgm is only valid with 8 (TODO add 16 bit support)
-	 byte order defaults to little
+     format is <bpp>[endian][pgm], e.g. 8pgm or 12l
+	 pgm is only valid for 8 and 16 bpp
+	 endian is l or b and defaults to little, except for 16 bit pgm
    -tfmt=fmt thumb format (default, unmodified rgb)
      ppm   8 bit rgb ppm
     
@@ -387,7 +387,7 @@ m.init_cli = function()
 					d.main_ifd:write_image_data(make_dst_name(d,args.thm,'_thm.rgb'))
 				elseif args.tfmt == 'ppm' then
 					-- TODO should check that it's actually an RGB8 thumb
-					local fh, err = io.open(make_dst_name(d,args.thm,'.ppm'),'wb')
+					local fh, err = io.open(make_dst_name(d,args.thm,'_thm.ppm'),'wb')
 					if not fh then
 						return false,err
 					end
@@ -404,15 +404,21 @@ m.init_cli = function()
 				if not args.rfmt then
 					d.raw_ifd:write_image_data(make_dst_name(d,args.raw,'.raw'))
 				else
-					local bpp,fmt=string.match(args.rfmt,'(%d+)(%a*)')
+					local bpp,endian,fmt=string.match(args.rfmt,'(%d+)([lb]?)(%a*)')
 					bpp = tonumber(bpp)
+					if endian == '' then
+						endian = nil -- use dump_image defaults
+					elseif endian == 'l' then
+						endian = 'little'
+					elseif endian == 'b' then
+						endian = 'big'
+					else
+						return false, 'invalid endian: '..tostring(endian)
+					end
 					if fmt == 'pgm' then
-						return d:dump_image(make_dst_name(d,args.raw,'.pgm'),{bpp=bpp,pgm=true})
+						return d:dump_image(make_dst_name(d,args.raw,'.pgm'),{bpp=bpp,pgm=true,endian=endian})
 					end
-					if fmt == '' then
-						fmt = 'l'
-					end
-					return d:dump_image(make_dst_name(d,args.raw,'.raw'),{bpp=bpp,endian=({l='little',b='big'})[fmt]})
+					return d:dump_image(make_dst_name(d,args.raw,'.raw'),{bpp=bpp,endian=endian})
 				end
 			end
 			return true

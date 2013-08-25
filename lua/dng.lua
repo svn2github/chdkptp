@@ -467,14 +467,23 @@ function dng_methods.dump_image(self,dst,opts)
 	local img = self.img
 	opts=util.extend_table({
 		bpp=8,
-		endian='little',
 	},opts)
+	-- hack to default 16 bit pgm to big endian if not specified
+	-- per http://netpbm.sourceforge.net/doc/pamendian.html is the correct format,
+	-- but allow little endian to be forced if someone wants it
+	if not opts.endian then 
+		if opts.pgm and opts.bpp == 16 then
+			opts.endian = 'big'
+		else
+			opts.endian = 'little'
+		end
+	end
+
 	if not img then
 		return false, 'image data not set'
 	end
-	-- TODO add 16
-	if opts.pgm and opts.bpp ~= 8 then
-		return false, 'only 8 bpp supported for pgm'
+	if opts.pgm and opts.bpp ~= 8  and opts.bpp ~= 16 then
+		return false, 'only 8 and 16 bpp supported for pgm'
 	end
 	local outimg,outlb = img:convert(opts)
 
@@ -482,8 +491,20 @@ function dng_methods.dump_image(self,dst,opts)
 	if not fh then
 		return false, 'open failed '..tostring(err)
 	end
+
 	if opts.pgm then
-		fh:write(string.format('P5\n%d\n%d\n%d\n',outimg:width(),outimg:height(),(2^outimg:bpp())-1))
+		-- set max value to max value that should appear
+		local maxval
+		if img:bpp() > outimg:bpp() then -- down converting max value will be full range of ouput
+			maxval = (2^outimg:bpp())-1
+		else
+			if opts.upvalmod == 'shift' then -- up converting, with multiply
+				maxval = (2^outimg:bpp())-1
+			else -- up converting, unchanged values
+				maxval = (2^img:bpp())-1
+			end
+		end
+		fh:write(string.format('P5\n%d\n%d\n%d\n',outimg:width(),outimg:height(),maxval))
 	end
 	outlb:fwrite(fh)
 	fh:close()
