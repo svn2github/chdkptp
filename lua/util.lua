@@ -392,6 +392,17 @@ function util.array_slice(t,opts)
 end
 
 --[[
+convert values of an array to table of value=true
+]]
+function util.flag_table(t)
+	local r={}
+	for i,v in ipairs(t) do
+		r[v]=true
+	end
+	return r
+end
+
+--[[
 split str delimited by pattern pat, or plain text if opts.plain
 empty pat splits chars
 trailing delimiters generate empty strings
