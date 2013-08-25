@@ -24,6 +24,7 @@ based on code from chdk tools/rawconvert.c and core/raw.c
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+#include "luautil.h"
 #include "lbuf.h"
 #include "rawimg.h"
 
@@ -538,67 +539,6 @@ static int rawimg_lua_patch_pixels(lua_State *L) {
 	return 1;
 }
 
-/*
-helper functions to get args from a table
-should be a standalone utility library
-throw error on incorrect type, return C value and pop off the stack
-*/
-static void *table_checkudata(lua_State *L, int narg, const char *fname, const char *tname) {
-	lua_getfield(L, narg, fname);
-	void *r = luaL_checkudata(L,-1,tname);
-	lua_pop(L,1);
-	return r;
-}
-
-static void *table_optudata(lua_State *L, int narg, const char *fname, const char *tname, void *d) {
-	void *r;
-	lua_getfield(L, narg, fname);
-	if(lua_isnil(L,-1)) {
-		r=d;
-	}
-	else {
-		r = luaL_checkudata(L,-1,tname);
-	}
-	lua_pop(L,1);
-	return r;
-}
-
-
-static lua_Number table_checknumber(lua_State *L, int narg, const char *fname) {
-	lua_getfield(L, narg, fname);
-	lua_Number r = luaL_checknumber(L,-1);
-	lua_pop(L,1);
-	return r;
-}
-
-static lua_Number table_optnumber(lua_State *L, int narg, const char *fname, lua_Number d) {
-	lua_getfield(L, narg, fname);
-	lua_Number r = luaL_optnumber(L,-1,d);
-	lua_pop(L,1);
-	return r;
-}
-
-/*
-static const char *table_checkstring(lua_State *L, int narg, const char *fname) {
-	lua_getfield(L, narg, fname);
-	const char *r = luaL_checkstring(L,-1);
-	lua_pop(L,1);
-	return r;
-}
-*/
-static int table_checkoption(lua_State *L, int narg, const char *fname, const char *def, const char *lst[]) {
-	lua_getfield(L, narg, fname);
-	int r = luaL_checkoption(L,-1, def, lst);
-	lua_pop(L,1);
-	return r;
-}
-
-static const char *table_optlstring(lua_State *L, int narg, const char *fname, const char *d, size_t *l) {
-	lua_getfield(L, narg, fname);
-	const char *r = luaL_optlstring(L,-1,d,l);
-	lua_pop(L,1);
-	return r;
-}
 
 /*
 convert image data to a different format, returning the result in an lbuf and new rawimg
@@ -615,8 +555,8 @@ static int rawimg_lua_convert(lua_State *L) {
 	if(!lua_istable(L,2)) {
 		return luaL_error(L,"expected table");
 	}
-	unsigned bpp = table_checknumber(L,2,"bpp");
-	unsigned endian = table_checkoption(L,2,"endian",NULL,endian_strings);
+	unsigned bpp = lu_table_checknumber(L,2,"bpp");
+	unsigned endian = lu_table_checkoption(L,2,"endian",NULL,endian_strings);
 	unsigned new_size = img->width*img->height*bpp/8;
 	// shift for conversions to lower bpp
 	int shift = 0;
@@ -639,7 +579,7 @@ static int rawimg_lua_convert(lua_State *L) {
 	luaL_getmetatable(L, RAWIMG_META);
 	lua_setmetatable(L, -2);
 
-	lBuf_t *lb = table_optudata(L,2,"lbuf",LBUF_META,NULL);
+	lBuf_t *lb = lu_table_optudata(L,2,"lbuf",LBUF_META,NULL);
 	if(!lb) {
 		char *data = malloc(new_size);
 		if(!data) {
@@ -711,21 +651,21 @@ static int rawimg_lua_bind_lbuf(lua_State *L) {
 		return luaL_error(L,"expected table");
 	}
 
-	lBuf_t *buf = (lBuf_t *)table_checkudata(L,1,"data",LBUF_META);
+	lBuf_t *buf = (lBuf_t *)lu_table_checkudata(L,1,"data",LBUF_META);
 
-	unsigned offset = table_optnumber(L,1,"data_offset",0);
+	unsigned offset = lu_table_optnumber(L,1,"data_offset",0);
 
-	img->width = table_checknumber(L,1,"width");
-	img->height = table_checknumber(L,1,"height");
-	unsigned bpp = table_checknumber(L,1,"bpp");
+	img->width = lu_table_checknumber(L,1,"width");
+	img->height = lu_table_checknumber(L,1,"height");
+	unsigned bpp = lu_table_checknumber(L,1,"bpp");
 
-	unsigned endian = table_checkoption(L,1,"endian",NULL,endian_strings);
+	unsigned endian = lu_table_checkoption(L,1,"endian",NULL,endian_strings);
 
-	img->black_level = table_optnumber(L,1,"black_level",0);
+	img->black_level = lu_table_optnumber(L,1,"black_level",0);
 
 	size_t cfa_size;
 	// TODO DNG cfa is relative to active area, should shift if top or left is odd
-	const char *cfa_pattern = table_optlstring(L,1,"cfa_pattern",NULL,&cfa_size);
+	const char *cfa_pattern = lu_table_optlstring(L,1,"cfa_pattern",NULL,&cfa_size);
 	if(!cfa_pattern) {
 		memset(img->cfa_pattern,0,4);
 	} else if(cfa_size != 4) {
@@ -739,10 +679,10 @@ static int rawimg_lua_bind_lbuf(lua_State *L) {
 	lua_getfield(L, 1, "active_area");
 	if(lua_istable(L,-1)) {
 		// if table present, all required
-		img->active_top = table_checknumber(L,-1,"top");
-		img->active_left = table_checknumber(L,-1,"left");
-		img->active_bottom = table_checknumber(L,-1,"bottom");
-		img->active_right = table_checknumber(L,-1,"right");
+		img->active_top = lu_table_checknumber(L,-1,"top");
+		img->active_left = lu_table_checknumber(L,-1,"left");
+		img->active_bottom = lu_table_checknumber(L,-1,"bottom");
+		img->active_right = lu_table_checknumber(L,-1,"right");
 		if(img->active_top >= img->active_bottom) {
 			return luaL_error(L,"active top >= bottom");
 		}
