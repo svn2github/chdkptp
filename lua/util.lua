@@ -412,13 +412,16 @@ function util.string_split(str,pat,opts)
 	opts = util.extend_table({
 		plain=false,
 		start=1,
+		empty=true, -- include empty strings from multiple / trailing delimiters (default func only)
 	},opts)
 	local r = {}
 	local pos = opts.start
 	local s,e 
 	if not opts.func then
 		opts.func = function(v)
-			table.insert(r,v)
+			if string.len(v) > 0 or opts.empty then
+				table.insert(r,v)
+			end
 		end
 	end
 	if string.len(pat) == 0 then
