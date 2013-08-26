@@ -420,7 +420,7 @@ function dng_methods.cfa_str(self)
 end
 
 function dng_methods.print_summary(self)
-	printf("%dx%dx%d %s DNG %s / %s %s %s\n",
+	printf("%dx%dx%d, %s, DNG %s / %s, %s, %s\n",
 		self.raw_ifd.byname.ImageWidth:getel(),
 		self.raw_ifd.byname.ImageLength:getel(),
 		self.raw_ifd.byname.BitsPerSample:getel(),
