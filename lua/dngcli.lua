@@ -18,11 +18,18 @@
 CLI commands for manipulating DNG images
 ]]
 -- store info for DNG cli commands, global for easy script access
--- TODO move to own module
 local m = {
 	--selected = current selected dng, or nil
 	list={},
 }
+-- current batch information, empty if not in batch
+local batch={
+	--current -- current dng object
+	--relpath
+	--src
+	--pretend
+}
+
 m.get_index = function(to_find)
 	for i,d in ipairs(m.list) do
 		if d == to_find then
@@ -33,47 +40,207 @@ m.get_index = function(to_find)
 end
 
 --[[
-make an output name from optional input name, replacing '.dng' with sfx if specified
-if name is directory, default to dng name in that directory
-if name not a string, default to dng name
+get dng for command, using numeric index or defaulting to selected or batch current
 ]]
-local function make_dst_name(d,name,sfx)
+m.get_sel_batch = function(index_arg)
+	if index_arg ~= nil then
+		return m.list[tonumber(index_arg)] -- nil if invalid
+	end
+	if batch.current then
+		return batch.current
+	end
+	return m.selected
+end
+m.get_sel_nobatch = function(index_arg)
+	if index_arg ~= nil then
+		return m.list[tonumber(index_arg)] -- nil if invalid
+	end
+	return m.selected
+end
+
+--[[
+prepare output path for a file write
+opts: {
+	over:bool  -- overwrite existing
+	sfx:string -- suffix to replace .dng
+	pretend:bool -- don't make any changes
+}
+]]
+local function prepare_dst_path(d,name,opts)
+	opts=util.extend_table({},opts)
+	local sfx = opts.sfx
 	if type(name) == 'string' then
 		if lfs.attributes(name,'mode') == 'directory' then
 			name = fsutil.joinpath(name,fsutil.basename(d.filename))
 		else
-			return name -- name specified and not a dir, just return it
+			sfx = nil -- if name specified, don't mess with suffix
 		end
 	else
-		name = d.filename
+		if batch.odir then
+			name = fsutil.joinpath_cam(batch.odir,batch.relpath)
+		else
+			name = d.filename
+		end
 	end
 	if sfx then
 		name = fsutil.remove_sfx(name,'.dng') .. sfx
 	end
+
+
+	local m = lfs.attributes(name,'mode')
+	if m == 'file' then
+		if not opts.over then
+			return false, 'file exists, use -over to overwrite '..tostring(name)
+		end
+	elseif m then -- TODO might want to allow
+		return false, "can't overwrite non-file "..tostring(filename)
+	else
+		-- doesn't exist, might need to create dir
+		if not opts.pretend then
+			local dstdir = fsutil.dirname(name)
+			local status, err = fsutil.mkdir_m(dstdir)
+			if not status then 
+				return false, err
+			end
+		end
+	end
 	return name
 end
 
-local function dngmod_single(d,args)
-	if args.patch then
-		if args.patch == true then
-			args.patch = 0
-		else
-			args.patch = tonumber(args.patch)
+local function do_dump_thumb(d,args)
+	local ext
+	if args.tfmt == 'ppm' then
+		ext = '.ppm'
+	elseif args.tfmt then
+		return false, 'invalid thumbnail format requested: '..tostring(args.tfmt)
+	else
+		ext = '.rgb'
+	end
+
+	local filename,err = prepare_dst_path(d,args.thm,{sfx='_thm'..ext,over=args.over,pretend=args.pretend})
+	if not filename then
+		return false, err
+	end
+	if args.pretend then
+		printf("dump thumb: %s\n",tostring(filename))
+		return true
+	end
+	if not args.tfmt then
+		d.main_ifd:write_image_data(filename)
+	elseif args.tfmt == 'ppm' then
+		-- TODO should check that it's actually an RGB8 thumb
+		local fh, err = io.open(filename,'wb')
+		if not fh then
+			return false,err
 		end
-		local count = d.img:patch_pixels(args.patch)
-		printf('patched %d pixels\n',count)
+		fh:write(string.format('P6\n%d\n%d\n%d\n',
+			d.main_ifd.byname.ImageWidth:getel(),
+			d.main_ifd.byname.ImageLength:getel(),255))
+		d.main_ifd:write_image_data(fh)
+		fh:close()
+	end
+	return true
+end
+
+local function do_dump_raw(d,args)
+	local ext='.raw'
+	local bpp,endian
+	local fmt='asis'
+
+	if args.rfmt then
+		bpp,endian,fmt=string.match(args.rfmt,'(%d+)([lb]?)(%a*)')
+		bpp = tonumber(bpp)
+		if endian == '' then
+			endian = nil -- use dump_image defaults
+		elseif endian == 'l' then
+			endian = 'little'
+		elseif endian == 'b' then
+			endian = 'big'
+		else
+			return false, 'invalid endian: '..tostring(endian)
+		end
+		if fmt == 'pgm' then
+			ext = '.pgm'
+		elseif fmt ~= '' then
+			return false, 'invalid format: '..tostring(fmt)
+		end
+	end
+
+	local filename,err = prepare_dst_path(d,args.raw,{sfx=ext,over=args.over,pretend=args.pretend})
+	if not filename then
+		return false, err
+	end
+	if args.pretend then
+		printf("dump raw: %s\n",tostring(filename))
+		return true
+	end
+	if fmt == 'asis' then
+		d.raw_ifd:write_image_data(filename)
+	elseif fmt == 'pgm' then
+		return d:dump_image(filename,{bpp=bpp,pgm=true,endian=endian})
+	else
+		return d:dump_image(filename,{bpp=bpp,endian=endian})
 	end
 end
 
--- find_files callback
-local function dngmod_callback(self,opts)
-	if #self.rpath == 0 and self.cur.st.mode == 'directory' then
+local dngbatch_ap=cli.argparser.create{
+	patch=false,
+	fmatch=false,
+	rmatch=false,
+	maxdepth=100,
+	pretend=false,
+	verbose=false,
+	odir=false,
+}
+
+local dngbatch_cmds=util.flag_table{
+	'info',
+	'mod',
+	'dump',
+	'save',
+}
+
+local function dngbatch_docmd(cmd,dargs)
+	if dargs.pretend or dargs.verbose then
+		printf('%s %s\n',cmd.name,cmd.argstr)
+		if dargs.pretend then
+			-- these commands pretend at a lower level to output path names etc
+			if cmd.name == 'dngsave' or cmd.name == 'dngdump' then
+				cmd.args.pretend = true
+			else
+				return true
+			end
+		end
+	end
+	
+	-- TODO based on cli.execute
+	local cstatus,status,msg = xpcall(
+		function()
+			return cli.names[cmd.name](cmd.args)
+		end,
+		util.err_traceback)
+	if not cstatus then
+		return false,status
+	end
+	if not status and not msg then
+		msg = cmd.name .. ' failed'
+	end
+	return status,msg
+end
+
+--[[
+findfiles callback
+]]
+local function dngbatch_callback(self,opts)
+	-- if directory, just keep processing
+	if self.cur.st.mode == 'directory' then
 		return true
 	end
 	if self.cur.name == '.' or self.cur.name == '..' then
 		return true
 	end
-	local dargs = opts.dngmod_args
+	local dargs = opts.dngbatch_args
+	local cmds = opts.dngbatch_cmds
 	local relpath
 	local src=self.cur.full
 	if #self.cur.path == 1 then
@@ -85,38 +252,96 @@ local function dngmod_callback(self,opts)
 			relpath = fsutil.joinpath(unpack(self.cur.path,2))
 		end
 	end
-	local dst
-	if dargs.odir then
-		dst=fsutil.joinpath_cam(dargs.odir,relpath)
-	else
-		dst=src
-	end
-	if self.cur.st.mode == 'directory' then
-		return true
-	end
-	local dstdir = fsutil.dirname(dst)
-	fsutil.mkdir_m(dstdir)
-	if lfs.attributes(dst,'mode') == 'file' and not dargs.over then
-		warnf("%s exists, skipping\n",dst)
-		return true
-	end
-	printf("process %s->%s\n",src,dst)
+	printf("load: %s\n",src)
+	local d,err
 	if dargs.pretend then
-		return true
+		d = {filename=src} -- dummy for pretend
+	else
+		d,err = dng.load(src)
+		-- TODO warn and continue?
+		if not d then 
+			return false, err
+		end
 	end
-	local d,err = dng.load(src)
-	-- TODO warn and continue?
-	if not d then 
-		return false, err
+	batch = {
+		current = d,
+		src = src,
+		relpath = relpath,
+		odir = dargs.odir,
+		pretend = dargs.pretend,
+	}
+	local status
+	for i,cmd in ipairs(cmds) do
+		status,err = dngbatch_docmd(cmd,dargs)
+		if not status then
+			break
+		end
 	end
-	dngmod_single(d,dargs)
-	local fh, err = io.open(dst,'wb')
-	if not fh then
-		return false, err
-	end
-	local status, err = d._lb:fwrite(fh)
-	fh:close()
+	-- ensure all batch vars are nil
+	batch = {}
 	return status,err
+end
+
+--[[
+TODO there should be a generic framework for this in cli
+]]
+local function dngbatch_cmd(self,args)
+	local err
+	-- split of dngbatch args from rest, delimited by {}
+	-- TODO input additional lines until }
+	local args,rest = string.match(args,'^([^{]*){%s*([^}]*)}$')
+	if not args then
+		return false, 'parse error, missing {}?'
+	end
+
+	args,err = dngbatch_ap:parse(args)
+	if not args then
+		return false,err
+	end
+
+	if #args == 0  then
+		return false,'no files specified'
+	end
+
+	local cmds={}
+	local errors={}
+
+	local cmdstrs = util.string_split(rest,'%s*;%s*',{empty=false})
+	if #cmdstrs == 0 then
+		return false, 'at least one command is required'
+	end
+
+	for i,v in ipairs(cmdstrs) do
+		local cmd,largs = string.match(v,'^%s*(%a+)%s*(.*)')
+		if not cmd then
+			table.insert(errors,string.format('%d: failed to parse %s',i,tostring(v)))
+		elseif not dngbatch_cmds[cmd] then
+			table.insert(errors,string.format('%d: invalid command %s',i,tostring(cmd)))
+		else
+			cmd = 'dng'..cmd
+			-- parse command args first to minimize errors during batch
+			-- collect errors to display all at once
+			local pargs, err = cli.names[cmd].args:parse(largs)
+			if pargs then
+				table.insert(cmds,{name=cmd,args=pargs,argstr=largs}) -- argstr is only for information with -pretend
+			else
+				table.insert(errors,string.format('%d: %s error %s',i,tostring(cmd),tostring(err)))
+			end
+		end
+	end
+	if #errors > 0 then
+		return false,'\n'..table.concat(errors,'\n')
+	end
+	local opts={
+		dirsfirst=true,
+		fmatch=args.fmatch,
+		rmatch=args.rmatch,
+		pretend=args.pretend,
+		maxdepth=tonumber(args.maxdepth),
+		dngbatch_args=args,
+		dngbatch_cmds=cmds,
+	}
+	return fsutil.find_files({unpack(args)},opts,dngbatch_callback)
 end
 
 m.init_cli = function()
@@ -124,12 +349,16 @@ m.init_cli = function()
 	{
 		names={'dngload'},
 		help='load a dng file',
-		arghelp="<file>",
+		arghelp="[options] <file>",
 		args=cli.argparser.create({
+			nosel=false,
 		}),
+		-- TODO options to reload or select/ignore if same file already loaded
 		help_detail=[[
  file: file to load
    only DNGs generated by CHDK or chdkptp are supported
+ options
+   -nosel  do not automatically select loaded file
 ]],
 		func=function(self,args) 
 			if not args[1] then
@@ -139,47 +368,48 @@ m.init_cli = function()
 			if not d then 
 				return false,err
 			end
-			m.selected = d
+			if not args.nosel then
+				m.selected = d
+			end
 			table.insert(m.list,d)
 			return true,'loaded '..d.filename
 		end,
 	},
 	{
+		-- backup or prompt for overwrite?
 		names={'dngsave'},
 		help='save a dng file',
-		arghelp="[options] [file]",
+		arghelp="[options] [image num] [file]",
 		args=cli.argparser.create({
-			over=false
+			over=false,
 		}),
 		help_detail=[[
- file: file or directory to write to
+ file:       file or directory to write to
    defaults to loaded name. if directory, appends original filename
  options:
-   -over  overwrite existing files
+   -over     overwrite existing files
 ]],
 		func=function(self,args) 
 			local filename
-			local d = m.selected
+			local narg
+			-- TODO this will prevent you from saving a file named '1' without explicit image number
+			if tonumber(args[1]) then
+				narg = table.remove(args,1)
+			end
+			local d = m.get_sel_batch(narg)
 			if not d then
 				return false, 'no file selected'
 			end
-			local filename = args[1]
 
-			if filename then
-				if lfs.attributes(filename,'mode') == 'directory' then
-					filename = fsutil.joinpath(filename,fsutil.basename(d.filename))
-				end
-			else
-				filename = d.filename
+			local filename,err = prepare_dst_path(d,args[1],{over=args.over,pretend=args.pretend})
+			if not filename then
+				return false, err
 			end
-			local m = lfs.attributes(filename,'mode')
-			if m == 'file' then
-				if not args.over then
-					return false, 'file exists, use -over to overwrite '..tostring(filename)
-				end
-			elseif m then -- TODO might want to allow
-				return false, "can't overwrite non-file "..tostring(filename)
+			if args.pretend then
+				printf("save: %s\n",filename)
+				return true
 			end
+
 			local fh,err = io.open(filename,'wb')
 			if not fh then
 				return false, err
@@ -187,29 +417,39 @@ m.init_cli = function()
 			local status, err = d._lb:fwrite(fh)
 			fh:close()
 			if status then
-				return true, string.format('wrote %s',filename)
+				printf('wrote %s\n',filename)
+				return true
 			end
 			return false, err
 		end,
 	},
 	{
+		-- TODO unload all option, collect garbage?
 		names={'dngunload'},
 		help='unload dng file',
+		arghelp="[image num]",
+		args=cli.argparser.create({}),
 		func=function(self,args) 
-			local d = m.selected
+			if #args > 0 then
+				narg = table.remove(args,1)
+			end
+			local d = m.get_sel_nobatch(narg)
 			if not d then
 				return false, 'no file selected'
 			end
 			local di = m.get_index(d)
 			table.remove(m.list,di)
-			m.selected = nil
+			if d == m.selected then
+				m.selected = nil
+			end
 			return true, 'unloaded '..tostring(d.filename)
 		end,
 	},
 	{
+		-- TODO file output, histogram, ifd values, individual ifd values
 		names={'dnginfo'},
 		help='display information about a dng',
-		arghelp="[options]",
+		arghelp="[options] [image num]",
 		args=cli.argparser.create({
 			s=false,
 			ifd=false,
@@ -224,10 +464,10 @@ m.init_cli = function()
    -ifd[=<ifd>]
    	   raw, exif, main, or 0, 0.0 etc. default 0
    -r   recurse into sub-ifds
-   -v   display ifd values, except image data
+   -v   display ifd values, except image data (TODO not implemented!)
 ]],
 		func=function(self,args) 
-			local d = m.selected
+			local d = m.get_sel_batch(args[1])
 			if not d then
 				return false, 'no file selected'
 			end
@@ -316,113 +556,93 @@ m.init_cli = function()
 		arghelp="[options] [files]",
 		args=cli.argparser.create({
 			patch=false,
-			fmatch=false,
-			rmatch=false,
-			maxdepth=100,
-			pretend=false,
-			odir=false,
 			over=false,
 		}),
 		help_detail=[[
  options:
-   -patch[=number]   patch bad pixels
- file selection
-   -fmatch=<pattern> only file with path/name matching <pattern>
-   -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
-   -maxdepth=n       only recurse into N levels of directory
-   -pretend          print actions instead of doing them
-   -over             overwrite existing
+   -patch[=n]   interpolate over pixels with value less than n (default 0)
 ]],
 		func=function(self,args) 
-			if #args == 0 then
-				local d = m.selected
-				if d then
-					dngmod_single(d,args)
-					return true
-				else
-					return false, 'no file selected'
-				end
+			local d = m.get_sel_batch(args[1])
+			if not d then
+				return false, 'no file selected'
 			end
-			local opts={
-				dirsfirst=true,
-				fmatch=args.fmatch,
-				rmatch=args.rmatch,
-				pretend=args.pretend,
-				maxdepth=tonumber(args.maxdepth),
-				dngmod_args=args,
-			}
-			return fsutil.find_files({unpack(args)},opts,dngmod_callback)
+			if args.patch then
+				if args.patch == true then
+					args.patch = 0
+				else
+					args.patch = tonumber(args.patch)
+				end
+				local count = d.img:patch_pixels(args.patch)
+				printf('patched %d pixels\n',count)
+			end
+			return true
 		end,
 	},
 	{
 		names={'dngdump'},
 		help='extract data from dng',
-		arghelp="[options]",
+		arghelp="[options] [image num]",
 		args=cli.argparser.create({
 			thm=false,
 			raw=false,
 			rfmt=false,
 			tfmt=false,
+			over=false,
 		}),
-		-- TODO filename handling
 		help_detail=[[
  options:
    -thm[=name]   extract thumbnail to name, default dngname_thm.(rgb|ppm)
    -raw[=name]   extract raw data to name, default dngname.(raw|pgm)
+   -over         overwrite existing file
    -rfmt=fmt raw format (default: unmodified from DNG)
      format is <bpp>[endian][pgm], e.g. 8pgm or 12l
 	 pgm is only valid for 8 and 16 bpp
 	 endian is l or b and defaults to little, except for 16 bit pgm
    -tfmt=fmt thumb format (default, unmodified rgb)
      ppm   8 bit rgb ppm
-    
 ]],
 		func=function(self,args) 
-			local d = m.selected
+			local d = m.get_sel_batch(args[1])
 			if not d then
 				return false, 'no file selected'
 			end
 			if args.thm then
-				if not args.tfmt then
-					d.main_ifd:write_image_data(make_dst_name(d,args.thm,'_thm.rgb'))
-				elseif args.tfmt == 'ppm' then
-					-- TODO should check that it's actually an RGB8 thumb
-					local fh, err = io.open(make_dst_name(d,args.thm,'_thm.ppm'),'wb')
-					if not fh then
-						return false,err
-					end
-					fh:write(string.format('P6\n%d\n%d\n%d\n',
-						d.main_ifd.byname.ImageWidth:getel(),
-						d.main_ifd.byname.ImageLength:getel(),255))
-					d.main_ifd:write_image_data(fh)
-					fh:close()
-				else
-					return false, 'invalid thumbnail format requested: '..tostring(args.tfmt)
+				local status, err = do_dump_thumb(d, args)
+				if not status then
+					return false, err
 				end
 			end
 			if args.raw then
-				if not args.rfmt then
-					d.raw_ifd:write_image_data(make_dst_name(d,args.raw,'.raw'))
-				else
-					local bpp,endian,fmt=string.match(args.rfmt,'(%d+)([lb]?)(%a*)')
-					bpp = tonumber(bpp)
-					if endian == '' then
-						endian = nil -- use dump_image defaults
-					elseif endian == 'l' then
-						endian = 'little'
-					elseif endian == 'b' then
-						endian = 'big'
-					else
-						return false, 'invalid endian: '..tostring(endian)
-					end
-					if fmt == 'pgm' then
-						return d:dump_image(make_dst_name(d,args.raw,'.pgm'),{bpp=bpp,pgm=true,endian=endian})
-					end
-					return d:dump_image(make_dst_name(d,args.raw,'.raw'),{bpp=bpp,endian=endian})
+				local status, err = do_dump_raw(d, args)
+				if not status then
+					return false, err
 				end
 			end
 			return true
 		end,
+	},
+	{
+		names={'dngbatch'},
+		help='manipulate multiple files',
+		arghelp="[options] [files] { command ; command ... }",
+		-- TODO should default to DNG (case insensitive) only, outside of fmatch, with option to change
+		-- TODO should allow filename substitutions for commands, e.g. dump -raw=$whatever
+		help_detail=[[
+ options:
+   -odir             output directory, if no name specified in file commands
+   -pretend          print actions instead of doing them
+   -verbose[=n]      print detail about actions
+ file selection
+   -fmatch=<pattern> only file with path/name matching <pattern>
+   -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
+   -maxdepth=n       only recurse into N levels of directory
+ commands:
+   mod dump save info
+  take the same options as the corresponding standalone commands
+  load and unload are implicitly called for each file
+]],
+		func=dngbatch_cmd,
 	},
 }
 end
