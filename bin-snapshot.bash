@@ -13,6 +13,8 @@ usage:
 	$name [options]
 options:
 	-debug: build debug and don't strip
+        -gui: build gui and cli executables (assumes config.mk set up)
+
 EOF
 	exit 1
 }
@@ -23,6 +25,9 @@ while [ ! -z "$arg" ] ; do
 	case $arg in
 	-debug)
 		debug=1
+	;;
+	-gui)
+		gui=1
 	;;
 	*)
 		usage "unknown option $arg"
@@ -52,12 +57,19 @@ if [ -f "$ZIPNAME" ] ; then
 	rm -f "$ZIPNAME"
 fi
 
-PROG="chdkptp$EXE"
+PROGS=chdkptp$EXE
 make DEBUG="$debug" clean all
-if [ -z "$debug" ] ; then
-	strip "$PROG"
+if [ ! -z "$gui" ] ; then
+	make DEBUG="$debug" GUI=1 clean all
+	PROGS="$PROGS chdkptp_gui$EXE"
 fi
-zip "$ZIPNAME" "$PROG" chdkptp-sample.sh \
+
+if [ -z "$debug" ] ; then
+	strip $PROGS
+fi
+
+
+zip "$ZIPNAME" $PROGS chdkptp-sample.sh \
 	lua/*.lua \
 	lua/extras/*.lua \
 	README.TXT USAGE.TXT COPYING THANKS.TXT

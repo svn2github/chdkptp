@@ -12,6 +12,8 @@ Changelog is at http://www.assembla.com/wiki/show/chdkptp/Changelog
 
 Documentation for end users can be found in USAGE.TXT
 
+Information about the Raspberry pi binary builds can be found in README-RASPI.TXT
+
 For information about CHDK, see http://chdk.wikia.com/wiki/CHDK
 For information about the CHDK PTP extension, see http://chdk.wikia.com/wiki/PTP_Extension
 
@@ -101,6 +103,10 @@ You will also need a fully working gcc environment.
 
 CD - similar to IUP
 
+==Building IUP and CD==
+If available, using pre-compiled libraries is suggested, but some notes can be found
+in README-RASPI-LIBS.TXT
+
 =Configuring the source (all platforms)=
 Edit config.mk to reflect the installation directories of the above packages and
 desired compile time options
@@ -111,6 +117,8 @@ make
 
 =Testing your build=
 chdkptp -e"exec require'tests':runall()"
+
+This is not a comprehensive test.
 
 =Running=
 See USAGE.TXT

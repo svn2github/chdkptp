@@ -12,6 +12,9 @@ CD_FREETYPE_LIB=freetype z
 endif
 endif
 
+#extra suffix to add to executable name
+EXE_EXTRA=
+
 CC=gcc
 CFLAGS=-DCHDKPTP_OSTYPE=\"$(OSTYPE)\" -Wall
 LDFLAGS=

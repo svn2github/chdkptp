@@ -84,14 +84,16 @@ LDFLAGS+=$(LIB_PATHS) $(patsubst %,-l%,$(LINK_LIBS) $(SYS_LIBS))
 
 SUBDIRS=lfs
 
-EXES=chdkptp$(EXE)
+CHDKPTP_EXE=chdkptp$(EXE_EXTRA)$(EXE)
+
+EXES=$(CHDKPTP_EXE)
 
 all: $(EXES)
 
 SRCS=properties.c ptp.c chdkptp.c lbuf.c liveimg.c rawimg.c luautil.c
 OBJS=$(SRCS:.c=.o)
 
-chdkptp$(EXE): $(OBJS)
+$(CHDKPTP_EXE): $(OBJS)
 	$(CC) -o $@ lfs/lfs.o $^ $(LDFLAGS)
 
 include bottom.mk
