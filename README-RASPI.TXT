@@ -1,6 +1,6 @@
 The raspberrypi binary includes GUI and CLI executables, named chdkptp_gui and chdkptp respectively
 The GUI executable requires IUP and CD libraries which are non-trivial to build on raspberry pi
-These binaries are available in a seperate package called raspbian-libs-<date>.zip
+These binaries are available in a separate package called raspbian-libs-<date>.zip
 To use the libraries with the GUI build, your chdkptp.sh should be set up to point to the chdkptp_gui
 executable and add the libs to LD_LIBRARY_PATH.
 Assuming you extracted the chdkptp package and the libs into a directory called /home/pi/pietest
