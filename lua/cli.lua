@@ -1471,7 +1471,7 @@ cli:add_commands{
    -s=<start>   first line of for subimage raw
    -c=<count>   number of lines for subimage
    -cont=<num>  shoot num shots in continuous mode
-   -badpix      interpolate over zero value pixels (dng only)
+   -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
 ]],
 		func=function(self,args)
 			local dst = args[1]
@@ -1567,6 +1567,9 @@ cli:add_commands{
 				rcopts.jpg=chdku.rc_handler_file(dst_dir,dst)
 			end
 			if args.dng then
+				if args.badpix == true then
+					args.badpix = 0
+				end
 				local dng_info = {
 					lstart=opts.lstart,
 					lcount=opts.lcount,

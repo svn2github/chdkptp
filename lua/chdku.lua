@@ -910,7 +910,7 @@ function chdku.rc_process_dng(dng_info,raw)
 	end
 	if dng_info.badpix then
 		cli.dbgmsg('patching badpixels: ')
-		local bcount=hdr.img:patch_pixels() -- TODO should use values from opcodes
+		local bcount=hdr.img:patch_pixels(dng_info.badpix) -- TODO should use values from opcodes
 		cli.dbgmsg('%d\n',bcount)
 	end
 

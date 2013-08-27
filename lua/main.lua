@@ -23,6 +23,8 @@ chdku=require('chdku')
 cli=require('cli')
 exp=require('exposure')
 dng=require('dng')
+dngcli=require'dngcli'
+
 --[[
 Command line arguments
 --]]
@@ -214,6 +216,7 @@ end
 prefs._add('core_verbose','number','ptp core verbosity',0,corevar.get_verbose,corevar.set_verbose)
 
 con=chdku.connection()
+dngcli.init_cli()
 
 local args = sys.getargs()
 if #args > 0 then
