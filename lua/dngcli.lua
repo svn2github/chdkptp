@@ -183,15 +183,6 @@ local function do_dump_raw(d,args)
 	end
 end
 
-local dngbatch_ap=cli.argparser.create{
-	patch=false,
-	fmatch=false,
-	rmatch=false,
-	maxdepth=100,
-	pretend=false,
-	verbose=false,
-	odir=false,
-}
 
 local dngbatch_cmds=util.flag_table{
 	'info',
@@ -232,13 +223,6 @@ end
 findfiles callback
 ]]
 local function dngbatch_callback(self,opts)
-	-- if directory, just keep processing
-	if self.cur.st.mode == 'directory' then
-		return true
-	end
-	if self.cur.name == '.' or self.cur.name == '..' then
-		return true
-	end
 	local dargs = opts.dngbatch_args
 	local cmds = opts.dngbatch_cmds
 	local relpath
@@ -282,6 +266,16 @@ local function dngbatch_callback(self,opts)
 	return status,err
 end
 
+local dngbatch_ap=cli.argparser.create{
+	patch=false,
+	fmatch=false,
+	rmatch=false,
+	maxdepth=1,
+	pretend=false,
+	verbose=false,
+	odir=false,
+	ext='dng'
+}
 --[[
 TODO there should be a generic framework for this in cli
 ]]
@@ -332,14 +326,19 @@ local function dngbatch_cmd(self,args)
 	if #errors > 0 then
 		return false,'\n'..table.concat(errors,'\n')
 	end
+	local sfx
+	if args.ext ~= '*' and args.ext ~= true then
+		sfx = '.'..args.ext
+	end
 	local opts={
-		dirsfirst=true,
+		dirs=false, -- pass only files to callback
 		fmatch=args.fmatch,
 		rmatch=args.rmatch,
 		pretend=args.pretend,
 		maxdepth=tonumber(args.maxdepth),
 		dngbatch_args=args,
 		dngbatch_cmds=cmds,
+		fsfx=sfx,
 	}
 	return fsutil.find_files({unpack(args)},opts,dngbatch_callback)
 end
@@ -558,6 +557,7 @@ m.init_cli = function()
 			patch=false,
 			over=false,
 		}),
+		--TODO opcode based patch, other rawops
 		help_detail=[[
  options:
    -patch[=n]   interpolate over pixels with value less than n (default 0)
@@ -583,6 +583,7 @@ m.init_cli = function()
 		names={'dngdump'},
 		help='extract data from dng',
 		arghelp="[options] [image num]",
+		-- TODO scale options
 		args=cli.argparser.create({
 			thm=false,
 			raw=false,
@@ -626,7 +627,6 @@ m.init_cli = function()
 		names={'dngbatch'},
 		help='manipulate multiple files',
 		arghelp="[options] [files] { command ; command ... }",
-		-- TODO should default to DNG (case insensitive) only, outside of fmatch, with option to change
 		-- TODO should allow filename substitutions for commands, e.g. dump -raw=$whatever
 		help_detail=[[
  options:
@@ -636,7 +636,8 @@ m.init_cli = function()
  file selection
    -fmatch=<pattern> only file with path/name matching <pattern>
    -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
-   -maxdepth=n       only recurse into N levels of directory
+   -maxdepth=n       only recurse into N levels of directory (default 1, only those specified in command)
+   -ext=string       only files with specified extension, default dng, * for all. Not a pattern
  commands:
    mod dump save info
   take the same options as the corresponding standalone commands
