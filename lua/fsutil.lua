@@ -377,6 +377,23 @@ function fsutil.find_files_fullname_fn(self,opts)
 	return true
 end
 
+--[[
+process directory tree with matching
+status,err = find_files(paths,opts,func)
+paths=<array of paths to process>
+opts={
+	fmatch='<pattern>', -- match on full path of files, default any (NOTE can match on filename with /<match>$)
+	dmatch='<pattern>', -- match on names of directories, default any 
+	rmatch='<pattern>', -- recurse into directories matching, default any 
+	fsfx='string',      -- compare (not pattern) suffix of file, can be used for extension
+	fsfx_ic=bool,       -- should suffix be case sensitive (default false)
+	dirs=true, -- pass directories to func. otherwise only files sent to func, but dirs are still recursed
+	dirsfirst=false, -- process directories before contained files
+	maxdepth=100, -- maxium depth of directories to recurse into, 0=just process paths passed in, don't recurse
+	martians=bool, -- process non-file, not directory items (devices etc) default false
+}
+]]
+
 function fsutil.find_files(paths,opts,func)
 	if not func then
 		func=fsutil.find_files_fullname_fn
@@ -385,15 +402,30 @@ function fsutil.find_files(paths,opts,func)
 		dirs=true,
 		dirsfirst=false,
 		maxdepth=100,
+		fsfx_ic=true,
 	},opts)
 
 	-- optional place to store callback data
 	local results
 
 	return fs_iter.run(paths,{
+		-- check file suffix (usually extension, but doesn't have to be)
+		ff_check_fsfx=function(self,opts)
+			if not opts.fsfx then
+				return true -- option not set, all match
+			end
+			local len=string.len(opts.fsfx)
+			if opts.fsfx_ic then
+				return self.cur.full:lower():sub(-len,-1) == opts.fsfx:lower()
+			end
+			return self.cur.full:sub(-len,-1) == opts.fsfx
+		end,
 		ff_check_match=function(self,opts)
 			if self.cur.st.mode == 'file' then
-				return not opts.fmatch or string.match(self.cur.full,opts.fmatch)
+				if opts.fmatch then
+					return string.match(self.cur.full,opts.fmatch) and self:ff_check_fsfx(opts)
+				end
+				return self:ff_check_fsfx(opts)
 			end
 			if self.cur.st.mode == 'directory' then
 				return not opts.dmatch or string.match(self.cur.full,opts.dmatch)
