@@ -6,6 +6,9 @@
 
 #ifdef WIN32
 #include <winsock2.h>
+#elif defined(__APPLE__)
+#include <arpa/inet.h> 
+#include <libkern/OSByteOrder.h> 
 #else
 /* ntohl and relatives live here */
 #include <arpa/inet.h>

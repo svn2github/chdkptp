@@ -112,6 +112,9 @@ Edit config.mk to reflect the installation directories of the above packages and
 desired compile time options
 See config-sample-*.mk for examples
 
+==Mac development==
+See README-OSX.TXT
+
 =Building=
 make
 
