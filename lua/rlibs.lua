@@ -1073,7 +1073,48 @@ function rs_shoot(opts)
 end
 ]],
 },
-
+--[[
+search memory for an aligned 32 bit word
+mem_search_word{
+	start:number
+	last:number
+	count:number
+	val:number
+}
+]]
+{
+	name='mem_search_word',
+	depend={'msg_batcher'},
+	code=[[
+function mem_search_word(opts)
+	if type(opts) ~= 'table' then
+		error('missing opts')
+	end
+	local start = tonumber(opts.start)
+	local last 
+	if opts.count then
+		last = start + (tonumber(opts.count)-1)*4
+	else
+		last = tonumber(opts.last)
+	end
+	local val = tonumber(opts.val)
+	if not start or not last or last < start or not val then
+		error('bad opts')
+	end
+	set_yield(-1,100)
+	local b=msg_batcher()
+	for i=start,last,4 do
+		local v = peek(i)
+		if v == val then
+			if not b:write(i) then
+				error('write failed')
+			end
+		end
+	end
+	b:flush()
+end
+]]
+},
 --[[
 a simple long lived script for interactive testing
 example
