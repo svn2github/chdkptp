@@ -77,7 +77,7 @@ local function prepare_dst_path(d,name,opts)
 		end
 	else
 		if batch.odir then
-			name = fsutil.joinpath_cam(batch.odir,batch.relpath)
+			name = fsutil.joinpath(batch.odir,batch.relpath)
 		else
 			name = d.filename
 		end
