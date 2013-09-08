@@ -494,7 +494,7 @@ function m.init()
 	end
 	local icnv = iup.canvas{rastersize="360x240",border="NO",expand="NO"}
 	m.icnv = icnv
-	m.statslabel = iup.label{size="90x80",alignment="ALEFT:ATOP"}
+	m.statslabel = iup.label{size="90x60",alignment="ALEFT:ATOP"}
 	m.container = iup.hbox{
 		iup.frame{
 			icnv,
@@ -531,6 +531,40 @@ function m.init()
 								update_fps(newval)
 							end
 						},
+					},
+					iup.button{
+						title="Screenshot",
+						action=function(self)
+							-- quick n dirty screenshot
+							local cnv = icnv.dccnv
+							local w,h = cnv:GetSize()
+							local bm = cd.CreateBitmap(w,h,cd.RGB)
+							cnv:GetBitmap(bm,0,0)
+							local lb=lbuf.new(w*h*3)
+							local o=0
+							for y=h-1,0,-1 do
+								for x=0,w-1 do
+									lb:set_u8(o,bm.r[y*w + x])
+									o=o+1
+									lb:set_u8(o,bm.g[y*w + x])
+									o=o+1
+									lb:set_u8(o,bm.b[y*w + x])
+									o=o+1
+								end
+							end
+							cd.KillBitmap(bm)
+							local filename = 'chdkptp_'..os.date('%Y%m%d_%H%M%S')..'.ppm'
+							local fh, err = io.open(filename,'wb')
+							if not fh then
+								warnf("failed to open %s: %s",tostring(filename),tostring(err))
+								return
+							end
+							fh:write(string.format('P6\n%d\n%d\n%d\n', w, h,255))
+							lb:fwrite(fh)
+							fh:close()
+							gui.infomsg('wrote %dx%d ppm %s\n',w,h,tostring(filename))
+
+						end
 					},
 				},
 				title="Stream"
