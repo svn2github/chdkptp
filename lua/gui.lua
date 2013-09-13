@@ -6,11 +6,13 @@ this file is licensed under the same terms as the IUP examples
 local gui = {}
 local live = require('gui_live')
 local tree = require('gui_tree')
+local user = require('gui_user')
 local icon = require('gui_icon')
 
 -- make global for easier testing
 gui.live = live
 gui.tree = tree
+gui.user = user
 
 connect_icon = iup.label{
 	image = icon.on,
@@ -421,17 +423,21 @@ end
 
 tree.init()
 live.init()
+user.init()
 
 contab = iup.vbox{
 	statustext,
 }
+
 maintabs = iup.tabs{
 	contab,
 	tree.get_container(),
 	live.get_container(),
+    user.get_container(),
 	tabtitle0='Console',
 	tabtitle1=tree.get_container_title(),
 	tabtitle2=live.get_container_title(),
+    tabtitle3=user.get_container_title(),
 }
 
 live.set_tabs(maintabs)
@@ -592,7 +598,7 @@ function add_status(status,msg)
 			printf(msg)
 		end
 	else 
-		printf("error: %s",tostring(msg))
+		printf("ERROR: %s\n",tostring(msg))
 	end
 end
 
