@@ -355,7 +355,7 @@ local function mupload_fn(self,opts)
 			opts.lastdir = dst_dir
 		end
 		-- TODO stat'ing in batches would be faster
-		st,err=con:stat(dst)
+		local st,err=con:stat(dst)
 		if st and not st.is_file then
 			return false, 'not a file: '..dst
 		end
