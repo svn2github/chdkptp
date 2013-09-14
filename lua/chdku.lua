@@ -51,8 +51,11 @@ function chdku.ts_get_offset()
 	-- local timestamp, assumed to be seconds since unix epoch
 	local tslocal=os.time()
 	-- !*t returns a table of hours, minutes etc in UTC (without a timezone spec)
+	-- the dst flag is overridden using the local value
 	-- os.time turns this into a timestamp, treating as local time
-	return tslocal - os.time(os.date('!*t',tslocal))
+	local ttmp = os.date('!*t',tslocal)
+	ttmp.isdst  = os.date('*t',tslocal).isdst
+	return tslocal - os.time(ttmp)
 end
 
 --[[
