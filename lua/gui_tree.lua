@@ -206,6 +206,27 @@ local function do_delete_dialog(data)
 	end
 end
 
+local function do_properties_dialog(data) 
+	local fullpath = data:fullpath()
+	local ftype
+	if data.stat.is_dir then
+		ftype = 'directory'
+	elseif data.stat.is_file then
+		ftype = 'file'
+	else
+		ftype = 'other'
+	end
+	local size 
+	if data.stat.is_dir then
+		size = 'n/a'
+	else
+		size = tostring(data.stat.size)
+	end
+	local mtime = os.date('%c',chdku.ts_cam2pc(data.stat.mtime))
+
+	iup.Alarm('Properties',string.format("%s\ntype: %s\nsize: %s\nmodifed: %s\n",fullpath,ftype,size,mtime),'OK')
+end
+
 function itree:refresh_tree_by_id(id)
 	if not id then
 		printf('refresh_tree_by_id: nil id\n')
@@ -230,13 +251,33 @@ function itree:refresh_tree_by_path(path)
 		gui.dbgmsg('refresh_tree_by_path: failed to find %s\n',tostring(path))
 	end
 end
---[[
+
 function itree:dropfiles_cb(filename,num,x,y)
 	-- note id -1 > not on any specific item
 	local id = iup.ConvertXYToPos(self,x,y)
-	printf('dropfiles_cb: %s %d %d %d %d\n',filename,num,x,y,id)
+	gui.dbgmsg('dropfiles_cb: %s %d %d %d %d\n',filename,num,x,y,id)
+	-- on unrecognized spot defaults to root
+	if id == -1 then
+		gui.infomsg("must drop on a directory\n")
+		return iup.IGNORE
+		-- TODO could default to root, or selected
+		-- but without confirm it's would be easy to miss
+		-- id = 0
+	end
+	local data = self:get_data(id)
+	local remotepath = data:fullpath()
+	if not data.stat.is_dir then
+		-- TODO for single files we might want to just overwrite
+		-- or drop back to parent?
+		gui.infomsg("can't upload to non-directory %s\n",remotepath)
+		return iup.IGNORE
+	end
+	gui.infomsg("upload %s to %s\n",filename,remotepath)
+	-- TODO no cancel, no overwrite options!
+	-- unfortunately called for each dropped item
+	add_status(con:mupload({filename},remotepath))
+	self:refresh_tree_by_path(remotepath)
 end
-]]
 
 function itree:rightclick_cb(id)
 	local data=self:get_data(id)
@@ -285,6 +326,12 @@ function itree:rightclick_cb(id)
 					do_delete_dialog(data)
 				end,
 			},
+			iup.item{
+				title='Properties...',
+				action=function()
+					do_properties_dialog(data)
+				end,
+			},
 		}:popup(iup.MOUSEPOS,iup.MOUSEPOS)
 	else
 		iup.menu{
@@ -298,6 +345,12 @@ function itree:rightclick_cb(id)
 				title='Delete...',
 				action=function()
 					do_delete_dialog(data)
+				end,
+			},
+			iup.item{
+				title='Properties...',
+				action=function()
+					do_properties_dialog(data)
 				end,
 			},
 		}:popup(iup.MOUSEPOS,iup.MOUSEPOS)
@@ -339,10 +392,12 @@ function itree:branchopen_cb(id)
 	local path
 	if id == 0 then
 		path = 'A/'
-		-- chdku.exec('return os.stat("A/")',{libs={'serialize','serialize_msgs'}})
-		-- TODO
-		-- self:set_data(0,{name='A/',stat={is_dir=true},path=''})
-		itree:set_data(0,{name='A/',stat={is_dir=true},path=''})
+		local st,err=con:stat(path)
+		if not st then
+			add_status(st,err)
+			st = {is_dir=true,size=0,mtime=0}
+		end
+		itree:set_data(0,{name='A/',stat=st,path=''})
 	end
 	local data = self:get_data(id)
 	self:populate_branch(id,data:fullpath())
