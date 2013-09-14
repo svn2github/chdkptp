@@ -25,14 +25,14 @@ function m.get_container_title()
 end
 
 function m.init()
-    dest = "" -- destination path for download, default is chdkptp dir
+    m.dest = "" -- destination path for download, default is chdkptp dir
     return
 end
 
 function m.get_container()
-    usertab = iup.vbox{
+    local usertab = iup.vbox{
         margin="4x4",
-        remote_capture_ui(),
+        m.remote_capture_ui(),
     }
     return usertab
 end
@@ -43,7 +43,7 @@ remote capture function as gui function
 * JPG Remote Shoot - shoot and save a JPG file in the destination (only available for cameras that support filewrite_task)
 * DNG Remote Shoot - shoot and save a DNG file in the destination
 ]]
-function remote_capture_ui()
+function m.remote_capture_ui()
     local gui_frame = iup.frame{
         title="Remote Capture",
         iup.vbox{
@@ -59,8 +59,8 @@ function remote_capture_ui()
                     }
                     dlg:popup(iup_centerparent, iup_centerparent)
                     if dlg.status == "0" then
-                        dest = dlg.value
-                        gui.infomsg("download destination %s\n", dest)
+                        m.dest = dlg.value
+                        gui.infomsg("download destination %s\n", m.dest)
                     end
                 end,
             },
@@ -68,9 +68,9 @@ function remote_capture_ui()
                 title="JPG Remote Shoot",
                 size="75x15",
                 fgcolor="255 0 0",
-                tip="Works not for all cameras!",
+                tip="Does not work for all cameras!",
                 action=function(self)
-                    local cmd="rs "..dest
+                    local cmd="rs "..m.dest
                     add_status(cli:execute(cmd))
                 end,
             },
@@ -79,7 +79,7 @@ function remote_capture_ui()
                 size="75x15",
                 fgcolor="255 0 0",
                 action=function(self)
-                    local cmd="rs "..dest.." -dng"
+                    local cmd="rs "..m.dest.." -dng"
                     add_status(cli:execute(cmd))
                 end,
             },
