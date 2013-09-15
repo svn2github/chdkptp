@@ -595,7 +595,7 @@ status_out = {
 function add_status(status,msg)
 	if status then
 		if msg then
-			printf(msg)
+			printf('%s',msg)
 		end
 	else 
 		printf("ERROR: %s\n",tostring(msg))
