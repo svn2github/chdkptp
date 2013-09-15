@@ -786,7 +786,9 @@ chdku.remotecap_dtypes={
 	[0]={
 		ext='jpg',
 		id=1,
-		max_chunks=16, -- should be much less, but exact value not certain
+-- actual limit isn't clear, sanity check so bad hook won't fill up disk
+-- MAX_CHUNKS_FOR_JPEG is per session, dryos > r50 can have multiple sessions
+		max_chunks=100, 
 	},
 	{ 
 		ext='raw',
