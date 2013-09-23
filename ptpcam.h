@@ -79,35 +79,10 @@ int myusb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int length,
  * defines
  */
 
-/* requested actions */
-#define ACT_DEVICE_RESET	0x1
-#define ACT_LIST_DEVICES	0x2
-#define ACT_LIST_PROPERTIES	0x3
-#define ACT_LIST_OPERATIONS	0x4
-#define ACT_GETSET_PROPERTY	0x5
-#define ACT_SHOW_INFO		0x6
-#define ACT_LIST_FILES		0x7
-#define ACT_GET_FILE		0x8
-#define ACT_GET_ALL_FILES	0x9
-#define ACT_CAPTURE		0xA
-#define ACT_DELETE_OBJECT	0xB
-#define ACT_DELETE_ALL_FILES	0xC
-#define ACT_LOOP_CAPTURE	0xD
-#define ACT_SHOW_ALL_PROPERTIES	0xE
-#define ACT_SHOW_UNKNOWN_PROPERTIES	0xF
-#define ACT_SET_PROPBYNAME	0x10
-
-#define ACT_NIKON_DC		0x101
-#define ACT_NIKON_DC2		0x102
-#define ACT_NIKON_IC		0x103
 
 /* printing value type */
 #define PTPCAM_PRINT_HEX	00
 #define PTPCAM_PRINT_DEC	01
-
-/* filename overwrite */
-#define OVERWRITE_EXISTING	1
-#define	SKIP_IF_EXISTS		0
 
 
 /*
@@ -150,8 +125,6 @@ extern short verbose;
  */
 
 //void ptpcam_siginthandler(int signum);
-
-//void show_info (int busn, int devn, short force);
 
 struct usb_bus* init_usb(void);
 void close_usb(PTP_USB* ptp_usb, struct usb_device* dev);

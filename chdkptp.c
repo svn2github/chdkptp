@@ -338,7 +338,6 @@ close_usb(PTP_USB* ptp_usb, struct usb_device* dev)
 struct usb_bus*
 get_busses()
 {
-//	usb_init();
 	usb_find_busses();
 	usb_find_devices();
 	return (usb_get_busses());
