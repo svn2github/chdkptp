@@ -15,6 +15,13 @@ SYS_LIBS=ws2_32 kernel32
 IUP_SYS_LIBS=comctl32 ole32 gdi32 comdlg32
 endif
 
+ifeq ("$(PTPIP_SUPPORT)","1")
+CFLAGS +=-DCHDKPTP_PTPIP=1
+PTPIP_SRCS=sock_util.c
+# ws2_32 already included
+endif
+# PTPIP
+
 ifeq ($(OSTYPE),Linux)
 # need 32 bit libs to do this
 #TARGET_ARCH=-m32
@@ -90,10 +97,20 @@ EXES=$(CHDKPTP_EXE)
 
 all: $(EXES)
 
-SRCS=properties.c ptp.c chdkptp.c lbuf.c liveimg.c rawimg.c luautil.c
+SRCS=properties.c ptp.c chdkptp.c lbuf.c liveimg.c rawimg.c luautil.c $(PTPIP_SRCS)
 OBJS=$(SRCS:.c=.o)
 
 $(CHDKPTP_EXE): $(OBJS)
 	$(CC) -o $@ lfs/lfs.o $^ $(LDFLAGS)
+
+
+# temp for PTP/IP test code
+ifeq ($(OSTYPE),Windows)
+NET_LIBS=-lws2_32
+else
+NETLIBS=
+endif
+ptpip$(EXE): ptpip.c sockutil.c
+	$(CC) $(CFLAGS) -o $@ $^ $(NET_LIBS)
 
 include bottom.mk
