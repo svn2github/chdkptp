@@ -63,6 +63,7 @@
 #  define N_(String) (String)
 #endif
 
+#include "sockutil.h"
 #include "ptpcam.h"
 
 #include <lua.h>
@@ -135,7 +136,7 @@
 short verbose=0;
 
 // TODO this is lame
-#define CHDK_CONNECTION_METHOD PTPParams *params; PTP_USB *ptp_usb; get_connection_data(L,1,&params,&ptp_usb);
+#define CHDK_CONNECTION_METHOD PTPParams *params; PTP_CON_STATE *ptp_cs; get_connection_data(L,1,&params,&ptp_cs);
 
 /* we need it for a proper signal handling :/ */
 // reyalp -not using signal handler for now, revisit later
@@ -145,15 +146,15 @@ PTPParams* globalparams;
 void
 ptpcam_siginthandler(int signum)
 {
-    PTP_USB* ptp_usb=(PTP_USB *)globalparams->data;
-    struct usb_device *dev=usb_device(ptp_usb->handle);
+    PTP_CON_STATE* ptp_cs=(PTP_CON_STATE *)globalparams->data;
+    struct usb_device *dev=usb_device(ptp_cs->usb.handle);
 
     if (signum==SIGINT)
     {
 	/* hey it's not that easy though... but at least we can try! */
 	printf("Got SIGINT, trying to clean up and close...\n");
 	usleep(5000);
-	close_camera (ptp_usb, globalparams, dev);
+	close_camera (ptp_cs, globalparams, dev);
 	exit (-1);
     }
 }
@@ -163,7 +164,7 @@ static short
 ptp_read_func (unsigned char *bytes, unsigned int size, void *data)
 {
 	int result=-1;
-	PTP_USB *ptp_usb=(PTP_USB *)data;
+	PTP_CON_STATE *ptp_cs=(PTP_CON_STATE *)data;
 	int toread=0;
 	signed long int rbytes=size;
 
@@ -173,13 +174,13 @@ ptp_read_func (unsigned char *bytes, unsigned int size, void *data)
 			toread = PTPCAM_USB_URB;
 		else
 			toread = rbytes;
-		result=USB_BULK_READ(ptp_usb->handle, ptp_usb->inep,(char *)bytes, toread,ptp_usb->timeout);
+		result=USB_BULK_READ(ptp_cs->usb.handle, ptp_cs->usb.inep,(char *)bytes, toread,ptp_cs->timeout);
 		/* sometimes retry might help */
 		if (result==0)
-			result=USB_BULK_READ(ptp_usb->handle, ptp_usb->inep,(char *)bytes, toread,ptp_usb->timeout);
+			result=USB_BULK_READ(ptp_cs->usb.handle, ptp_cs->usb.inep,(char *)bytes, toread,ptp_cs->timeout);
 		if (result < 0)
 			break;
-		ptp_usb->read_count += toread;
+		ptp_cs->read_count += toread;
 		rbytes-=PTPCAM_USB_URB;
 	} while (rbytes>0);
 
@@ -197,11 +198,11 @@ static short
 ptp_write_func (unsigned char *bytes, unsigned int size, void *data)
 {
 	int result;
-	PTP_USB *ptp_usb=(PTP_USB *)data;
+	PTP_CON_STATE *ptp_cs=(PTP_CON_STATE *)data;
 
-	result=USB_BULK_WRITE(ptp_usb->handle,ptp_usb->outep,(char *)bytes,size,ptp_usb->timeout);
+	result=USB_BULK_WRITE(ptp_cs->usb.handle,ptp_cs->usb.outep,(char *)bytes,size,ptp_cs->timeout);
 	if (result >= 0) {
-		ptp_usb->write_count += size;
+		ptp_cs->write_count += size;
 		return (PTP_RC_OK);
 	} else {
 		if (verbose) perror("usb_bulk_write");
@@ -214,11 +215,11 @@ static short
 ptp_check_int (unsigned char *bytes, unsigned int size, void *data)
 {
 	int result;
-	PTP_USB *ptp_usb=(PTP_USB *)data;
+	PTP_CON_STATE *ptp_cs=(PTP_CON_STATE *)data;
 
-	result=USB_BULK_READ(ptp_usb->handle, ptp_usb->intep,(char *)bytes,size,ptp_usb->timeout);
+	result=USB_BULK_READ(ptp_cs->usb.handle, ptp_cs->usb.intep,(char *)bytes,size,ptp_cs->timeout);
 	if (result==0)
-	    result=USB_BULK_READ(ptp_usb->handle, ptp_usb->intep,(char *)bytes,size,ptp_usb->timeout);
+	    result=USB_BULK_READ(ptp_cs->usb.handle, ptp_cs->usb.intep,(char *)bytes,size,ptp_cs->timeout);
 	if (verbose>2) fprintf (stderr, "USB_BULK_READ returned %i, size=%i\n", result, size);
 
 	if (result >= 0) {
@@ -255,7 +256,7 @@ ptpcam_error (void *data, const char *format, va_list args)
 
 
 int
-init_ptp_usb (PTPParams* params, PTP_USB* ptp_usb, struct usb_device* dev)
+init_ptp_usb (PTPParams* params, PTP_CON_STATE* ptp_cs, struct usb_device* dev)
 {
 	usb_dev_handle *device_handle;
 
@@ -269,7 +270,7 @@ init_ptp_usb (PTPParams* params, PTP_USB* ptp_usb, struct usb_device* dev)
 	params->senddata_func=ptp_usb_senddata;
 	params->getresp_func=ptp_usb_getresp;
 	params->getdata_func=ptp_usb_getdata;
-	params->data=ptp_usb;
+	params->data=ptp_cs;
 	params->transaction_id=0;
 	params->byteorder = PTP_DL_LE;
 
@@ -278,8 +279,8 @@ init_ptp_usb (PTPParams* params, PTP_USB* ptp_usb, struct usb_device* dev)
 		perror("usb_open()");
 		return 0;
 	}
-	ptp_usb->handle=device_handle;
-	ptp_usb->write_count = ptp_usb->read_count = 0;
+	ptp_cs->usb.handle=device_handle;
+	ptp_cs->write_count = ptp_cs->read_count = 0;
 	usb_set_configuration(device_handle, dev->config->bConfigurationValue);
 	usb_claim_interface(device_handle,
 		dev->config->interface->altsetting->bInterfaceNumber);
@@ -291,30 +292,30 @@ init_ptp_usb (PTPParams* params, PTP_USB* ptp_usb, struct usb_device* dev)
 }
 
 void
-clear_stall(PTP_USB* ptp_usb)
+clear_stall(PTP_CON_STATE* ptp_cs)
 {
 	uint16_t status=0;
 	int ret;
 
 	/* check the inep status */
-	ret=usb_get_endpoint_status(ptp_usb,ptp_usb->inep,&status);
+	ret=usb_get_endpoint_status(ptp_cs,ptp_cs->usb.inep,&status);
 	if (ret<0) perror ("inep: usb_get_endpoint_status()");
 	/* and clear the HALT condition if happend */
 	else if (status) {
 		printf("Resetting input pipe!\n");
-		ret=usb_clear_stall_feature(ptp_usb,ptp_usb->inep);
+		ret=usb_clear_stall_feature(ptp_cs,ptp_cs->usb.inep);
         	/*usb_clear_halt(ptp_usb->handle,ptp_usb->inep); */
 		if (ret<0)perror ("usb_clear_stall_feature()");
 	}
 	status=0;
 
 	/* check the outep status */
-	ret=usb_get_endpoint_status(ptp_usb,ptp_usb->outep,&status);
+	ret=usb_get_endpoint_status(ptp_cs,ptp_cs->usb.outep,&status);
 	if (ret<0) perror ("outep: usb_get_endpoint_status()");
 	/* and clear the HALT condition if happend */
 	else if (status) {
 		printf("Resetting output pipe!\n");
-        	ret=usb_clear_stall_feature(ptp_usb,ptp_usb->outep);
+        	ret=usb_clear_stall_feature(ptp_cs,ptp_cs->usb.outep);
 		/*usb_clear_halt(ptp_usb->handle,ptp_usb->outep); */
 		if (ret<0)perror ("usb_clear_stall_feature()");
 	}
@@ -323,12 +324,12 @@ clear_stall(PTP_USB* ptp_usb)
 }
 
 void
-close_usb(PTP_USB* ptp_usb, struct usb_device* dev)
+close_usb(PTP_CON_STATE* ptp_cs, struct usb_device* dev)
 {
-	//clear_stall(ptp_usb);
-   	usb_release_interface(ptp_usb->handle, dev->config->interface->altsetting->bInterfaceNumber);
-	usb_reset(ptp_usb->handle);
-	usb_close(ptp_usb->handle);
+	//clear_stall(ptp_cs);
+   	usb_release_interface(ptp_cs->usb.handle, dev->config->interface->altsetting->bInterfaceNumber);
+	usb_reset(ptp_cs->usb.handle);
+	usb_close(ptp_cs->usb.handle);
 }
 
 
@@ -377,54 +378,54 @@ find_endpoints(struct usb_device *dev, int* inep, int* outep, int* intep)
 }
 
 void
-close_camera(PTP_USB *ptp_usb, PTPParams *params)
+close_camera(PTP_CON_STATE *ptp_cs, PTPParams *params)
 {
 	// usb_device(handle) appears to give bogus results when the device has gone away
 	// TODO possible a different device could come back on this bus/dev ?
-	struct usb_device *dev=find_device_by_path(ptp_usb->bus,ptp_usb->dev);
+	struct usb_device *dev=find_device_by_path(ptp_cs->usb.bus,ptp_cs->usb.dev);
 	if(!dev) {
-		fprintf(stderr,"attempted to close non-present device %s:%s\n",ptp_usb->bus,ptp_usb->dev);
+		fprintf(stderr,"attempted to close non-present device %s:%s\n",ptp_cs->usb.bus,ptp_cs->usb.dev);
 		return;
 	}
 
 	if (ptp_closesession(params)!=PTP_RC_OK)
 		fprintf(stderr,"ERROR: Could not close session!\n");
-	close_usb(ptp_usb, dev);
+	close_usb(ptp_cs, dev);
 }
 
 int
-usb_get_endpoint_status(PTP_USB* ptp_usb, int ep, uint16_t* status)
+usb_get_endpoint_status(PTP_CON_STATE* ptp_cs, int ep, uint16_t* status)
 {
-	 return (usb_control_msg(ptp_usb->handle,
+	 return (usb_control_msg(ptp_cs->usb.handle,
 		USB_DP_DTH|USB_RECIP_ENDPOINT, USB_REQ_GET_STATUS,
 		USB_FEATURE_HALT, ep, (char *)status, 2, 3000));
 }
 
 int
-usb_clear_stall_feature(PTP_USB* ptp_usb, int ep)
+usb_clear_stall_feature(PTP_CON_STATE* ptp_cs, int ep)
 {
-	return (usb_control_msg(ptp_usb->handle,
+	return (usb_control_msg(ptp_cs->usb.handle,
 		USB_RECIP_ENDPOINT, USB_REQ_CLEAR_FEATURE, USB_FEATURE_HALT,
 		ep, NULL, 0, 3000));
 }
 
 int
-usb_ptp_get_device_status(PTP_USB* ptp_usb, uint16_t* devstatus);
+usb_ptp_get_device_status(PTP_CON_STATE* ptp_cs, uint16_t* devstatus);
 int
-usb_ptp_get_device_status(PTP_USB* ptp_usb, uint16_t* devstatus)
+usb_ptp_get_device_status(PTP_CON_STATE* ptp_cs, uint16_t* devstatus)
 {
-	return (usb_control_msg(ptp_usb->handle,
+	return (usb_control_msg(ptp_cs->usb.handle,
 		USB_DP_DTH|USB_TYPE_CLASS|USB_RECIP_INTERFACE,
 		USB_REQ_GET_DEVICE_STATUS, 0, 0,
 		(char *)devstatus, 4, 3000));
 }
 
 int
-usb_ptp_device_reset(PTP_USB* ptp_usb);
+usb_ptp_device_reset(PTP_CON_STATE* ptp_cs);
 int
-usb_ptp_device_reset(PTP_USB* ptp_usb)
+usb_ptp_device_reset(PTP_CON_STATE* ptp_cs)
 {
-	return (usb_control_msg(ptp_usb->handle,
+	return (usb_control_msg(ptp_cs->usb.handle,
 		USB_TYPE_CLASS|USB_RECIP_INTERFACE,
 		USB_REQ_DEVICE_RESET, 0, 0, NULL, 0, 3000));
 }
@@ -435,7 +436,7 @@ void
 reset_device (struct usb_device *dev)
 {
 	PTPParams params;
-	PTP_USB ptp_usb;
+	PTP_CON_STATE ptp_cs;
 	uint16_t status;
 	uint16_t devstatus[2] = {0,0};
 	int ret;
@@ -448,48 +449,48 @@ reset_device (struct usb_device *dev)
 	}
 	printf("dev %s\tbus %s\n",dev->filename,dev->bus->dirname);
 
-	find_endpoints(dev,&ptp_usb.inep,&ptp_usb.outep,&ptp_usb.intep);
+	find_endpoints(dev,&ptp_cs.usb.inep,&ptp_cs.usb.outep,&ptp_cs.usb.intep);
 
-	if(!init_ptp_usb(&params, &ptp_usb, dev)) {
+	if(!init_ptp_usb(&params, &ptp_cs, dev)) {
 		printf("init_ptp_usb failed\n");
 		return;
 	}
 	
 	/* get device status (devices likes that regardless of its result)*/
-	usb_ptp_get_device_status(&ptp_usb,devstatus);
+	usb_ptp_get_device_status(&ptp_cs,devstatus);
 	
 	/* check the in endpoint status*/
-	ret = usb_get_endpoint_status(&ptp_usb,ptp_usb.inep,&status);
+	ret = usb_get_endpoint_status(&ptp_cs,ptp_cs.usb.inep,&status);
 	if (ret<0) perror ("usb_get_endpoint_status()");
 	/* and clear the HALT condition if happend*/
 	if (status) {
 		printf("Resetting input pipe!\n");
-		ret=usb_clear_stall_feature(&ptp_usb,ptp_usb.inep);
+		ret=usb_clear_stall_feature(&ptp_cs,ptp_cs.usb.inep);
 		if (ret<0)perror ("usb_clear_stall_feature()");
 	}
 	status=0;
 	/* check the out endpoint status*/
-	ret = usb_get_endpoint_status(&ptp_usb,ptp_usb.outep,&status);
+	ret = usb_get_endpoint_status(&ptp_cs,ptp_cs.usb.outep,&status);
 	if (ret<0) perror ("usb_get_endpoint_status()");
 	/* and clear the HALT condition if happend*/
 	if (status) {
 		printf("Resetting output pipe!\n");
-		ret=usb_clear_stall_feature(&ptp_usb,ptp_usb.outep);
+		ret=usb_clear_stall_feature(&ptp_cs,ptp_cs.usb.outep);
 		if (ret<0)perror ("usb_clear_stall_feature()");
 	}
 	status=0;
 	/* check the interrupt endpoint status*/
-	ret = usb_get_endpoint_status(&ptp_usb,ptp_usb.intep,&status);
+	ret = usb_get_endpoint_status(&ptp_cs,ptp_cs.usb.intep,&status);
 	if (ret<0)perror ("usb_get_endpoint_status()");
 	/* and clear the HALT condition if happend*/
 	if (status) {
 		printf ("Resetting interrupt pipe!\n");
-		ret=usb_clear_stall_feature(&ptp_usb,ptp_usb.intep);
+		ret=usb_clear_stall_feature(&ptp_cs,ptp_cs.usb.intep);
 		if (ret<0)perror ("usb_clear_stall_feature()");
 	}
 
 	/* get device status (now there should be some results)*/
-	ret = usb_ptp_get_device_status(&ptp_usb,devstatus);
+	ret = usb_ptp_get_device_status(&ptp_cs,devstatus);
 	if (ret<0) 
 		perror ("usb_ptp_get_device_status()");
 	else	{
@@ -500,38 +501,38 @@ reset_device (struct usb_device *dev)
 	}
 	
 	/* finally reset the device (that clears prevoiusly opened sessions)*/
-	ret = usb_ptp_device_reset(&ptp_usb);
+	ret = usb_ptp_device_reset(&ptp_cs);
 	if (ret<0)perror ("usb_ptp_device_reset()");
 	/* get device status (devices likes that regardless of its result)*/
-	usb_ptp_get_device_status(&ptp_usb,devstatus);
+	usb_ptp_get_device_status(&ptp_cs,devstatus);
 
-	close_usb(&ptp_usb, dev);
+	close_usb(&ptp_cs, dev);
 }
 
 //----------------------------
 /*
 get pointers out of user data in given arg
 */
-static void get_connection_data(lua_State *L,int narg, PTPParams **params,PTP_USB **ptp_usb) {
+static void get_connection_data(lua_State *L,int narg, PTPParams **params,PTP_CON_STATE **ptp_cs) {
 	*params = (PTPParams *)luaL_checkudata(L,narg,CHDK_CONNECTION_META);
-	*ptp_usb = (PTP_USB *)((*params)->data);
+	*ptp_cs = (PTP_CON_STATE *)((*params)->data);
 }
 
-static void close_connection(PTPParams *params,PTP_USB *ptp_usb)
+static void close_connection(PTPParams *params,PTP_CON_STATE *ptp_cs)
 {
-	if(ptp_usb->connected) {
-		close_camera(ptp_usb,params);
+	if(ptp_cs->connected) {
+		close_camera(ptp_cs,params);
 	}
-	ptp_usb->connected = 0;
+	ptp_cs->connected = 0;
 }
 
-static int check_connection_status(PTP_USB *ptp_usb) {
+static int check_connection_status(PTP_CON_STATE *ptp_cs) {
 	uint16_t devstatus[2] = {0,0};
 	
-	if(!ptp_usb->connected) {// never initialized
+	if(!ptp_cs->connected) {// never initialized
 		return 0;
 	}
-	if(usb_ptp_get_device_status(ptp_usb,devstatus) < 0) {
+	if(usb_ptp_get_device_status(ptp_cs,devstatus) < 0) {
 		return 0;
 	}
 	return (devstatus[1] == 0x2001);
@@ -657,7 +658,7 @@ struct usb_device *find_device_by_path(const char *find_bus, const char *find_de
 	return NULL;
 }
 
-int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
+int open_camera_dev(struct usb_device *dev, PTP_CON_STATE *ptp_cs, PTPParams *params)
 {
 	uint16_t devstatus[2] = {0,0};
 	int ret;
@@ -665,8 +666,8 @@ int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
 		printf("open_camera_dev: NULL dev\n");
 		return 0;
 	}
-	find_endpoints(dev,&ptp_usb->inep,&ptp_usb->outep,&ptp_usb->intep);
-	if(!init_ptp_usb(params, ptp_usb, dev)) {
+	find_endpoints(dev,&ptp_cs->usb.inep,&ptp_cs->usb.outep,&ptp_cs->usb.intep);
+	if(!init_ptp_usb(params, ptp_cs, dev)) {
 		printf("open_camera_dev: init_ptp_usb 1 failed\n");
 		return 0;
 	}
@@ -675,10 +676,10 @@ int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
 	if(ret!=PTP_RC_OK) {
 // TODO temp debug - this appears to be needed on linux if other stuff grabbed the dev
 		printf("open_camera_dev: ptp_opensession failed 0x%x\n",ret);
-		ret = usb_ptp_device_reset(ptp_usb);
+		ret = usb_ptp_device_reset(ptp_cs);
 		if (ret<0)perror ("open_camera_dev:usb_ptp_device_reset()");
 		/* get device status (devices likes that regardless of its result)*/
-		ret = usb_ptp_get_device_status(ptp_usb,devstatus);
+		ret = usb_ptp_get_device_status(ptp_cs,devstatus);
 		if (ret<0) 
 			perror ("usb_ptp_get_device_status()");
 		else	{
@@ -688,9 +689,9 @@ int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
 				printf ("Device status 0x%04x\n",devstatus[1]);
 		}
 
-		close_usb(ptp_usb, dev);
-		find_endpoints(dev,&ptp_usb->inep,&ptp_usb->outep,&ptp_usb->intep);
-		if(!init_ptp_usb(params, ptp_usb, dev)) {
+		close_usb(ptp_cs, dev);
+		find_endpoints(dev,&ptp_cs->usb.inep,&ptp_cs->usb.outep,&ptp_cs->usb.intep);
+		if(!init_ptp_usb(params, ptp_cs, dev)) {
 			printf("open_camera_dev: init_ptp_usb 2 failed\n");
 			return 0;
 		}
@@ -704,11 +705,11 @@ int open_camera_dev(struct usb_device *dev, PTP_USB *ptp_usb, PTPParams *params)
 	if (ptp_getdeviceinfo(params,&params->deviceinfo)!=PTP_RC_OK) {
 		// TODO do we want to close here ?
 		printf("Could not get device info!\n");
-		close_camera(ptp_usb, params);
+		close_camera(ptp_cs, params);
 		return 0;
 	}
 	// TODO we could check camera CHDK, API version, etc here
-	ptp_usb->connected = 1;
+	ptp_cs->connected = 1;
 	return 1;
 }
 
@@ -726,7 +727,7 @@ An existing connection may or may not be connected
 if devinfo is absent, the dummy connection is returned
 */
 static int chdk_connection(lua_State *L) {
-	PTP_USB *ptp_usb;
+	PTP_CON_STATE *ptp_cs;
 	PTPParams *params;
 	const char *bus="dummy";
 	const char *dev="dummy";
@@ -754,12 +755,12 @@ static int chdk_connection(lua_State *L) {
 	lua_setmetatable(L, -2);
 
 	memset(params,0,sizeof(PTPParams));
-	ptp_usb = malloc(sizeof(PTP_USB));
-	params->data = ptp_usb; // this will be set on connect, but we want set so it can be collected even if we don't connect
-	memset(ptp_usb,0,sizeof(PTP_USB));
-	strcpy(ptp_usb->dev,dev);
-	strcpy(ptp_usb->bus,bus);
-	ptp_usb->timeout = USB_TIMEOUT;
+	ptp_cs = malloc(sizeof(PTP_CON_STATE));
+	params->data = ptp_cs; // this will be set on connect, but we want set so it can be collected even if we don't connect
+	memset(ptp_cs,0,sizeof(PTP_CON_STATE));
+	strcpy(ptp_cs->usb.dev,dev);
+	strcpy(ptp_cs->usb.bus,bus);
+	ptp_cs->timeout = USB_TIMEOUT;
 	sprintf(dev_path,"%s/%s",bus,dev);
 
 	// save in registry so we can easily identify / enumerate existing connections
@@ -777,23 +778,23 @@ static int chdk_connect(lua_State *L) {
 	struct usb_device *dev;
 	
 	// TODO might want to disconnect/reconnect, or check real connection status ? or options
-	if(ptp_usb->connected) {
+	if(ptp_cs->connected) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"already connected");
 		return 2;
 	}
 
-	dev=find_device_by_path(ptp_usb->bus,ptp_usb->dev);
+	dev=find_device_by_path(ptp_cs->usb.bus,ptp_cs->usb.dev);
 	if(!dev) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"no device");
 		return 2;
 	}
-	if(open_camera_dev(dev,ptp_usb,params)) {
+	if(open_camera_dev(dev,ptp_cs,params)) {
 		lua_pushboolean(L,1);
 		return 1;
 	} else {
-		ptp_usb->connected = 0;
+		ptp_cs->connected = 0;
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"connection failed");
 		return 2;
@@ -807,7 +808,7 @@ note under windows the device does not appear in in chdk.list_usb_devices() for 
 static int chdk_disconnect(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 
-	close_connection(params,ptp_usb);
+	close_connection(params,ptp_cs);
 	lua_pushboolean(L,1);
 	return 1;
 }
@@ -816,10 +817,10 @@ static int chdk_is_connected(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	// TODO this should probably be more consistent over other PTP calls, #41
 	// flag says we are connected, check usb and update flag
-	if(ptp_usb->connected) { 
-		ptp_usb->connected = check_connection_status(ptp_usb);
+	if(ptp_cs->connected) { 
+		ptp_cs->connected = check_connection_status(ptp_cs);
 	}
-	lua_pushboolean(L,ptp_usb->connected);
+	lua_pushboolean(L,ptp_cs->connected);
 	return 1;
 }
 
@@ -829,7 +830,7 @@ static int chdk_is_connected(lua_State *L) {
 static int chdk_camera_api_version(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	int major,minor;
-	if ( !ptp_usb->connected ) {
+	if ( !ptp_cs->connected ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -886,16 +887,16 @@ con:get_script_id() will return the id of the started script
 */
 static int chdk_execlua(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
-    if (!ptp_usb->connected) {
+    if (!ptp_cs->connected) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
 	}
 
-	if(!ptp_chdk_exec_lua(params,(char *)luaL_optstring(L,2,""),&ptp_usb->script_id)) {
+	if(!ptp_chdk_exec_lua(params,(char *)luaL_optstring(L,2,""),&ptp_cs->script_id)) {
 		lua_pushboolean(L,0);
 		// if we got a script id, script request got as far as the the camera
-		if(ptp_usb->script_id) {
+		if(ptp_cs->script_id) {
 			lua_pushstring(L,"syntax"); // caller can check messages for details
 		} else {
 			lua_pushstring(L,"failed");
@@ -956,7 +957,7 @@ status[,errmsg]=con:upload(src,dst)
 */
 static int chdk_upload(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
-    if (!ptp_usb->connected) {
+    if (!ptp_cs->connected) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -978,7 +979,7 @@ status[,errmsg]=con:download(src,dst)
 */
 static int chdk_download(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
-    if (!ptp_usb->connected) {
+    if (!ptp_cs->connected) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -1006,7 +1007,7 @@ imgnum:
 */
 static int chdk_capture_ready(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
-	if (!ptp_usb->connected) {
+	if (!ptp_cs->connected) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -1038,7 +1039,7 @@ false or
 */
 static int chdk_capture_get_chunk(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
-	if (!ptp_usb->connected) {
+	if (!ptp_cs->connected) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -1082,7 +1083,7 @@ static int chdk_getmem(lua_State *L) {
 	unsigned addr, count;
 	const char *dest;
 	char *buf;
-	if ( !ptp_usb->connected ) {
+	if ( !ptp_cs->connected ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -1127,7 +1128,7 @@ static int chdk_call_function(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 	int args[11];
 	int ret;
-	if ( !ptp_usb->connected ) {
+	if ( !ptp_cs->connected ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -1155,7 +1156,7 @@ static int chdk_call_function(lua_State *L) {
 static int chdk_script_support(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	unsigned status = 0;
-	if ( !ptp_usb->connected ) {
+	if ( !ptp_cs->connected ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -1176,7 +1177,7 @@ status={run:bool,msg:bool} or false
 static int chdk_script_status(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	unsigned status;
-	if ( !ptp_usb->connected ) {
+	if ( !ptp_cs->connected ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -1203,7 +1204,7 @@ static int chdk_get_live_data(lua_State *L) {
 	unsigned flags=lua_tonumber(L,3);
 	char *data=NULL;
 	unsigned data_size = 0;
-	if ( !ptp_usb->connected ) {
+	if ( !ptp_cs->connected ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -1280,7 +1281,7 @@ static int chdk_read_msg(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	ptp_chdk_script_msg *msg = NULL;
 
-	if ( !ptp_usb->connected ) {
+	if ( !ptp_cs->connected ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -1344,9 +1345,9 @@ static int chdk_write_msg(lua_State *L) {
 	const char *str;
 	size_t len;
 	int status;
-	int target_script_id = luaL_optinteger(L,3,ptp_usb->script_id);
+	int target_script_id = luaL_optinteger(L,3,ptp_cs->script_id);
 
-	if ( !ptp_usb->connected ) {
+	if ( !ptp_cs->connected ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -1399,8 +1400,8 @@ scripts that encounter a syntax error still generate an id
 static int chdk_get_script_id(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	// TODO do we want to check connections status ?
-	if(ptp_usb->script_id) {
-		lua_pushnumber(L,ptp_usb->script_id);
+	if(ptp_cs->script_id) {
+		lua_pushnumber(L,ptp_cs->script_id);
 	} else {
 		lua_pushboolean(L,0);
 	}
@@ -1414,7 +1415,7 @@ get_status_result,status[0],status[1]=con:dev_status()
 static int chdk_dev_status(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	uint16_t devstatus[2] = {0,0};
-	int r = usb_ptp_get_device_status(ptp_usb,devstatus);
+	int r = usb_ptp_get_device_status(ptp_cs,devstatus);
 	lua_pushnumber(L,r);
 	lua_pushnumber(L,devstatus[0]);
 	lua_pushnumber(L,devstatus[1]);
@@ -1437,7 +1438,7 @@ version does not match canon firmware version (e.g. d10 100a = "1-6.0.1.0")
 static int chdk_get_ptp_devinfo(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 	// don't actually need to be connected to get this, but ensures we have valid data
-	if ( !ptp_usb->connected ) {
+	if ( !ptp_cs->connected ) {
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"not connected");
 		return 2;
@@ -1470,14 +1471,14 @@ usb_dev_info = {
 static int chdk_get_usb_devinfo(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 	struct usb_device *dev;
-	dev=find_device_by_path(ptp_usb->bus,ptp_usb->dev);
+	dev=find_device_by_path(ptp_cs->usb.bus,ptp_cs->usb.dev);
 	if(dev) {
 		push_usb_dev_info(L,dev);
 	} else {
 		lua_newtable(L);
-		lua_pushstring(L, ptp_usb->bus);
+		lua_pushstring(L, ptp_cs->usb.bus);
 		lua_setfield(L, -2, "bus");
-		lua_pushstring(L, ptp_usb->dev);
+		lua_pushstring(L, ptp_cs->usb.dev);
 		lua_setfield(L, -2, "dev");
 	}
 	return 1;
@@ -1518,29 +1519,29 @@ static const luaL_Reg chdklib[] = {
 static int chdk_connection_gc(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 
-	//printf("collecting connection %s:%s\n",ptp_usb->bus,ptp_usb->dev);
+	//printf("collecting connection %s:%s\n",ptp_cs->usb.bus,ptp_cs->usb.dev);
 
-	if(ptp_usb->connected) {
+	if(ptp_cs->connected) {
 		//printf("disconnecting...");
-		close_camera(ptp_usb,params);
+		close_camera(ptp_cs,params);
 		//printf("done\n");
 	}
-	free(ptp_usb);
+	free(ptp_cs);
 	return 0;
 }
 
 static int chdk_reset_counters(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
-	ptp_usb->write_count = ptp_usb->read_count = 0;
+	ptp_cs->write_count = ptp_cs->read_count = 0;
 	return 0;
 }
 
 static int chdk_get_counters(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 	lua_createtable(L,0,2);
-	lua_pushnumber(L,ptp_usb->write_count);
+	lua_pushnumber(L,ptp_cs->write_count);
 	lua_setfield(L,-2,"write");
-	lua_pushnumber(L,ptp_usb->read_count);
+	lua_pushnumber(L,ptp_cs->read_count);
 	lua_setfield(L,-2,"read");
 	return 1;
 }

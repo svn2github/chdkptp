@@ -32,20 +32,39 @@
 #ifndef LIBUSB_PATH_MAX
 #define LIBUSB_PATH_MAX (PATH_MAX + 1)
 #endif
+#define PTP_CON_USB 0
+#define PTP_CON_IP  1
 typedef struct {
 	usb_dev_handle* handle;
 	int inep;
 	int outep;
 	int intep;
-	int script_id;
-	int timeout;
-	int connected; // soft check without actually trying to access usb
 	char bus[LIBUSB_PATH_MAX]; // identifies what device this is for
 	char dev[LIBUSB_PATH_MAX]; // TODO this may not work out, libusb on win changes the dev number on reset
+} PTP_USB;
+
+typedef struct {
+	socket_t cmd_sock;
+	socket_t event_sock;
+	int connection_id;
+	// TODO need id strings like bus/dev
+} PTP_IP;
+
+typedef struct {
+	// common connection state
+	int con_type; 
+	int script_id;
+	int timeout;
+	int connected; // soft check without actually trying to access connection
 	// counters
 	uint64_t write_count;
 	uint64_t read_count;
-} PTP_USB;
+	union {
+		PTP_USB usb;
+		PTP_IP ip;
+	};
+} PTP_CON_STATE;
+
 
 /*
  * variables
@@ -62,13 +81,13 @@ extern short verbose;
 //void ptpcam_siginthandler(int signum);
 
 struct usb_bus* init_usb(void);
-void close_usb(PTP_USB* ptp_usb, struct usb_device* dev);
-int init_ptp_usb (PTPParams*, PTP_USB*, struct usb_device*);
-void clear_stall(PTP_USB* ptp_usb);
+void close_usb(PTP_CON_STATE* ptp_cs, struct usb_device* dev);
+int init_ptp_usb (PTPParams* params, PTP_CON_STATE *cs, struct usb_device*);
+void clear_stall(PTP_CON_STATE* ptp_cs);
 
-int usb_get_endpoint_status(PTP_USB* ptp_usb, int ep, uint16_t* status);
-int usb_clear_stall_feature(PTP_USB* ptp_usb, int ep);
-int open_camera (int busn, int devn, short force, PTP_USB *ptp_usb, PTPParams *params, struct usb_device **dev);
-void close_camera (PTP_USB *ptp_usb, PTPParams *params);
+int usb_get_endpoint_status(PTP_CON_STATE* ptp_cs, int ep, uint16_t* status);
+int usb_clear_stall_feature(PTP_CON_STATE* ptp_cs, int ep);
+int open_camera (int busn, int devn, short force, PTP_CON_STATE *ptp_cs, PTPParams *params, struct usb_device **dev);
+void close_camera (PTP_CON_STATE *ptp_cs, PTPParams *params);
 struct usb_device *find_device_by_path(const char *find_bus, const char *find_dev);
 #endif /* __PTPCAM_H__ */
