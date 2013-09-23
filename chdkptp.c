@@ -133,9 +133,6 @@
 
 /* one global variable (yes, I know it sucks) */
 short verbose=0;
-/* the other one, it sucks definitely ;) */
-// TODO this will go in the connection object
-int ptpcam_usb_timeout = USB_TIMEOUT;
 
 // TODO this is lame
 #define CHDK_CONNECTION_METHOD PTPParams *params; PTP_USB *ptp_usb; get_connection_data(L,1,&params,&ptp_usb);
@@ -176,10 +173,10 @@ ptp_read_func (unsigned char *bytes, unsigned int size, void *data)
 			toread = PTPCAM_USB_URB;
 		else
 			toread = rbytes;
-		result=USB_BULK_READ(ptp_usb->handle, ptp_usb->inep,(char *)bytes, toread,ptpcam_usb_timeout);
+		result=USB_BULK_READ(ptp_usb->handle, ptp_usb->inep,(char *)bytes, toread,ptp_usb->timeout);
 		/* sometimes retry might help */
 		if (result==0)
-			result=USB_BULK_READ(ptp_usb->handle, ptp_usb->inep,(char *)bytes, toread,ptpcam_usb_timeout);
+			result=USB_BULK_READ(ptp_usb->handle, ptp_usb->inep,(char *)bytes, toread,ptp_usb->timeout);
 		if (result < 0)
 			break;
 		ptp_usb->read_count += toread;
@@ -202,7 +199,7 @@ ptp_write_func (unsigned char *bytes, unsigned int size, void *data)
 	int result;
 	PTP_USB *ptp_usb=(PTP_USB *)data;
 
-	result=USB_BULK_WRITE(ptp_usb->handle,ptp_usb->outep,(char *)bytes,size,ptpcam_usb_timeout);
+	result=USB_BULK_WRITE(ptp_usb->handle,ptp_usb->outep,(char *)bytes,size,ptp_usb->timeout);
 	if (result >= 0) {
 		ptp_usb->write_count += size;
 		return (PTP_RC_OK);
@@ -219,9 +216,9 @@ ptp_check_int (unsigned char *bytes, unsigned int size, void *data)
 	int result;
 	PTP_USB *ptp_usb=(PTP_USB *)data;
 
-	result=USB_BULK_READ(ptp_usb->handle, ptp_usb->intep,(char *)bytes,size,ptpcam_usb_timeout);
+	result=USB_BULK_READ(ptp_usb->handle, ptp_usb->intep,(char *)bytes,size,ptp_usb->timeout);
 	if (result==0)
-	    result=USB_BULK_READ(ptp_usb->handle, ptp_usb->intep,(char *)bytes,size,ptpcam_usb_timeout);
+	    result=USB_BULK_READ(ptp_usb->handle, ptp_usb->intep,(char *)bytes,size,ptp_usb->timeout);
 	if (verbose>2) fprintf (stderr, "USB_BULK_READ returned %i, size=%i\n", result, size);
 
 	if (result >= 0) {
@@ -762,6 +759,7 @@ static int chdk_connection(lua_State *L) {
 	memset(ptp_usb,0,sizeof(PTP_USB));
 	strcpy(ptp_usb->dev,dev);
 	strcpy(ptp_usb->bus,bus);
+	ptp_usb->timeout = USB_TIMEOUT;
 	sprintf(dev_path,"%s/%s",bus,dev);
 
 	// save in registry so we can easily identify / enumerate existing connections

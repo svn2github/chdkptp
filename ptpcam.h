@@ -19,71 +19,8 @@
 #ifndef __PTPCAM_H__
 #define __PTPCAM_H__
 
-//#ifdef LINUX_OS
-#if 0
-#define USB_BULK_READ myusb_bulk_read
-#define USB_BULK_WRITE myusb_bulk_write
-int myusb_bulk_read(usb_dev_handle *dev, int ep, char *bytes, int size,
-	int timeout);
-int myusb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int length,
-	int timeout);
-#else
 #define USB_BULK_READ usb_bulk_read
 #define USB_BULK_WRITE usb_bulk_write
-#endif
-
-/*
- * macros
- */
-
-// TODO these need to be reworked to play nicely with lua error handling
-/* Check value and Return on error */
-#define CR(o,error) {						\
-			uint16_t result=o;				\
-			if((result)!=PTP_RC_OK) {			\
-				ptp_perror(&params,result);		\
-				fprintf(stderr,"ERROR: "error);		\
-				close_camera(&ptp_usb, &params);   \
-				return;					\
-			}						\
-}
-
-/* Check value and Continue on error */
-#define CC(result,error) {						\
-			if((result)!=PTP_RC_OK) {			\
-				fprintf(stderr,"ERROR: "error);		\
-				usb_release_interface(ptp_usb.handle,	\
-		dev->config->interface->altsetting->bInterfaceNumber);	\
-				continue;					\
-			}						\
-}
-
-/* error reporting macro */
-#ifndef ERROR
-#define ERROR(error) fprintf(stderr,"ERROR: "error);				
-#endif
-
-/* property value printing macros */
-#define PRINT_PROPVAL_DEC(value)	\
-		print_propval(dpd.DataType, value,			\
-		PTPCAM_PRINT_DEC)
-
-#define PRINT_PROPVAL_HEX(value)					\
-		print_propval(dpd.DataType, value,			\
-		PTPCAM_PRINT_HEX)
-
-
-
-
-/*
- * defines
- */
-
-
-/* printing value type */
-#define PTPCAM_PRINT_HEX	00
-#define PTPCAM_PRINT_DEC	01
-
 
 /*
  * structures
@@ -91,12 +28,11 @@ int myusb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int length,
 
 // connection data
 // TODO might be more convenient to use this as the meta data and put in a pointer to PTPParams ?
-typedef struct _PTP_USB PTP_USB;
 // TODO - guess this is win only
 #ifndef LIBUSB_PATH_MAX
 #define LIBUSB_PATH_MAX (PATH_MAX + 1)
 #endif
-struct _PTP_USB {
+typedef struct {
 	usb_dev_handle* handle;
 	int inep;
 	int outep;
@@ -109,7 +45,7 @@ struct _PTP_USB {
 	// counters
 	uint64_t write_count;
 	uint64_t read_count;
-};
+} PTP_USB;
 
 /*
  * variables
@@ -118,7 +54,6 @@ struct _PTP_USB {
 /* one global variable */
 // TODO
 extern short verbose;
-
 
 /*
  * functions
