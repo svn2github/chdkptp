@@ -666,7 +666,7 @@ cli:add_commands{
 				end
 
 				if status then
-					if lcon._con == con._con then
+					if con_status == '+' and lcon._con == con._con then
 						con_status = "*"
 					end
 
