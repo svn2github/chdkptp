@@ -17,7 +17,7 @@ endif
 
 ifeq ("$(PTPIP_SUPPORT)","1")
 CFLAGS +=-DCHDKPTP_PTPIP=1
-PTPIP_SRCS=sock_util.c
+PTPIP_SRCS=sockutil.c
 # ws2_32 already included
 endif
 # PTPIP

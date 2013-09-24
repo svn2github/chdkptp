@@ -377,9 +377,7 @@ find_endpoints(struct usb_device *dev, int* inep, int* outep, int* intep)
 	}
 }
 
-void
-close_camera(PTP_CON_STATE *ptp_cs, PTPParams *params)
-{
+void close_camera_usb(PTP_CON_STATE *ptp_cs, PTPParams *params) {
 	// usb_device(handle) appears to give bogus results when the device has gone away
 	// TODO possible a different device could come back on this bus/dev ?
 	struct usb_device *dev=find_device_by_path(ptp_cs->usb.bus,ptp_cs->usb.dev);
@@ -391,6 +389,20 @@ close_camera(PTP_CON_STATE *ptp_cs, PTPParams *params)
 	if (ptp_closesession(params)!=PTP_RC_OK)
 		fprintf(stderr,"ERROR: Could not close session!\n");
 	close_usb(ptp_cs, dev);
+}
+
+void close_camera_tcp(PTP_CON_STATE *ptp_cs, PTPParams *params) {
+	return;
+}
+
+void
+close_camera(PTP_CON_STATE *ptp_cs, PTPParams *params)
+{
+	if(ptp_cs->con_type == PTP_CON_USB) {
+		close_camera_usb(ptp_cs,params);
+	} else {
+		close_camera_tcp(ptp_cs,params);
+	}
 }
 
 int
@@ -526,7 +538,7 @@ static void close_connection(PTPParams *params,PTP_CON_STATE *ptp_cs)
 	ptp_cs->connected = 0;
 }
 
-static int check_connection_status(PTP_CON_STATE *ptp_cs) {
+static int check_connection_status_usb(PTP_CON_STATE *ptp_cs) {
 	uint16_t devstatus[2] = {0,0};
 	
 	if(!ptp_cs->connected) {// never initialized
@@ -538,6 +550,10 @@ static int check_connection_status(PTP_CON_STATE *ptp_cs) {
 	return (devstatus[1] == 0x2001);
 }
 
+// TODO
+static int check_connection_status_tcp(PTP_CON_STATE *ptp_cs) {
+	return 1;
+}
 
 /*
 convenience - values extracted from a devinfo table
@@ -595,17 +611,15 @@ static int compare_ldevinfo(devinfo_lua *ldevinfo,struct usb_device *dev) {
 }
 
 /*
-get the connection user data specified by bus/path and push it on the stack
+get the connection user data specified by connection_list key and push it on the stack
 if nothing is found, returns 0 and pushes nothing
 */
-int get_connection_udata_by_path(lua_State *L, const char *bus, const char *dev) {
-	char dev_path[LIBUSB_PATH_MAX*2];
-	if(!bus || !dev) {
+int get_connection_list_udata(lua_State *L, const char *key) {
+	if(!key) {
 		return 0;
 	}
-	sprintf(dev_path,"%s/%s",bus,dev);
 	lua_getfield(L,LUA_REGISTRYINDEX,CHDK_CONNECTION_LIST);
-	lua_getfield(L,-1,dev_path);
+	lua_getfield(L,-1,key);
 	//  TODO could check meta table
 	if(lua_isuserdata(L,-1)) {
 		lua_replace(L, -2); // move udata up to connection list
@@ -658,26 +672,26 @@ struct usb_device *find_device_by_path(const char *find_bus, const char *find_de
 	return NULL;
 }
 
-int open_camera_dev(struct usb_device *dev, PTP_CON_STATE *ptp_cs, PTPParams *params)
+int open_camera_dev_usb(struct usb_device *dev, PTP_CON_STATE *ptp_cs, PTPParams *params)
 {
 	uint16_t devstatus[2] = {0,0};
 	int ret;
   	if(!dev) {
-		printf("open_camera_dev: NULL dev\n");
+		printf("open_camera_dev_usb: NULL dev\n");
 		return 0;
 	}
 	find_endpoints(dev,&ptp_cs->usb.inep,&ptp_cs->usb.outep,&ptp_cs->usb.intep);
 	if(!init_ptp_usb(params, ptp_cs, dev)) {
-		printf("open_camera_dev: init_ptp_usb 1 failed\n");
+		printf("open_camera_dev_usb: init_ptp_usb 1 failed\n");
 		return 0;
 	}
 
 	ret = ptp_opensession(params,1);
 	if(ret!=PTP_RC_OK) {
 // TODO temp debug - this appears to be needed on linux if other stuff grabbed the dev
-		printf("open_camera_dev: ptp_opensession failed 0x%x\n",ret);
+		printf("open_camera_dev_usb: ptp_opensession failed 0x%x\n",ret);
 		ret = usb_ptp_device_reset(ptp_cs);
-		if (ret<0)perror ("open_camera_dev:usb_ptp_device_reset()");
+		if (ret<0)perror ("open_camera_dev_usb:usb_ptp_device_reset()");
 		/* get device status (devices likes that regardless of its result)*/
 		ret = usb_ptp_get_device_status(ptp_cs,devstatus);
 		if (ret<0) 
@@ -692,12 +706,12 @@ int open_camera_dev(struct usb_device *dev, PTP_CON_STATE *ptp_cs, PTPParams *pa
 		close_usb(ptp_cs, dev);
 		find_endpoints(dev,&ptp_cs->usb.inep,&ptp_cs->usb.outep,&ptp_cs->usb.intep);
 		if(!init_ptp_usb(params, ptp_cs, dev)) {
-			printf("open_camera_dev: init_ptp_usb 2 failed\n");
+			printf("open_camera_dev_usb: init_ptp_usb 2 failed\n");
 			return 0;
 		}
 		ret=ptp_opensession(params,1);
 		if(ret!=PTP_RC_OK) {
-			printf("open_camera_dev: ptp_opensession 2 failed: 0x%x\n",ret);
+			printf("open_camera_dev_usb: ptp_opensession 2 failed: 0x%x\n",ret);
 			return 0;
 		}
 
@@ -714,11 +728,16 @@ int open_camera_dev(struct usb_device *dev, PTP_CON_STATE *ptp_cs, PTPParams *pa
 }
 
 /*
-chdk_connection=chdk.connection([devinfo])
+chdk_connection=chdk.connection([devspec])
 devspec={
 	bus="bus",
 	dev="dev",
-}
+} 
+or
+devspec={
+	host="host",
+	port="port",
+} 
 retreive or create the connection object for the specified device
 each unique bus/dev combination has only one connection object. 
 No attempt is made to verify that the device exists (it might be plugged/unplugged later anyway)
@@ -731,7 +750,10 @@ static int chdk_connection(lua_State *L) {
 	PTPParams *params;
 	const char *bus="dummy";
 	const char *dev="dummy";
-	char dev_path[LIBUSB_PATH_MAX*2];
+	const char *host=NULL;
+	const char *port=NULL;
+	char con_key[LIBUSB_PATH_MAX*2+4];
+	int con_type;
 
 	if(lua_istable(L,1)) {
 		lua_getfield(L,1,"dev");
@@ -741,13 +763,46 @@ static int chdk_connection(lua_State *L) {
 		lua_getfield(L,1,"bus");
 		bus = lua_tostring(L,-1);
 		lua_pop(L,1);
+
+		lua_getfield(L,1,"host");
+		host = lua_tostring(L,-1);
+		lua_pop(L,1);
+
+		lua_getfield(L,1,"port");
+		port = lua_tostring(L,-1);
+		lua_pop(L,1);
+	}
+
+	if(host || port) {
+#ifdef CHDKPTP_PTPIP
+		if(dev || bus) {
+			return luaL_error(L,"cannot specify dev or bus with PTP/IP");
+		}
+		if(!host) {
+			return luaL_error(L,"missing host");
+		}
+		if(!port) {
+			port = PTPIP_PORT_STR;
+		}
+		if(strlen(host) >= LIBUSB_PATH_MAX || strlen(port) >= LIBUSB_PATH_MAX) {
+			return luaL_error(L,"invalid PTP/IP spec");
+		}
+		sprintf(con_key,"tcp:%s:%s",host,port);
+		con_type = PTP_CON_TCP;
+#else
+		return luaL_error(L,"PTP/IP not supported in this build");
+#endif
+
+	} else  {
 		if(!bus || !dev || strlen(dev) >= LIBUSB_PATH_MAX || strlen(bus) >= LIBUSB_PATH_MAX) {
 			return luaL_error(L,"invalid device spec");
 		}
+		sprintf(con_key,"usb:%s/%s",bus,dev);
+		con_type = PTP_CON_USB;
 	}
 
 	// if connection to specified device exists, just return it
-	if(get_connection_udata_by_path(L,bus,dev )) {
+	if(get_connection_list_udata(L,con_key)) {
 		return 1;
 	}
 	params = lua_newuserdata(L,sizeof(PTPParams));
@@ -758,24 +813,49 @@ static int chdk_connection(lua_State *L) {
 	ptp_cs = malloc(sizeof(PTP_CON_STATE));
 	params->data = ptp_cs; // this will be set on connect, but we want set so it can be collected even if we don't connect
 	memset(ptp_cs,0,sizeof(PTP_CON_STATE));
-	strcpy(ptp_cs->usb.dev,dev);
-	strcpy(ptp_cs->usb.bus,bus);
+	if(con_type == PTP_CON_USB) {
+		strcpy(ptp_cs->usb.dev,dev);
+		strcpy(ptp_cs->usb.bus,bus);
+	} else {
+		strcpy(ptp_cs->tcp.host,host);
+		strcpy(ptp_cs->tcp.port,port);
+	}
 	ptp_cs->timeout = USB_TIMEOUT;
-	sprintf(dev_path,"%s/%s",bus,dev);
+	ptp_cs->con_type = con_type;
 
 	// save in registry so we can easily identify / enumerate existing connections
 	lua_getfield(L,LUA_REGISTRYINDEX,CHDK_CONNECTION_LIST);
 	lua_pushvalue(L, -2); // our user data, for use as key
-	lua_setfield(L, -2,dev_path); //set t[path]=userdata
+	lua_setfield(L, -2,con_key); //set t[path]=userdata
 	lua_pop(L,1); // done with t
 	return 1;
+}
+
+static int connect_cam_usb(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_cs) {
+	struct usb_device *dev=find_device_by_path(ptp_cs->usb.bus,ptp_cs->usb.dev);
+	if(!dev) {
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"no device");
+		return 2;
+	}
+	if(open_camera_dev_usb(dev,ptp_cs,params)) {
+		lua_pushboolean(L,1);
+		return 1;
+	} else {
+		ptp_cs->connected = 0;
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"connection failed");
+		return 2;
+	}
+}
+static int connect_cam_tcp(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_cs) {
+	return luaL_error(L,"PTP/IP not supported");
 }
 /*
 status[,errmsg]=con:connect()
 */
 static int chdk_connect(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
-	struct usb_device *dev;
 	
 	// TODO might want to disconnect/reconnect, or check real connection status ? or options
 	if(ptp_cs->connected) {
@@ -784,20 +864,10 @@ static int chdk_connect(lua_State *L) {
 		return 2;
 	}
 
-	dev=find_device_by_path(ptp_cs->usb.bus,ptp_cs->usb.dev);
-	if(!dev) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"no device");
-		return 2;
-	}
-	if(open_camera_dev(dev,ptp_cs,params)) {
-		lua_pushboolean(L,1);
-		return 1;
+	if(ptp_cs->con_type == PTP_CON_USB) {
+		return connect_cam_usb(L,params,ptp_cs);
 	} else {
-		ptp_cs->connected = 0;
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"connection failed");
-		return 2;
+		return connect_cam_tcp(L,params,ptp_cs);
 	}
 }
 
@@ -818,7 +888,11 @@ static int chdk_is_connected(lua_State *L) {
 	// TODO this should probably be more consistent over other PTP calls, #41
 	// flag says we are connected, check usb and update flag
 	if(ptp_cs->connected) { 
-		ptp_cs->connected = check_connection_status(ptp_cs);
+		if(ptp_cs->con_type == PTP_CON_USB) {
+			ptp_cs->connected = check_connection_status_usb(ptp_cs);
+		} else {
+			ptp_cs->connected = check_connection_status_tcp(ptp_cs);
+		}
 	}
 	lua_pushboolean(L,ptp_cs->connected);
 	return 1;
@@ -1454,11 +1528,14 @@ static int chdk_get_ptp_devinfo(lua_State *L) {
 	lua_setfield(L, -2, "serial_number");
 	// TODO techincally this belongs to the endpoint
 	// putting it here for informational purposes anyway so we can display in lua
+	// TODO not applicable to ptpip
 	lua_pushnumber(L, params->max_packet_size);
 	lua_setfield(L, -2, "max_packet_size");
 
 	return 1;
 }
+
+// TODO lua code expects all to devices to have devinfo
 /*
 usb_dev_info=con:get_usb_devinfo()
 usb_dev_info = {
@@ -1470,6 +1547,10 @@ usb_dev_info = {
 */
 static int chdk_get_usb_devinfo(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
+	// TODO
+	if(ptp_cs->con_type != PTP_CON_USB) {
+		return luaL_error(L,"not a USB connection");
+	}
 	struct usb_device *dev;
 	dev=find_device_by_path(ptp_cs->usb.bus,ptp_cs->usb.dev);
 	if(dev) {
