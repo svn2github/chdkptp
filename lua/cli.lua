@@ -1091,6 +1091,7 @@ cli:add_commands{
 
 			-- ptp/ip ignore other options
 			-- TODO should warn
+			local lcon
 			if args.h then
 				if not args.p then
 					args.p = nil
@@ -1101,7 +1102,6 @@ cli:add_commands{
 					return false,"expected number for product id"
 				end
 				local devices = chdk.list_usb_devices()
-				local lcon
 				for i, devinfo in ipairs(devices) do
 					lcon = nil
 					if chdku.match_device(devinfo,match) then
