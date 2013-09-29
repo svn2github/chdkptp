@@ -480,7 +480,13 @@ int init_ptp_tcp(PTPParams* params, PTP_CON_STATE* ptp_cs) {
 		printf("opensession failed");
 		return 0;
 	}
+
 	ptp_cs->connected = 1;
+
+	if (ptp_getdeviceinfo(params,&params->deviceinfo)!=PTP_RC_OK) {
+		printf("Could not get device info!\n");
+		return 0;
+	}
 
 	return 1;
 }
