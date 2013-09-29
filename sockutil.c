@@ -41,19 +41,25 @@ TODO might want to just use luasocket code
 
 #include "sockutil.h"
 
+static int initialized;
 // TODO should probably return status
 void sockutil_startup(void) {
+	if(initialized)
+		return;
 #ifdef WIN32
-    WSADATA wsaData;
-    int r = WSAStartup(MAKEWORD(2,2), &wsaData);
-    if (r != 0) {
-        printf("WSAStartup failed with error: %d\n", r);
-        exit(1);
-    }
+	WSADATA wsaData;
+	int r = WSAStartup(MAKEWORD(2,2), &wsaData);
+	if (r != 0) {
+		printf("WSAStartup failed with error: %d\n", r);
+		exit(1);
+	}
 #endif
+	initialized = 1;
 }
 
 void sockutil_cleanup(void) {
+	if(!initialized)
+		return;
 #ifdef WIN32
 	WSACleanup();
 #endif

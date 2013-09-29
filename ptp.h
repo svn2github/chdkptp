@@ -98,6 +98,54 @@ typedef struct _PTPUSBEventContainer PTPUSBEventContainer;
 #define PTP_USB_CONTAINER_RESPONSE		0x0003
 #define PTP_USB_CONTAINER_EVENT			0x0004
 
+// TODO arbitrary buffer for commands that aren't OP request or OP response
+#define PTPIP_CMD_PAYLOAD_LEN 256
+
+// code is a short, so following aren't alligned
+typedef struct __attribute__ ((__packed__)) {
+	uint32_t length;
+	uint32_t type;
+	union {
+		struct __attribute__ ((__packed__)) {
+			uint32_t dataphase; // this is called data phase info in the draft spec and wireshark dissector
+								// but doesn't appear to be used in captured traffic
+								// prevents using same struct for cmd and resp
+			short code;
+			uint32_t trans_id;
+			uint32_t param1;
+			uint32_t param2;
+			uint32_t param3;
+			uint32_t param4;
+			uint32_t param5;
+		} req;
+		struct __attribute__ ((__packed__)) {
+			short code;
+			uint32_t trans_id;
+			uint32_t param1;
+			uint32_t param2;
+			uint32_t param3;
+			uint32_t param4;
+			uint32_t param5;
+		} resp;
+		struct __attribute__ ((__packed__)) {
+			uint32_t trans_id;
+			uint64_t data_length; // for START_DATA
+		} datactl;
+		unsigned char data[PTPIP_CMD_PAYLOAD_LEN];
+	};
+} PTPIPContainer;
+
+#define PTPIP_TYPE_INIT_CMD			0x1
+#define PTPIP_TYPE_INIT_CMD_ACK		0x2
+#define PTPIP_TYPE_INIT_EVENT		0x3
+#define PTPIP_TYPE_INIT_EVENT_ACK	0x4
+#define PTPIP_TYPE_INIT_FAIL		0x5
+#define PTPIP_TYPE_REQ				0x6
+#define PTPIP_TYPE_RESP				0x7
+#define PTPIP_TYPE_START_DATA		0x9
+#define PTPIP_TYPE_DATA				0xa
+#define PTPIP_TYPE_END_DATA			0xC
+
 /* Vendor IDs */
 #define PTP_VENDOR_EASTMAN_KODAK	0x00000001
 #define PTP_VENDOR_SEIKO_EPSON		0x00000002
@@ -757,6 +805,13 @@ struct _PTPParams {
 };
 
 /* last, but not least - ptp functions */
+uint16_t ptp_tcp_sendreq	(PTPParams* params, PTPContainer* req);
+uint16_t ptp_tcp_senddata	(PTPParams* params, PTPContainer* ptp,
+				unsigned char *data, unsigned int size);
+uint16_t ptp_tcp_getresp	(PTPParams* params, PTPContainer* resp);
+uint16_t ptp_tcp_getdata	(PTPParams* params, PTPContainer* ptp, 
+				unsigned char **data);
+
 uint16_t ptp_usb_sendreq	(PTPParams* params, PTPContainer* req);
 uint16_t ptp_usb_senddata	(PTPParams* params, PTPContainer* ptp,
 				unsigned char *data, unsigned int size);

@@ -19,6 +19,9 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#if defined(WIN32) && defined(CHDKPTP_PTPIP)
+#define WINVER 0x0502
+#endif
 
 #include "config.h"
 #include "ptp.h"
@@ -34,7 +37,12 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#ifndef WIN32
+#ifdef WIN32
+#ifdef CHDKPTP_PTPIP
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
+#else
 #include <sys/mman.h>
 #endif
 #include <usb.h>
@@ -161,7 +169,7 @@ ptpcam_siginthandler(int signum)
 #endif
 
 static short
-ptp_read_func (unsigned char *bytes, unsigned int size, void *data)
+ptp_usb_read_func (unsigned char *bytes, unsigned int size, void *data)
 {
 	int result=-1;
 	PTP_CON_STATE *ptp_cs=(PTP_CON_STATE *)data;
@@ -195,7 +203,7 @@ ptp_read_func (unsigned char *bytes, unsigned int size, void *data)
 }
 
 static short
-ptp_write_func (unsigned char *bytes, unsigned int size, void *data)
+ptp_usb_write_func (unsigned char *bytes, unsigned int size, void *data)
 {
 	int result;
 	PTP_CON_STATE *ptp_cs=(PTP_CON_STATE *)data;
@@ -212,7 +220,7 @@ ptp_write_func (unsigned char *bytes, unsigned int size, void *data)
 
 /* XXX this one is suposed to return the number of bytes read!!! */
 static short
-ptp_check_int (unsigned char *bytes, unsigned int size, void *data)
+ptp_usb_check_int (unsigned char *bytes, unsigned int size, void *data)
 {
 	int result;
 	PTP_CON_STATE *ptp_cs=(PTP_CON_STATE *)data;
@@ -253,17 +261,240 @@ ptpcam_error (void *data, const char *format, va_list args)
 	fflush(stderr);
 }
 
+#ifdef CHDKPTP_PTPIP
+static short
+ptp_tcp_write_func (unsigned char *bytes, unsigned int size, void *data)
+{
+	int result;
+	PTP_CON_STATE *ptp_cs=(PTP_CON_STATE *)data;
+	result = send( ptp_cs->tcp.cmd_sock, (char *)bytes, size, 0 );
+	if (result == SOCKET_ERROR) {
+		printf("send failed: %d %s\n", sockutil_errno(),sockutil_strerror(sockutil_errno()));
+		return PTP_ERROR_IO;
+	} else {
+		ptp_cs->write_count += size;
+		return (PTP_RC_OK);
+	}
+}
 
+// TODO this is all wrong, we might not get whole packet, or might get part of next
+// need to restructure for a PTP/IP packet oriented read
+static short
+ptp_tcp_read_func (unsigned char *bytes, unsigned int size, void *data)
+{
+	PTP_CON_STATE *ptp_cs=(PTP_CON_STATE *)data;
+	int result = recv(ptp_cs->tcp.cmd_sock, (char *)bytes, size, 0);
+	if ( result > 0 ) {
+		//printf("read %d\n",result);
+		ptp_cs->read_count += result;
+		return PTP_RC_OK;
+	} else if ( result == 0 ) {
+		printf("Connection closed\n");
+		return PTP_ERROR_IO;
+	} else {
+		printf("recv failed: %d %s\n", sockutil_errno(),sockutil_strerror(sockutil_errno()));
+		return PTP_ERROR_IO;
+	}
+}
+
+// TODO
+/* XXX this one is suposed to return the number of bytes read!!! */
+static short
+ptp_tcp_check_int (unsigned char *bytes, unsigned int size, void *data)
+{
+	return PTP_RC_OK;
+}
+
+// TODO should be specified in connection, in case it actually matters
+// guid for connection request, must be 16 bytes, values don't seem to matter
+char my_guid[] = {
+	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xde,0xad,0xbe,0xef,0x12,0x34,0x56,0x78
+};
+// friendly name (i.e windows network name), in utf16 value doesn't seem to matter
+// according to draft spec, may be null (one 16 bit null)
+char my_name[] = {
+	'w',0x00,'h',0x00,'e',0x00,'e',0x00,0x00,0x00
+};
+
+// TODO
+static int init_event_channel_tcp(PTP_CON_STATE* ptp_cs) {
+	printf("initializing event channel\n");
+	
+	// Create a socket for the command channel
+	socket_t sock = socket(ptp_cs->tcp.ai_con->ai_family, ptp_cs->tcp.ai_con->ai_socktype, ptp_cs->tcp.ai_con->ai_protocol);
+	if (sock == INVALID_SOCKET) {
+		printf("socket failed with error:  %d %s\n", sockutil_errno(),sockutil_strerror(sockutil_errno()));
+	}
+
+	// Connect to camera
+	int r = connect( sock, ptp_cs->tcp.ai_con->ai_addr, (int)ptp_cs->tcp.ai_con->ai_addrlen);
+	if (r == SOCKET_ERROR) {
+		printf("connect failed with error:  %d %s\n", sockutil_errno(),sockutil_strerror(sockutil_errno()));
+		return 0;
+	}
+	ptp_cs->tcp.event_sock = sock;
+	// TODO need to init channel before open session will work
+	PTPIPContainer pkt;
+	// todo should use htod*
+	pkt.type = PTPIP_TYPE_INIT_EVENT;
+	pkt.length = 12; // header + connection number
+	
+	*(uint32_t *)(pkt.data) = ptp_cs->tcp.connection_id;
+	int result = send( ptp_cs->tcp.event_sock, (char *)&pkt, pkt.length, 0 );
+	if (result == SOCKET_ERROR) {
+		printf("send failed: %d %s\n", sockutil_errno(),sockutil_strerror(sockutil_errno()));
+		return 0;
+	}
+
+	memset(&pkt,0,sizeof(pkt));
+	r = recv(ptp_cs->tcp.event_sock, (char *)&pkt, sizeof(pkt), 0);
+	if ( r > 0 ) {
+		if( r >= 8) {
+			if(pkt.length != r) {
+				printf("size %d != %d\n",pkt.length,r);
+				return 0;
+			}
+			if(pkt.type != PTPIP_TYPE_INIT_EVENT_ACK) {
+				printf("unexpected type %d\n",pkt.type);
+				return 0;
+			}
+		} else {
+			printf("failed to read header %d\n",r);
+			return 0;
+		}
+	} else if ( r == 0 ) {
+		printf("connection closed\n");
+		return 0;
+	} else {
+		printf("recv failed with error: %d %s\n", sockutil_errno(),sockutil_strerror(sockutil_errno())); 
+		return 0;
+	}
+	return 1;
+}
+
+int init_ptp_tcp(PTPParams* params, PTP_CON_STATE* ptp_cs) {
+	params->write_func=ptp_tcp_write_func;
+	params->read_func=ptp_tcp_read_func;
+	params->check_int_func=ptp_tcp_check_int;
+	params->check_int_fast_func=ptp_tcp_check_int;
+	params->error_func=ptpcam_error;
+	params->debug_func=ptpcam_debug;
+	params->sendreq_func=ptp_tcp_sendreq;
+	params->senddata_func=ptp_tcp_senddata;
+	params->getresp_func=ptp_tcp_getresp;
+	params->getdata_func=ptp_tcp_getdata;
+	params->data=ptp_cs;
+	params->transaction_id=0;
+	params->byteorder = PTP_DL_LE;
+
+	ptp_cs->write_count = ptp_cs->read_count = 0;
+
+	socket_t sock = INVALID_SOCKET;
+	struct addrinfo *result = NULL,
+					*ptr = NULL,
+					hints;
+
+	sockutil_startup();
+
+	memset( &hints, 0, sizeof(hints) );
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+
+	// resolve address and port
+	int r = getaddrinfo(ptp_cs->tcp.host, ptp_cs->tcp.port, &hints, &result);
+	if ( r != 0 ) {
+		printf("getaddrinfo failed: %d\n", r);
+		return 0;
+	}
+
+	// Attempt to connect to an address until one succeeds
+	for(ptr=result; ptr != NULL ;ptr=ptr->ai_next) {
+		// Create a socket for the command channel
+		sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+		if (sock == INVALID_SOCKET) {
+			printf("socket failed: %d %s\n", sockutil_errno(),sockutil_strerror(sockutil_errno()));
+			freeaddrinfo(result);
+			return 0;
+		}
+
+		// Connect to camera
+		r = connect( sock, ptr->ai_addr, (int)ptr->ai_addrlen);
+		if (r == SOCKET_ERROR) {
+			sockutil_close(sock);
+			sock = INVALID_SOCKET;
+			continue;
+		}
+		break;
+	}
+	ptp_cs->tcp.ai = result;
+	ptp_cs->tcp.ai_con = ptr;
+	ptp_cs->tcp.cmd_sock = sock;
+	printf("initializing command channel\n");
+
+	PTPIPContainer pkt;
+	// TODO should use pack functons
+	pkt.type = PTPIP_TYPE_INIT_CMD;
+	pkt.length = sizeof(my_guid) + sizeof(my_name) + 12; // header + version
+
+	char *p = (char *)pkt.data;
+	memcpy(p,my_guid,sizeof(my_guid));
+	
+	p+=sizeof(my_guid);
+
+	memcpy(p,my_name,sizeof(my_name));
+	p+=sizeof(my_name);
+
+	*(int *)p = 0x00010000; // version is after variable length name...
+
+	if(params->write_func((unsigned char *)&pkt,pkt.length,ptp_cs) != PTP_RC_OK) {
+		return 0;
+	}
+
+	memset(&pkt,0,sizeof(pkt));
+
+	if(params->read_func((unsigned char *)&pkt,sizeof(pkt),ptp_cs) != PTP_RC_OK) {
+		return 0;
+	}
+	if(pkt.length < 34) { // header 8 + connection id  4 + guid  16 + version 4 + wchar null name
+		printf("response too small\n");
+		return 0;
+	}
+	// TODO should use unpack functons
+	if(pkt.type != PTPIP_TYPE_INIT_CMD_ACK) {
+		printf("not ack, aborting\n");
+		return 0;
+	}
+	p = (char *)&pkt;
+	ptp_cs->tcp.connection_id = *(uint32_t *)(p + 8);
+	memcpy(ptp_cs->tcp.cam_guid,p + 12,16);
+	// TODO name and version
+
+	if(!init_event_channel_tcp(ptp_cs)) {
+		return 0;
+	}
+
+	printf("opening session\n");
+	short ret = ptp_opensession(params,1);
+	if(ret!=PTP_RC_OK) {
+		printf("opensession failed");
+		return 0;
+	}
+	ptp_cs->connected = 1;
+
+	return 1;
+}
+#endif
 
 int
 init_ptp_usb (PTPParams* params, PTP_CON_STATE* ptp_cs, struct usb_device* dev)
 {
 	usb_dev_handle *device_handle;
 
-	params->write_func=ptp_write_func;
-	params->read_func=ptp_read_func;
-	params->check_int_func=ptp_check_int;
-	params->check_int_fast_func=ptp_check_int;
+	params->write_func=ptp_usb_write_func;
+	params->read_func=ptp_usb_read_func;
+	params->check_int_func=ptp_usb_check_int;
+	params->check_int_fast_func=ptp_usb_check_int;
 	params->error_func=ptpcam_error;
 	params->debug_func=ptpcam_debug;
 	params->sendreq_func=ptp_usb_sendreq;
@@ -282,6 +513,7 @@ init_ptp_usb (PTPParams* params, PTP_CON_STATE* ptp_cs, struct usb_device* dev)
 	ptp_cs->usb.handle=device_handle;
 	ptp_cs->write_count = ptp_cs->read_count = 0;
 	usb_set_configuration(device_handle, dev->config->bConfigurationValue);
+	// TODO should check status, -EBUSY!
 	usb_claim_interface(device_handle,
 		dev->config->interface->altsetting->bInterfaceNumber);
 	// Get max endpoint packet size for bulk transfer fix
@@ -327,7 +559,7 @@ void
 close_usb(PTP_CON_STATE* ptp_cs, struct usb_device* dev)
 {
 	//clear_stall(ptp_cs);
-   	usb_release_interface(ptp_cs->usb.handle, dev->config->interface->altsetting->bInterfaceNumber);
+	usb_release_interface(ptp_cs->usb.handle, dev->config->interface->altsetting->bInterfaceNumber);
 	usb_reset(ptp_cs->usb.handle);
 	usb_close(ptp_cs->usb.handle);
 }
@@ -392,6 +624,26 @@ void close_camera_usb(PTP_CON_STATE *ptp_cs, PTPParams *params) {
 }
 
 void close_camera_tcp(PTP_CON_STATE *ptp_cs, PTPParams *params) {
+#ifdef CHDKPTP_PTPIP
+	if(ptp_cs->connected) {
+		if (ptp_closesession(params)!=PTP_RC_OK) {
+			fprintf(stderr,"ERROR: Could not close session!\n");
+		}
+	}
+
+	if( ptp_cs->tcp.cmd_sock != INVALID_SOCKET) {
+		sockutil_close(ptp_cs->tcp.cmd_sock);
+		ptp_cs->tcp.cmd_sock = INVALID_SOCKET;
+	}
+	if( ptp_cs->tcp.event_sock != INVALID_SOCKET) {
+		sockutil_close(ptp_cs->tcp.event_sock);
+		ptp_cs->tcp.event_sock = INVALID_SOCKET;
+	}
+	if(ptp_cs->tcp.ai) {
+		freeaddrinfo(ptp_cs->tcp.ai);
+		ptp_cs->tcp.ai = ptp_cs->tcp.ai_con = NULL;
+	}
+#endif
 	return;
 }
 
@@ -541,6 +793,7 @@ static void close_connection(PTPParams *params,PTP_CON_STATE *ptp_cs)
 static int check_connection_status_usb(PTP_CON_STATE *ptp_cs) {
 	uint16_t devstatus[2] = {0,0};
 	
+	// TODO shouldn't ever be true
 	if(!ptp_cs->connected) {// never initialized
 		return 0;
 	}
@@ -819,6 +1072,7 @@ static int chdk_connection(lua_State *L) {
 	} else {
 		strcpy(ptp_cs->tcp.host,host);
 		strcpy(ptp_cs->tcp.port,port);
+		ptp_cs->tcp.cmd_sock = ptp_cs->tcp.event_sock = INVALID_SOCKET;
 	}
 	ptp_cs->timeout = USB_TIMEOUT;
 	ptp_cs->con_type = con_type;
@@ -849,7 +1103,18 @@ static int connect_cam_usb(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_c
 	}
 }
 static int connect_cam_tcp(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_cs) {
+#ifdef CHDKPTP_PTPIP
+	if(!init_ptp_tcp(params,ptp_cs)) {
+		close_camera_tcp(ptp_cs,params); // TODO should clean up any partially open stuff
+		lua_pushboolean(L,0);
+		lua_pushstring(L,"connect failed"); // TODO return detailed error messages instead of printing
+		return 0;
+	}
+	lua_pushboolean(L,1);
+	return 1;
+#else
 	return luaL_error(L,"PTP/IP not supported");
+#endif
 }
 /*
 status[,errmsg]=con:connect()
@@ -1882,6 +2147,9 @@ int main(int argc, char ** argv)
 	lua_close(L);
 	// gc takes care of any open connections
 
+#ifdef CHDKPTP_PTPIP
+	sockutil_cleanup();
+#endif
 	return 0;
 }
 

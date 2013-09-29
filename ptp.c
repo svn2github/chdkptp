@@ -52,6 +52,8 @@
 #  define N_(String) (String)
 #endif
 
+#include "sockutil.h"
+
 #define CHECK_PTP_RC(result)	{uint16_t r=(result); if (r!=PTP_RC_OK) return r;}
 
 #define PTP_CNT_INIT(cnt) {memset(&cnt,0,sizeof(cnt));}
@@ -93,8 +95,208 @@ ptp_error (PTPParams *params, const char *format, ...)
 /* Pack / unpack functions */
 
 #include "ptp-pack.c"
+/* ptp/ip send / receive functions */
+#ifdef CHDKPTP_PTPIP
+uint16_t ptp_tcp_sendreq(PTPParams *params, PTPContainer *ptp)
+{
+	PTPIPContainer pkt;
+	uint16_t ret;
+	unsigned length = (sizeof(pkt.req) + 8) - 4*(5-ptp->Nparam); // req plus header
 
-/* send / receive functions */
+	memset(&pkt,0,sizeof(pkt));
+	pkt.length = htod32(length);
+	pkt.type = htod32(PTPIP_TYPE_REQ);
+	pkt.req.dataphase = 0; // name from wireshark dissector, appears to be 0
+						// even if there is a send or receive data phase
+						// actual meaning unclear
+	pkt.req.trans_id=htod32(ptp->Transaction_ID);
+	pkt.req.code=htod16(ptp->Code);
+	pkt.req.param1=htod32(ptp->Param1);
+	pkt.req.param2=htod32(ptp->Param2);
+	pkt.req.param3=htod32(ptp->Param3);
+	pkt.req.param4=htod32(ptp->Param4);
+	pkt.req.param5=htod32(ptp->Param5);
+
+	ret=params->write_func((unsigned char *)&pkt, length, params->data);
+	if (ret!=PTP_RC_OK) {
+		ret = PTP_ERROR_IO;
+	}
+	return ret;
+}
+
+uint16_t
+ptp_tcp_senddata (PTPParams* params, PTPContainer* ptp,
+			unsigned char *data, unsigned int size)
+{
+	uint16_t ret;
+	unsigned length;
+
+	// start data packet
+	PTPIPContainer pkt;
+	memset(&pkt,0,sizeof(pkt));
+	length = 20; // header + transaction ID + 64 bit length
+	pkt.length = htod32(length); 
+	pkt.type = htod32(PTPIP_TYPE_START_DATA);
+
+	pkt.datactl.trans_id = htod32(ptp->Transaction_ID);
+	pkt.datactl.data_length = size;/*htod64(size);*/ // TODO
+
+	ret=params->write_func((unsigned char *)&pkt, length, params->data);
+	if (ret!=PTP_RC_OK) {
+		ret = PTP_ERROR_IO;
+	}
+
+	// "data packet" ... not clear why this is needed when start data gives size
+	// allows breaking data into multiple "packets"
+	memset(&pkt,0,sizeof(pkt));
+	pkt.length = htod32(12 + size); // header + transaction ID + total data length?
+	pkt.type = htod32(PTPIP_TYPE_DATA);
+
+	ret=params->write_func((unsigned char *)&pkt, 12, params->data); // size is actual size of our packet
+	if (ret!=PTP_RC_OK) {
+		ret = PTP_ERROR_IO;
+	}
+
+	// write actual data
+	ret=params->write_func(data, size, params->data);
+	if (ret!=PTP_RC_OK) {
+		ret = PTP_ERROR_IO;
+	}
+
+	// end data packet
+	memset(&pkt,0,sizeof(pkt));
+	pkt.length = 12; // header + transaction ID
+	pkt.type = htod32(PTPIP_TYPE_END_DATA);
+
+	pkt.datactl.trans_id = htod32(ptp->Transaction_ID);
+
+	ret=params->write_func((unsigned char *)&pkt, pkt.length, params->data);
+	if (ret!=PTP_RC_OK) {
+		ret = PTP_ERROR_IO;
+	}
+
+	return ret;
+}
+
+uint16_t
+ptp_tcp_getresp (PTPParams* params, PTPContainer* resp)
+{
+	uint16_t ret;
+	static PTPIPContainer pkt;
+
+	memset(&pkt,0,sizeof(pkt));
+
+	/* read response, it should never be longer than sizeof(pkt) */
+	// TODO could read into the next packet!
+	ret=params->read_func((unsigned char *)&pkt,
+				sizeof(pkt), params->data);
+
+	if (ret!=PTP_RC_OK) {
+		ret = PTP_ERROR_IO;
+	} else
+	if (dtoh16(pkt.type)!=PTPIP_TYPE_RESP) {
+		ret = PTP_ERROR_RESP_EXPECTED;
+	} else
+	if (dtoh16(pkt.resp.code)!=resp->Code) {
+		ret = dtoh16(pkt.resp.code);
+	}
+	if (ret!=PTP_RC_OK) {
+/*		ptp_error (params,
+		"PTP: request code 0x%04x getting resp error 0x%04x",
+			resp->Code, ret);*/
+		return ret;
+	}
+	/* build an appropriate PTPContainer */
+	resp->Code=dtoh16(pkt.resp.code);
+	resp->SessionID=params->session_id;
+	resp->Transaction_ID=dtoh32(pkt.resp.trans_id);
+	resp->Param1=dtoh32(pkt.resp.param1);
+	resp->Param2=dtoh32(pkt.resp.param2);
+	resp->Param3=dtoh32(pkt.resp.param3);
+	resp->Param4=dtoh32(pkt.resp.param4);
+	resp->Param5=dtoh32(pkt.resp.param5);
+	resp->Nparam=(dtoh32(pkt.length)-(8+6))/4; // TODO header + code + trans_id
+
+	return ret;
+}
+
+uint16_t
+ptp_tcp_getdata (PTPParams* params, PTPContainer* ptp,
+		unsigned char **data)
+{
+	PTPIPContainer pkt;
+	uint16_t ret;
+	uint64_t total_len;
+	uint64_t total_read=0;
+	uint32_t pkt_len;
+
+	// read the START_DATA packet
+	ret=params->read_func((unsigned char *)&pkt, 20, params->data);
+	if (ret!=PTP_RC_OK) {
+		return PTP_ERROR_IO;
+	}
+
+	if (dtoh32(pkt.type)!=PTPIP_TYPE_START_DATA) {
+		printf("expected START_DATA\n");
+		return PTP_ERROR_DATA_EXPECTED;
+	}
+
+	// get overall length
+	total_len=pkt.datactl.data_length;//dtoh64(pkt.datactl.data_length)
+
+	if (*data==NULL) *data=calloc(1,total_len);
+	if (!*data) {
+		return PTP_ERROR_NOMEM;
+	}
+
+	unsigned char *p = *data;
+	int got_end = 0;
+	do {
+		// read the DATA packet
+		ret=params->read_func((unsigned char *)&pkt, 12, params->data);
+		if (ret!=PTP_RC_OK) {
+			return PTP_ERROR_IO;
+		}
+		// END_DATA can contain data, may be used instead of DATA packet
+		if (dtoh32(pkt.type)==PTPIP_TYPE_END_DATA) {
+			// printf("END_DATA\n");
+			// TODO should verify that length gives correct total on end
+			got_end = 1;
+		} else if (dtoh32(pkt.type)!=PTPIP_TYPE_DATA) {
+			printf("expected DATA\n");
+			return PTP_ERROR_DATA_EXPECTED;
+		}
+		pkt_len = dtoh32(pkt.length) - 12;
+		// TODO not safe, we might not read whole len!
+		ret=params->read_func(p, pkt_len, params->data);
+		if (ret!=PTP_RC_OK) {
+			return PTP_ERROR_IO;
+		}
+		if(total_read + pkt_len > total_len) {
+			printf("length error\n");
+			return PTP_ERROR_BADPARAM; // TODO
+		}
+		p += pkt_len;
+		total_read += pkt_len;
+	} while (total_read < total_len);
+	
+	// read the END_DATA packet
+	if(!got_end) {
+		ret=params->read_func((unsigned char *)&pkt, 12, params->data);
+		if (ret!=PTP_RC_OK) {
+			return PTP_ERROR_IO;
+		}
+		if (dtoh32(pkt.type)!=PTPIP_TYPE_END_DATA) {
+			printf("expected END_DATA\n");
+			return PTP_ERROR_DATA_EXPECTED;
+		}
+	}
+	return PTP_RC_OK;
+}
+
+#endif // CHDKPTP_PTPIP
+
+/* usb send / receive functions */
 
 uint16_t
 ptp_usb_sendreq (PTPParams* params, PTPContainer* req)

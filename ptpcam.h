@@ -48,7 +48,11 @@ typedef struct {
 typedef struct {
 	socket_t cmd_sock;
 	socket_t event_sock;
+	struct addrinfo *ai; // getaddrinfo result
+	struct addrinfo *ai_con; // addr info selected for connection
+
 	int connection_id;
+	char cam_guid[16];
 	// TODO 
 	char host[LIBUSB_PATH_MAX];
 	char port[LIBUSB_PATH_MAX];
