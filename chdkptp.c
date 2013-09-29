@@ -96,7 +96,7 @@
 
 /* CHDK additions */
 #define CHDKPTP_VERSION_MAJOR 0
-#define CHDKPTP_VERSION_MINOR 3
+#define CHDKPTP_VERSION_MINOR 4
 
 /* lua registry indexes */
 /* meta table for connection objects */
@@ -1808,30 +1808,48 @@ static int chdk_get_ptp_devinfo(lua_State *L) {
 
 // TODO lua code expects all to devices to have devinfo
 /*
-usb_dev_info=con:get_usb_devinfo()
-usb_dev_info = {
+dev_info=con:get_con_devinfo()
+dev_info = {
+	transport="usb"|"ip"
+	-- usb
 	bus="bus"
 	dev="dev"
 	"vendor_id" = VENDORID, -- nil if no matching PTP capable device is connected
 	"product_id" = PRODUCTID, -- nil if no matching PTP capable device is connected
+	-- ip
+	host="host" -- host specified in chdk.connection
+	port="port"
+	guid="guid" -- binary 16 byte GUID from cam
 }
 */
-static int chdk_get_usb_devinfo(lua_State *L) {
+static int chdk_get_con_devinfo(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 	// TODO
-	if(ptp_cs->con_type != PTP_CON_USB) {
-		return luaL_error(L,"not a USB connection");
-	}
-	struct usb_device *dev;
-	dev=find_device_by_path(ptp_cs->usb.bus,ptp_cs->usb.dev);
-	if(dev) {
-		push_usb_dev_info(L,dev);
+	if(ptp_cs->con_type == PTP_CON_USB) {
+		struct usb_device *dev;
+		dev=find_device_by_path(ptp_cs->usb.bus,ptp_cs->usb.dev);
+		if(dev) {
+			push_usb_dev_info(L,dev);
+		} else {
+			lua_newtable(L);
+			lua_pushstring(L, ptp_cs->usb.bus);
+			lua_setfield(L, -2, "bus");
+			lua_pushstring(L, ptp_cs->usb.dev);
+			lua_setfield(L, -2, "dev");
+		}
+		lua_pushstring(L, "usb");
+		lua_setfield(L, -2, "transport");
 	} else {
 		lua_newtable(L);
-		lua_pushstring(L, ptp_cs->usb.bus);
-		lua_setfield(L, -2, "bus");
-		lua_pushstring(L, ptp_cs->usb.dev);
-		lua_setfield(L, -2, "dev");
+		lua_pushstring(L, ptp_cs->tcp.host);
+		lua_setfield(L, -2, "host");
+		lua_pushstring(L, ptp_cs->tcp.port);
+		lua_setfield(L, -2, "port");
+		lua_pushlstring(L, ptp_cs->tcp.cam_guid,16);
+		lua_setfield(L, -2, "guid");
+
+		lua_pushstring(L, "ip");
+		lua_setfield(L, -2, "transport");
 	}
 	return 1;
 }
@@ -1919,7 +1937,7 @@ static const luaL_Reg chdkconnection[] = {
   {"get_script_id", chdk_get_script_id},
   {"dev_status", chdk_dev_status},
   {"get_ptp_devinfo", chdk_get_ptp_devinfo},
-  {"get_usb_devinfo", chdk_get_usb_devinfo}, // does not need to be connected, returns bus and dev at minimum
+  {"get_con_devinfo", chdk_get_con_devinfo}, // does not need to be connected, returns connection spec at minimum
   {"get_live_data",chdk_get_live_data},
   {"capture_ready", chdk_capture_ready},
   {"capture_get_chunk", chdk_capture_get_chunk},

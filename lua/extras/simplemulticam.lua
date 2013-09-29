@@ -83,8 +83,8 @@ function m.connect(devspec)
 		m.dbgmsg('%d:%s bus=%s dev=%s sn=%s\n',
 			#m.cams+1,
 			lcon.ptpdev.model,
-			lcon.usbdev.dev,
-			lcon.usbdev.bus,
+			lcon.condev.dev,
+			lcon.condev.bus,
 			tostring(lcon.ptpdev.serial_number))
 		table.insert(m.cams,lcon)
 	end

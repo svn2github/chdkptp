@@ -1230,11 +1230,11 @@ function con_methods:wait_status(opts)
 end
 
 --[[
-set usbdev, ptpdev apiver for current connection
+set condev, ptpdev apiver for current connection
 ]]
 function con_methods:update_connection_info()
 	-- this currently can't fail, devinfo is always stored in connection object
-	self.usbdev=self:get_usb_devinfo()
+	self.condev=self:get_con_devinfo()
 	local status,err=self:get_ptp_devinfo()	
 	if status then
 		self.ptpdev = status
@@ -1284,7 +1284,7 @@ function con_methods:reconnect(opts)
 		self:disconnect()
 	end
 	local ptpdev = self.ptpdev
-	local usbdev = self.usbdev
+	local condev = self.condev
 	-- appears to be needed to avoid device numbers changing (reset too soon ?)
 	sys.sleep(opts.wait)
 	local status,err = self:connect()
@@ -1293,7 +1293,7 @@ function con_methods:reconnect(opts)
 	end
 	if ptpdev.model ~= self.ptpdev.model
 			or ptpdev.serial_number ~= self.ptpdev.serial_number
-			or usbdev.product_id ~= self.usbdev.product_id then
+			or condev.product_id ~= self.condev.product_id then
 		if opts.strict then
 			self:disconnect()
 			return false,'reconnected to a different device'
@@ -1432,7 +1432,7 @@ function con_methods:live_dump_start(filename)
 		self.live = chdku.live_wrap()
 	end
 	if not filename then
-		filename = string.format('chdk_%x_%s.lvdump',con.usbdev.product_id,os.date('%Y%m%d_%H%M%S'))
+		filename = string.format('chdk_%x_%s.lvdump',tostring(con.condev.product_id),os.date('%Y%m%d_%H%M%S'))
 	end
 	--printf('recording to %s\n',dumpname)
 	self.live.dump_fh = io.open(filename,"wb")

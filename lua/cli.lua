@@ -650,6 +650,7 @@ cli:add_commands{
 ]],
 		func=function() 
 			local msg = ''
+			-- TODO usb only, will not show connected PTP/IP
 			local devs = chdk.list_usb_devices()
 			for i,desc in ipairs(devs) do
 				local lcon = chdku.connection(desc)
@@ -673,9 +674,9 @@ cli:add_commands{
 					msg = msg .. string.format("%s%d:%s b=%s d=%s v=0x%x p=0x%x s=%s\n",
 												con_status, i,
 												tostring(lcon.ptpdev.model),
-												lcon.usbdev.bus, lcon.usbdev.dev,
-												tostring(lcon.usbdev.vendor_id),
-												tostring(lcon.usbdev.product_id),
+												lcon.condev.bus, lcon.condev.dev,
+												tostring(lcon.condev.vendor_id),
+												tostring(lcon.condev.product_id),
 												tostring(lcon.ptpdev.serial_number))
 				else
 					-- use the requested dev/bus here, since the lcon data may not be set
@@ -1050,12 +1051,13 @@ cli:add_commands{
 	{
 		names={'connect','c'},
 		help='connect to device',
-		arghelp="[-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] ",
+		arghelp="[-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] | -h=host [-p=port]",
 		args=argparser.create{
 			b='.*',
 			d='.*',
 			p=false,
 			s=false,
+			h=false,
 		},
 		
 		help_detail=[[
@@ -1087,34 +1089,43 @@ cli:add_commands{
 				con:disconnect()
 			end
 
-			if match.product_id and not tonumber(match.product_id) then
-				return false,"expected number for product id"
-			end
-			local devices = chdk.list_usb_devices()
-			local lcon
-			for i, devinfo in ipairs(devices) do
-				lcon = nil
-				if chdku.match_device(devinfo,match) then
-					lcon = chdku.connection(devinfo)
-					-- if we are looking for model or serial, need to connect to the dev to check
-					if match.model or match.serial_number then
-						local tempcon = false
-						cli.dbgmsg('model check %s %s\n',tostring(match.model),tostring(match.serial_number))
-						if not lcon:is_connected() then
-							lcon:connect()
-							tempcon = true
-						else
-							lcon:update_connection_info()
-						end
-						if not lcon:match_ptp_info(match) then
-							if tempcon then
-								lcon:disconnect()
+			-- ptp/ip ignore other options
+			-- TODO should warn
+			if args.h then
+				if not args.p then
+					args.p = nil
+				end
+				lcon = chdku.connection({host=args.h,port=args.p})
+			else
+				if match.product_id and not tonumber(match.product_id) then
+					return false,"expected number for product id"
+				end
+				local devices = chdk.list_usb_devices()
+				local lcon
+				for i, devinfo in ipairs(devices) do
+					lcon = nil
+					if chdku.match_device(devinfo,match) then
+						lcon = chdku.connection(devinfo)
+						-- if we are looking for model or serial, need to connect to the dev to check
+						if match.model or match.serial_number then
+							local tempcon = false
+							cli.dbgmsg('model check %s %s\n',tostring(match.model),tostring(match.serial_number))
+							if not lcon:is_connected() then
+								lcon:connect()
+								tempcon = true
+							else
+								lcon:update_connection_info()
 							end
-							lcon = nil
+							if not lcon:match_ptp_info(match) then
+								if tempcon then
+									lcon:disconnect()
+								end
+								lcon = nil
+							end
 						end
-					end
-					if lcon then
-						break
+						if lcon then
+							break
+						end
 					end
 				end
 			end

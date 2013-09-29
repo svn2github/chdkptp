@@ -52,8 +52,8 @@ function mc:connect()
 			printf('%d:%s bus=%s dev=%s sn=%s\n',
 				i,
 				lcon.ptpdev.model,
-				lcon.usbdev.dev,
-				lcon.usbdev.bus,
+				lcon.condev.dev,
+				lcon.condev.bus,
 				tostring(lcon.ptpdev.serial_number))
 			lcon.mc_id = string.format('%d:%s',i,lcon.ptpdev.model)
 			table.insert(self.cams,lcon)
