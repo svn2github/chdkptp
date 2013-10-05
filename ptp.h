@@ -747,7 +747,7 @@ typedef struct _PTPCANONFolderEntry PTPCANONFolderEntry;
 typedef struct _PTPParams PTPParams;
 
 /* raw write functions */
-typedef short (* PTPIOReadFunc)	(unsigned char *bytes, unsigned int size,
+typedef int (* PTPIOReadFunc)	(unsigned char *bytes, unsigned int max_size, 
 				 void *data);
 typedef short (* PTPIOWriteFunc)(unsigned char *bytes, unsigned int size,
 				 void *data);

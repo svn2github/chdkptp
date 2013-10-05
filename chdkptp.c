@@ -168,14 +168,14 @@ ptpcam_siginthandler(int signum)
 }
 #endif
 
-static short
-ptp_usb_read_func (unsigned char *bytes, unsigned int size, void *data)
+static int
+ptp_usb_read_func (unsigned char *bytes, unsigned max_size, void *data)
 {
 	int result=-1;
 	PTP_CON_STATE *ptp_cs=(PTP_CON_STATE *)data;
 	int toread=0;
-	signed long int rbytes=size;
-
+	signed long int rbytes=max_size;
+	int read_size = 0;
 	do {
 		bytes+=toread;
 		if (rbytes>PTPCAM_USB_URB) 
@@ -188,17 +188,19 @@ ptp_usb_read_func (unsigned char *bytes, unsigned int size, void *data)
 			result=USB_BULK_READ(ptp_cs->usb.handle, ptp_cs->usb.inep,(char *)bytes, toread,ptp_cs->timeout);
 		if (result < 0)
 			break;
+
+		read_size += result;
 		ptp_cs->read_count += toread;
 		rbytes-=PTPCAM_USB_URB;
 	} while (rbytes>0);
 
 	if (result >= 0) {
-		return (PTP_RC_OK);
+		return read_size;
 	}
 	else 
 	{
 		if (verbose) perror("usb_bulk_read");
-		return PTP_ERROR_IO;
+		return -1;
 	}
 }
 
@@ -218,8 +220,7 @@ ptp_usb_write_func (unsigned char *bytes, unsigned int size, void *data)
 	}
 }
 
-/* XXX this one is suposed to return the number of bytes read!!! */
-static short
+static int
 ptp_usb_check_int (unsigned char *bytes, unsigned int size, void *data)
 {
 	int result;
@@ -279,27 +280,26 @@ ptp_tcp_write_func (unsigned char *bytes, unsigned int size, void *data)
 
 // TODO this is all wrong, we might not get whole packet, or might get part of next
 // need to restructure for a PTP/IP packet oriented read
-static short
-ptp_tcp_read_func (unsigned char *bytes, unsigned int size, void *data)
+static int
+ptp_tcp_read_func (unsigned char *bytes, unsigned max_size, void *data)
 {
 	PTP_CON_STATE *ptp_cs=(PTP_CON_STATE *)data;
-	int result = recv(ptp_cs->tcp.cmd_sock, (char *)bytes, size, 0);
+	int result = recv(ptp_cs->tcp.cmd_sock, (char *)bytes, max_size, 0);
 	if ( result > 0 ) {
 		//printf("read %d\n",result);
 		ptp_cs->read_count += result;
-		return PTP_RC_OK;
+		return result;
 	} else if ( result == 0 ) {
 		printf("Connection closed\n");
-		return PTP_ERROR_IO;
+		return -1;
 	} else {
 		printf("recv failed: %d %s\n", sockutil_errno(),sockutil_strerror(sockutil_errno()));
-		return PTP_ERROR_IO;
+		return -1;
 	}
 }
 
 // TODO
-/* XXX this one is suposed to return the number of bytes read!!! */
-static short
+static int
 ptp_tcp_check_int (unsigned char *bytes, unsigned int size, void *data)
 {
 	return PTP_RC_OK;
@@ -453,7 +453,7 @@ int init_ptp_tcp(PTPParams* params, PTP_CON_STATE* ptp_cs) {
 
 	memset(&pkt,0,sizeof(pkt));
 
-	if(params->read_func((unsigned char *)&pkt,sizeof(pkt),ptp_cs) != PTP_RC_OK) {
+	if(params->read_func((unsigned char *)&pkt,sizeof(pkt),ptp_cs) < 0) {
 		return 0;
 	}
 	if(pkt.length < 34) { // header 8 + connection id  4 + guid  16 + version 4 + wchar null name

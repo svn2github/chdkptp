@@ -181,17 +181,17 @@ ptp_tcp_senddata (PTPParams* params, PTPContainer* ptp,
 uint16_t
 ptp_tcp_getresp (PTPParams* params, PTPContainer* resp)
 {
-	uint16_t ret;
+	uint16_t ret = PTP_RC_OK;
+	int rsize;
 	static PTPIPContainer pkt;
 
 	memset(&pkt,0,sizeof(pkt));
 
 	/* read response, it should never be longer than sizeof(pkt) */
 	// TODO could read into the next packet!
-	ret=params->read_func((unsigned char *)&pkt,
-				sizeof(pkt), params->data);
+	rsize=params->read_func((unsigned char *)&pkt, sizeof(pkt), params->data);
 
-	if (ret!=PTP_RC_OK) {
+	if (rsize < 0) {
 		ret = PTP_ERROR_IO;
 	} else
 	if (dtoh16(pkt.type)!=PTPIP_TYPE_RESP) {
@@ -225,14 +225,15 @@ ptp_tcp_getdata (PTPParams* params, PTPContainer* ptp,
 		unsigned char **data)
 {
 	PTPIPContainer pkt;
-	uint16_t ret;
 	uint64_t total_len;
 	uint64_t total_read=0;
 	uint32_t pkt_len;
 
+	int rsize;
+
 	// read the START_DATA packet
-	ret=params->read_func((unsigned char *)&pkt, 20, params->data);
-	if (ret!=PTP_RC_OK) {
+	rsize=params->read_func((unsigned char *)&pkt, 20, params->data);
+	if (rsize < 0) {
 		return PTP_ERROR_IO;
 	}
 
@@ -253,8 +254,8 @@ ptp_tcp_getdata (PTPParams* params, PTPContainer* ptp,
 	int got_end = 0;
 	do {
 		// read the DATA packet
-		ret=params->read_func((unsigned char *)&pkt, 12, params->data);
-		if (ret!=PTP_RC_OK) {
+		rsize=params->read_func((unsigned char *)&pkt, 12, params->data);
+		if (rsize < 0) {
 			return PTP_ERROR_IO;
 		}
 		// END_DATA can contain data, may be used instead of DATA packet
@@ -268,8 +269,8 @@ ptp_tcp_getdata (PTPParams* params, PTPContainer* ptp,
 		}
 		pkt_len = dtoh32(pkt.length) - 12;
 		// TODO not safe, we might not read whole len!
-		ret=params->read_func(p, pkt_len, params->data);
-		if (ret!=PTP_RC_OK) {
+		rsize=params->read_func(p, pkt_len, params->data);
+		if (rsize < 0) {
 			return PTP_ERROR_IO;
 		}
 		if(total_read + pkt_len > total_len) {
@@ -282,8 +283,8 @@ ptp_tcp_getdata (PTPParams* params, PTPContainer* ptp,
 	
 	// read the END_DATA packet
 	if(!got_end) {
-		ret=params->read_func((unsigned char *)&pkt, 12, params->data);
-		if (ret!=PTP_RC_OK) {
+		rsize=params->read_func((unsigned char *)&pkt, 12, params->data);
+		if (rsize < 0) {
 			return PTP_ERROR_IO;
 		}
 		if (dtoh32(pkt.type)!=PTPIP_TYPE_END_DATA) {
@@ -382,17 +383,18 @@ uint16_t
 ptp_usb_getdata (PTPParams* params, PTPContainer* ptp,
 		unsigned char **data)
 {
-	static uint16_t ret;
+	static uint16_t ret = PTP_RC_OK;
 	static PTPUSBBulkContainer usbdata;
+
+	int rsize;
 
 	PTP_CNT_INIT(usbdata);
 
 	do {
 		static uint32_t len;
 		/* read first(?) part of data */
-		ret=params->read_func((unsigned char *)&usbdata,
-				sizeof(usbdata), params->data);
-		if (ret!=PTP_RC_OK) {
+		rsize=params->read_func((unsigned char *)&usbdata, sizeof(usbdata), params->data);
+		if (rsize < 0) {
 			ret = PTP_ERROR_IO;
 			break;
 		} else
@@ -419,11 +421,11 @@ ptp_usb_getdata (PTPParams* params, PTPContainer* ptp,
 		/* is that all of data? */
 		if (len+PTP_USB_BULK_HDR_LEN<=sizeof(usbdata)) break;
 		/* if not finaly read the rest of it */
-		ret=params->read_func(((unsigned char *)(*data))+
+		rsize=params->read_func(((unsigned char *)(*data))+
 					PTP_USB_BULK_PAYLOAD_LEN,
 					len-PTP_USB_BULK_PAYLOAD_LEN,
 					params->data);
-		if (ret!=PTP_RC_OK) {
+		if (rsize<0) {
 			ret = PTP_ERROR_IO;
 			break;
 		}
@@ -440,15 +442,17 @@ ptp_usb_getdata (PTPParams* params, PTPContainer* ptp,
 uint16_t
 ptp_usb_getresp (PTPParams* params, PTPContainer* resp)
 {
-	static uint16_t ret;
+	static uint16_t ret = PTP_RC_OK;
 	static PTPUSBBulkContainer usbresp;
+
+	int rsize;
 
 	PTP_CNT_INIT(usbresp);
 	/* read response, it should never be longer than sizeof(usbresp) */
-	ret=params->read_func((unsigned char *)&usbresp,
+	rsize=params->read_func((unsigned char *)&usbresp,
 				sizeof(usbresp), params->data);
 
-	if (ret!=PTP_RC_OK) {
+	if (rsize < 0) {
 		ret = PTP_ERROR_IO;
 	} else
 	if (dtoh16(usbresp.type)!=PTP_USB_CONTAINER_RESPONSE) {
@@ -577,15 +581,17 @@ static uint16_t ptp_getdata_transaction(PTPParams* params, PTPContainer* ptp, PT
 	/* send request */
 	CHECK_PTP_RC(params->sendreq_func (params, ptp));
 
-	uint16_t ret;
+	uint16_t ret = PTP_RC_OK;
 	PTPUSBBulkContainer usbdata;
+
+	int rsize;
 
 	PTP_CNT_INIT(usbdata);
 	do {
 		uint32_t len;
 		/* read first(?) part of data */
-		ret=params->read_func((unsigned char *)&usbdata, sizeof(usbdata), params->data);
-		if (ret!=PTP_RC_OK) {
+		rsize=params->read_func((unsigned char *)&usbdata, sizeof(usbdata), params->data);
+		if (rsize < 0) {
 			ret = PTP_ERROR_IO;
 			break;
 		} else if (dtoh16(usbdata.type)!=PTP_USB_CONTAINER_DATA) {
@@ -621,8 +627,9 @@ static uint16_t ptp_getdata_transaction(PTPParams* params, PTPContainer* ptp, PT
 		while(remaining>0) {
 			uint32_t rbytes = remaining < buf_size ? remaining:buf_size;
 
-			ret=params->read_func(buf, rbytes, params->data);
-			if (ret!=PTP_RC_OK) {
+			rsize=params->read_func(buf, rbytes, params->data);
+			if (rsize < 0) {
+				ret = PTP_ERROR_IO;
 				break;
 			}
 			ret=gdparams->fn(buf,rbytes,gdparams);
