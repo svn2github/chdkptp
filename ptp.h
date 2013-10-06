@@ -100,6 +100,8 @@ typedef struct _PTPUSBEventContainer PTPUSBEventContainer;
 
 // TODO arbitrary buffer for commands that aren't OP request or OP response
 #define PTPIP_CMD_PAYLOAD_LEN 256
+// length + type
+#define PTPIP_HEADER_LEN 8
 
 // code is a short, so following aren't alligned
 typedef struct __attribute__ ((__packed__)) {
@@ -746,11 +748,24 @@ typedef struct _PTPCANONFolderEntry PTPCANONFolderEntry;
 
 typedef struct _PTPParams PTPParams;
 
+typedef struct _PTPGetdataParams PTPGetdataParams;
+typedef uint16_t (* PTPGetdataHandlerFunc)(PTPParams* params, PTPGetdataParams *gdparams, unsigned size, unsigned char *data);
+typedef struct _PTPGetdataParams {
+	PTPGetdataHandlerFunc handler; // handler, optional
+	unsigned block_size; // buffer / call handler with chunks up to size
+	void *ret_data; // no handler, data returned in buffer, allocated if needed
+	void *handler_data; // parameters for handler
+	uint64_t total_size; // total size of data in this operation, set before handler call
+} PTPGetdataParams;
+
 /* raw write functions */
-typedef int (* PTPIOReadFunc)	(unsigned char *bytes, unsigned int max_size, 
-				 void *data);
-typedef short (* PTPIOWriteFunc)(unsigned char *bytes, unsigned int size,
-				 void *data);
+typedef int (* PTPIOReadFunc)	(unsigned char *bytes, unsigned max_size, void *data);
+typedef short (* PTPIOWriteFunc)(unsigned char *bytes, unsigned size, void *data);
+
+/* functions to read control information vs bulk data */
+typedef uint16_t (* PTPIOReadControlFunc)(PTPParams* params, void *dst);
+typedef uint16_t (* PTPIOReadDataFunc)(PTPParams* params, unsigned size, unsigned char *data);
+
 /*
  * This functions take PTP oriented arguments and send them over an
  * appropriate data layer doing byteorder conversion accordingly.
@@ -759,11 +774,21 @@ typedef uint16_t (* PTPIOSendReq)	(PTPParams* params, PTPContainer* req);
 typedef uint16_t (* PTPIOSendData)	(PTPParams* params, PTPContainer* ptp,
 					unsigned char *data, unsigned int size);
 typedef uint16_t (* PTPIOGetResp)	(PTPParams* params, PTPContainer* resp);
-typedef uint16_t (* PTPIOGetData)	(PTPParams* params, PTPContainer* ptp,
-					unsigned char **data);
+typedef uint16_t (* PTPIOGetData)	(PTPParams* params, PTPContainer* ptp, PTPGetdataParams *gdparams);
 /* debug functions */
 typedef void (* PTPErrorFunc) (void *data, const char *format, va_list args);
 typedef void (* PTPDebugFunc) (void *data, const char *format, va_list args);
+
+// should be enough for any command
+#define PTP_PACKET_BUFFER_SIZE  PTP_USB_BULK_HS_MAX_PACKET_LEN
+
+
+typedef struct {
+	/* buffer excess data that may be read with response packets */
+	unsigned char data[PTP_PACKET_BUFFER_SIZE];
+	int pos;
+	int len;
+} PTPPacketBuffer;
 
 struct _PTPParams {
 	/* data layer byteorder */
@@ -774,6 +799,9 @@ struct _PTPParams {
 	PTPIOWriteFunc	write_func;
 	PTPIOReadFunc	check_int_func;
 	PTPIOReadFunc	check_int_fast_func;
+
+	PTPIOReadControlFunc	read_control_func;
+	PTPIOReadDataFunc		read_data_func;
 
 	/* Custom IO functions */
 	PTPIOSendReq	sendreq_func;
@@ -802,22 +830,28 @@ struct _PTPParams {
 
 	/* Max endpoint packet size (for bulk transfer fix) */
 	uint32_t max_packet_size;
+
+	PTPPacketBuffer pkt_buf;
 };
 
 /* last, but not least - ptp functions */
+uint16_t ptp_tcp_read_data(PTPParams* params, unsigned size, unsigned char *dst);
+uint16_t ptp_usb_read_data(PTPParams* params, unsigned size, unsigned char *dst);
+
+uint16_t ptp_tcp_read_control(PTPParams* params, void *dst);
+uint16_t ptp_usb_read_control(PTPParams* params, void *dst);
+
 uint16_t ptp_tcp_sendreq	(PTPParams* params, PTPContainer* req);
 uint16_t ptp_tcp_senddata	(PTPParams* params, PTPContainer* ptp,
 				unsigned char *data, unsigned int size);
 uint16_t ptp_tcp_getresp	(PTPParams* params, PTPContainer* resp);
-uint16_t ptp_tcp_getdata	(PTPParams* params, PTPContainer* ptp, 
-				unsigned char **data);
+uint16_t ptp_tcp_getdata	(PTPParams* params, PTPContainer* ptp, PTPGetdataParams *gdparams);
 
 uint16_t ptp_usb_sendreq	(PTPParams* params, PTPContainer* req);
 uint16_t ptp_usb_senddata	(PTPParams* params, PTPContainer* ptp,
 				unsigned char *data, unsigned int size);
 uint16_t ptp_usb_getresp	(PTPParams* params, PTPContainer* resp);
-uint16_t ptp_usb_getdata	(PTPParams* params, PTPContainer* ptp, 
-				unsigned char **data);
+uint16_t ptp_usb_getdata	(PTPParams* params, PTPContainer* ptp, PTPGetdataParams *gdparams);
 uint16_t ptp_usb_event_check	(PTPParams* params, PTPContainer* event);
 uint16_t ptp_usb_event_wait		(PTPParams* params, PTPContainer* event);
 

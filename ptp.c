@@ -95,8 +95,127 @@ ptp_error (PTPParams *params, const char *format, ...)
 /* Pack / unpack functions */
 
 #include "ptp-pack.c"
+/* transport buffer functions */
+/* read data from buffer up to max size, return length actually read */
+int ptp_transport_read_from_buffer(PTPPacketBuffer *b,int max_size, unsigned char *dst) {
+	int len;
+	//printf("read_from_buffer pos:%d len:%d want %d\n",b->pos,b->len,max_size);
+	if(!b->len) {
+		return 0;
+	}
+	if(b->len > max_size) {
+		len = max_size;
+	} else {
+		len = b->len;
+	}
+	memcpy(dst,b->data + b->pos,len);
+	b->len -= len;
+	b->pos += len;
+
+
+	if(!b->len) {
+		b->pos = 0;
+	}
+	//printf("read_from_buffer pos:%d len:%d got %d\n",b->pos,b->len,len);
+	return len;
+}
+
+/* read at least min_size to buffer, buffer must be empty */
+uint16_t ptp_transport_read_to_buffer(PTPParams *params,int min_size) {
+	PTPPacketBuffer *b = &params->pkt_buf;
+	if(b->len || b->pos || min_size > PTP_PACKET_BUFFER_SIZE) {
+		printf("ptp_transport_read_to_buffer bad param %d %d %d\n",b->len,b->pos,min_size);
+		return PTP_ERROR_BADPARAM; // TODO
+	}
+	int total = 0;
+	unsigned char *p = b->data;
+	int avail = PTP_PACKET_BUFFER_SIZE;
+	do {
+		int rsize=params->read_func(p, avail, params->data);
+		if(rsize < 0) {
+			return PTP_ERROR_IO;
+		}
+		p += rsize;
+		avail -= rsize;
+		total += rsize;
+	} while(total < min_size);
+	b->len = total;
+	return PTP_RC_OK;
+}
+
+/* read size form buffer or transport */
+uint16_t ptp_control_read_buffered(PTPParams *params,int size, unsigned char *dst) {
+	PTPPacketBuffer *b = &params->pkt_buf;
+
+	int bcount = ptp_transport_read_from_buffer(b,size,dst);
+	//printf("control_read_buffered bcount %d\n",bcount);
+	// if less than size came from buffer, we know it's empty
+	if(bcount < size) {
+		//printf("control_read_buffered read %d\n",size-bcount);
+
+		uint16_t ret = ptp_transport_read_to_buffer(params,size - bcount);
+		if(ret != PTP_RC_OK) {
+			return ret;
+		}
+		if(ptp_transport_read_from_buffer(b,size-bcount,dst+bcount) != size-bcount) {
+			printf("ptp_control_read_buffer bad length\n");
+			return PTP_ERROR_BADPARAM; // TODO
+		}
+	}
+	return PTP_RC_OK;
+}
+
+
 /* ptp/ip send / receive functions */
 #ifdef CHDKPTP_PTPIP
+// read exactly size dataphase data
+uint16_t ptp_tcp_read_data(PTPParams *params, unsigned size, unsigned char *dst)
+{
+	int rtotal = ptp_transport_read_from_buffer(&params->pkt_buf,size,dst);
+	// if less than size in buffer, need to read directly
+	while(rtotal < size) {
+		int rlen = params->read_func(dst + rtotal, size - rtotal, params->data);
+		if(rlen < 0) {
+			return PTP_ERROR_IO;
+		}
+		rtotal += rlen;
+	}
+	return PTP_RC_OK;
+}
+// read the non-payload part of a packet
+uint16_t ptp_tcp_read_control(PTPParams *params, void *dst)
+{
+	PTPIPContainer *pkt = dst;
+
+	uint16_t ret = ptp_control_read_buffered(params,PTPIP_HEADER_LEN,(unsigned char *)pkt);
+	if(ret != PTP_RC_OK) {
+		return ret;
+	}
+	uint32_t length = dtoh32(pkt->length);
+	uint32_t type = dtoh32(pkt->type);
+
+	switch(type) {
+		case PTPIP_TYPE_INIT_CMD_ACK:
+		//case PTPIP_TYPE_INIT_EVENT_ACK:
+		case PTPIP_TYPE_INIT_FAIL:
+		case PTPIP_TYPE_RESP:
+		case PTPIP_TYPE_START_DATA:
+			if(length > PTPIP_HEADER_LEN) {
+				ret = ptp_control_read_buffered(params, length - PTPIP_HEADER_LEN, (unsigned char *)pkt+PTPIP_HEADER_LEN);
+			}
+			break;
+		case PTPIP_TYPE_DATA:
+		case PTPIP_TYPE_END_DATA:
+			// transaction id
+			ret = ptp_control_read_buffered(params, 4, (unsigned char *)pkt+PTPIP_HEADER_LEN);
+			break; // length includes payload data
+		default:
+			printf("unexpected packet type 0x%x\n",type);
+			ret = PTP_ERROR_BADPARAM;
+	}
+	return ret;
+}
+
 uint16_t ptp_tcp_sendreq(PTPParams *params, PTPContainer *ptp)
 {
 	PTPIPContainer pkt;
@@ -181,31 +300,24 @@ ptp_tcp_senddata (PTPParams* params, PTPContainer* ptp,
 uint16_t
 ptp_tcp_getresp (PTPParams* params, PTPContainer* resp)
 {
-	uint16_t ret = PTP_RC_OK;
-	int rsize;
+	uint16_t ret;
 	static PTPIPContainer pkt;
 
 	memset(&pkt,0,sizeof(pkt));
 
+//	printf("get_resp\n");
 	/* read response, it should never be longer than sizeof(pkt) */
-	// TODO could read into the next packet!
-	rsize=params->read_func((unsigned char *)&pkt, sizeof(pkt), params->data);
-
-	if (rsize < 0) {
-		ret = PTP_ERROR_IO;
-	} else
-	if (dtoh16(pkt.type)!=PTPIP_TYPE_RESP) {
-		ret = PTP_ERROR_RESP_EXPECTED;
-	} else
-	if (dtoh16(pkt.resp.code)!=resp->Code) {
-		ret = dtoh16(pkt.resp.code);
-	}
-	if (ret!=PTP_RC_OK) {
-/*		ptp_error (params,
-		"PTP: request code 0x%04x getting resp error 0x%04x",
-			resp->Code, ret);*/
+	ret=params->read_control_func(params,&pkt);
+	if(ret != PTP_RC_OK) {
+		printf("read_control_func failed 0x%x\n",ret);
 		return ret;
 	}
+	if (dtoh16(pkt.type)!=PTPIP_TYPE_RESP) {
+		ret = PTP_ERROR_RESP_EXPECTED;
+	} else if (dtoh16(pkt.resp.code)!=resp->Code) {
+		ret = dtoh16(pkt.resp.code);
+	}
+
 	/* build an appropriate PTPContainer */
 	resp->Code=dtoh16(pkt.resp.code);
 	resp->SessionID=params->session_id;
@@ -221,72 +333,140 @@ ptp_tcp_getresp (PTPParams* params, PTPContainer* resp)
 }
 
 uint16_t
-ptp_tcp_getdata (PTPParams* params, PTPContainer* ptp,
-		unsigned char **data)
+ptp_tcp_getdata (PTPParams* params, PTPContainer* ptp, PTPGetdataParams *gdparams)
 {
 	PTPIPContainer pkt;
 	uint64_t total_len;
 	uint64_t total_read=0;
-	uint32_t pkt_len;
 
-	int rsize;
+	uint16_t ret;
 
-	// read the START_DATA packet
-	rsize=params->read_func((unsigned char *)&pkt, 20, params->data);
-	if (rsize < 0) {
-		return PTP_ERROR_IO;
+	ret=params->read_control_func(params,&pkt);
+	if(ret != PTP_RC_OK) {
+		return ret;
 	}
 
 	if (dtoh32(pkt.type)!=PTPIP_TYPE_START_DATA) {
 		printf("expected START_DATA\n");
 		return PTP_ERROR_DATA_EXPECTED;
 	}
+	//printf("got START_DATA\n");
 
 	// get overall length
-	total_len=pkt.datactl.data_length;//dtoh64(pkt.datactl.data_length)
+	total_len=pkt.datactl.data_length;//TODO dtoh64(pkt.datactl.data_length)
 
-	if (*data==NULL) *data=calloc(1,total_len);
-	if (!*data) {
-		return PTP_ERROR_NOMEM;
+	unsigned char *buf;
+	unsigned char *p;
+	uint32_t block_size;
+	if(gdparams->handler) {
+		if (gdparams->block_size == 0) {
+			block_size = 1024*1024*2; // TODO
+		} else if (gdparams->block_size < 1024) {
+			block_size = 1024;
+		} else {
+			block_size = gdparams->block_size;
+		}
+		buf = malloc(block_size);
+		p = buf;
+	} else {
+		if(!gdparams->ret_data) {
+			gdparams->ret_data=malloc(total_len);
+		}
+		if(!gdparams->ret_data) {
+			return PTP_ERROR_NOMEM;
+		}
+		p = gdparams->ret_data;
+		block_size = 0;
 	}
+	gdparams->total_size = total_len;
 
-	unsigned char *p = *data;
 	int got_end = 0;
+	uint32_t pkt_len;
+	uint32_t block_read = 0;
 	do {
-		// read the DATA packet
-		rsize=params->read_func((unsigned char *)&pkt, 12, params->data);
-		if (rsize < 0) {
-			return PTP_ERROR_IO;
+		// read the DATA / END_DATA packet
+		ret=params->read_control_func(params,&pkt);
+		if(ret != PTP_RC_OK) {
+			break;
 		}
 		// END_DATA can contain data, may be used instead of DATA packet
 		if (dtoh32(pkt.type)==PTPIP_TYPE_END_DATA) {
-			// printf("END_DATA\n");
+//			printf("END_DATA\n");
 			// TODO should verify that length gives correct total on end
 			got_end = 1;
 		} else if (dtoh32(pkt.type)!=PTPIP_TYPE_DATA) {
 			printf("expected DATA\n");
-			return PTP_ERROR_DATA_EXPECTED;
+			ret = PTP_ERROR_DATA_EXPECTED;
+			break;
 		}
+		//printf("got %s\n",((dtoh32(pkt.type)==PTPIP_TYPE_DATA)?"DATA":"END_DATA"));
 		pkt_len = dtoh32(pkt.length) - 12;
-		// TODO not safe, we might not read whole len!
-		rsize=params->read_func(p, pkt_len, params->data);
-		if (rsize < 0) {
-			return PTP_ERROR_IO;
+		if(block_size) {
+			uint32_t pkt_read = 0;
+			while(pkt_read < pkt_len) {
+				uint32_t read_size;
+				uint32_t block_left = block_size - block_read;
+				uint32_t pkt_left = pkt_len - pkt_read;
+				if(block_left < pkt_left) {
+					read_size = block_left;
+				} else {
+					read_size = pkt_left;
+				}
+				//printf("read total:%d packet:%d block:%d call:%d\n",(int)total_read,pkt_read,block_read,read_size);
+				ret=params->read_data_func(params, read_size, p);
+				if(ret != PTP_RC_OK) {
+					break;
+				}
+				pkt_read += read_size;
+				p+=read_size;
+				block_read += read_size;
+				total_read += read_size;
+				// reached block size, send to handler
+				if(block_read == block_size) {
+					//printf("flush:%d\n",block_size);
+					ret = gdparams->handler(params,gdparams,block_size,buf);
+					if(ret != PTP_RC_OK) {
+						break;
+					}
+					// new block
+					p = buf;
+					block_read = 0;
+				}
+			}
+			if(ret != PTP_RC_OK) {
+				break;
+			}
+		} else {
+			ret=params->read_data_func(params, pkt_len, p);
+			if(ret != PTP_RC_OK) {
+				break;
+			}
+			p += pkt_len;
+			total_read += pkt_len;
 		}
-		if(total_read + pkt_len > total_len) {
-			printf("length error\n");
-			return PTP_ERROR_BADPARAM; // TODO
-		}
-		p += pkt_len;
-		total_read += pkt_len;
 	} while (total_read < total_len);
+
+	// caller responsible for freeing if not handler buf
+	if(block_size) {
+		// send any final partial block to the handler
+		if(ret == PTP_RC_OK && block_read) {
+			//printf("final flush:%d\n",block_read);
+			ret = gdparams->handler(params,gdparams,block_read,buf);
+		}
+		free(buf);
+	}
+
+	if(ret != PTP_RC_OK) {
+		return ret;
+	}
 	
 	// read the END_DATA packet
 	if(!got_end) {
-		rsize=params->read_func((unsigned char *)&pkt, 12, params->data);
-		if (rsize < 0) {
-			return PTP_ERROR_IO;
+		ret=params->read_control_func(params,&pkt);
+		if(ret != PTP_RC_OK) {
+			return ret;
 		}
+//		printf("got END_DATA\n");
 		if (dtoh32(pkt.type)!=PTPIP_TYPE_END_DATA) {
 			printf("expected END_DATA\n");
 			return PTP_ERROR_DATA_EXPECTED;
@@ -296,6 +476,65 @@ ptp_tcp_getdata (PTPParams* params, PTPContainer* ptp,
 }
 
 #endif // CHDKPTP_PTPIP
+// read exactly size dataphase data, buffering any excess
+uint16_t ptp_usb_read_data(PTPParams *params, unsigned size, unsigned char *dst)
+{
+	int rtotal = ptp_transport_read_from_buffer(&params->pkt_buf,size,dst);
+	// if less than size in buffer, need to read directly
+	if(rtotal < size) {
+		// USB only wants to read whole packets
+		// TODO this is inefficient, if we start unaligned, will user buffer every trans
+		int toread = size - rtotal;
+		int rest = toread % PTP_USB_BULK_HS_MAX_PACKET_LEN; // could use connection max packet size
+
+		int bulktotal = size - rest;
+
+		//printf("read_data size:%d buf:%d bulk:%d rest:%d\n",size,rtotal,bulktotal,rest);
+		while(rtotal < bulktotal) {
+			int rlen = params->read_func(dst + rtotal, bulktotal - rtotal, params->data);
+			if(rlen < 0) {
+				return PTP_ERROR_IO;
+			}
+			rtotal += rlen;
+		}
+		uint16_t ret = ptp_transport_read_to_buffer(params,rest);
+		if(ret != PTP_RC_OK) {
+			return ret;
+		}
+		rtotal += ptp_transport_read_from_buffer(&params->pkt_buf,rest,dst+rtotal);
+		if(rtotal != size) {
+			printf("usb_read_data size mismatch! %d != %d\n",rtotal,size);
+			return PTP_ERROR_IO;
+		}
+	}
+	return PTP_RC_OK;
+}
+// read the non-payload part of a packet
+uint16_t ptp_usb_read_control(PTPParams *params, void *dst)
+{
+	PTPUSBBulkContainer *pkt=dst;
+
+	uint16_t ret = ptp_control_read_buffered(params,PTP_USB_BULK_HDR_LEN,(unsigned char *)pkt);
+	if(ret != PTP_RC_OK) {
+		return ret;
+	}
+	uint32_t length = dtoh32(pkt->length);
+	uint16_t type = dtoh16(pkt->type);
+
+	switch(type) {
+		case PTP_USB_CONTAINER_RESPONSE:
+			if(length > PTP_USB_BULK_HDR_LEN) {
+				ret = ptp_control_read_buffered(params, length-PTP_USB_BULK_HDR_LEN, (unsigned char *)pkt+PTP_USB_BULK_HDR_LEN);
+			}
+		case PTP_USB_CONTAINER_DATA:
+			break;
+//		case PTP_USB_CONTAINER_EVENT:
+		default:
+			printf("unexpected packet type 0x%x\n",type);
+			ret = PTP_ERROR_BADPARAM;
+	}
+	return ret;
+}
 
 /* usb send / receive functions */
 
@@ -380,81 +619,88 @@ ptp_usb_senddata (PTPParams* params, PTPContainer* ptp,
 }
 
 uint16_t
-ptp_usb_getdata (PTPParams* params, PTPContainer* ptp,
-		unsigned char **data)
+ptp_usb_getdata (PTPParams* params, PTPContainer* ptp, PTPGetdataParams *gdparams)
 {
-	static uint16_t ret = PTP_RC_OK;
+	uint16_t ret;
 	static PTPUSBBulkContainer usbdata;
-
-	int rsize;
 
 	PTP_CNT_INIT(usbdata);
 
-	do {
-		static uint32_t len;
-		/* read first(?) part of data */
-		rsize=params->read_func((unsigned char *)&usbdata, sizeof(usbdata), params->data);
-		if (rsize < 0) {
-			ret = PTP_ERROR_IO;
-			break;
-		} else
-		if (dtoh16(usbdata.type)!=PTP_USB_CONTAINER_DATA) {
-			ret = PTP_ERROR_DATA_EXPECTED;
-			break;
-		} else
-		if (dtoh16(usbdata.code)!=ptp->Code) {
-			ret = dtoh16(usbdata.code);
-			break;
+	/* read data header */
+	ret = params->read_control_func(params,&usbdata);
+	if(ret != PTP_RC_OK) {
+		return ret;
+	}
+	if (dtoh16(usbdata.type)!=PTP_USB_CONTAINER_DATA) {
+		return PTP_ERROR_DATA_EXPECTED;
+	}
+	if (dtoh16(usbdata.code)!=ptp->Code) {
+		return dtoh16(usbdata.code);
+	}
+	/* evaluate data length */
+	uint32_t total_len=dtoh32(usbdata.length)-PTP_USB_BULK_HDR_LEN;
+
+	gdparams->total_size = total_len;
+	if(gdparams->handler) {
+		uint32_t block_size;
+		if (gdparams->block_size == 0) {
+			block_size = 1024*1024*2; // TODO
+		} else if (gdparams->block_size < 1024) {
+			block_size = 1024;
+		} else {
+			block_size = gdparams->block_size;
 		}
-		/* evaluate data length */
-		len=dtoh32(usbdata.length)-PTP_USB_BULK_HDR_LEN;
-		/* allocate memory for data if not allocated already */
-		if (*data==NULL) *data=calloc(1,len);
-		if (!*data) {
-			ret = PTP_ERROR_NOMEM;
-			break;
+		unsigned char *buf = malloc(block_size);
+		if(!buf) {
+			return PTP_ERROR_NOMEM;
 		}
-		/* copy first part of data to 'data' */
-		memcpy(*data,usbdata.payload.data,
-			PTP_USB_BULK_PAYLOAD_LEN<len?
-			PTP_USB_BULK_PAYLOAD_LEN:len);
-		/* is that all of data? */
-		if (len+PTP_USB_BULK_HDR_LEN<=sizeof(usbdata)) break;
-		/* if not finaly read the rest of it */
-		rsize=params->read_func(((unsigned char *)(*data))+
-					PTP_USB_BULK_PAYLOAD_LEN,
-					len-PTP_USB_BULK_PAYLOAD_LEN,
-					params->data);
-		if (rsize<0) {
-			ret = PTP_ERROR_IO;
-			break;
+		uint32_t to_read = total_len;
+		while(to_read > 0) {
+			uint32_t read_size;
+			if(to_read > block_size) {
+				read_size = block_size;
+			} else {
+				read_size = to_read;
+			}
+			//printf("read_data %d\n",read_size);
+			ret=params->read_data_func(params, read_size, buf);
+			if(ret != PTP_RC_OK) {
+				printf("read_data failed 0x%x\n",ret);
+				break;
+			}
+			to_read -= read_size;
+			//printf("handler %d\n",read_size);
+			ret = gdparams->handler(params,gdparams,read_size,buf);
+			if(ret != PTP_RC_OK) {
+				printf("getdata handler failed 0x%x\n",ret);
+				break;
+			}
 		}
-	} while (0);
-/*
-	if (ret!=PTP_RC_OK) {
-		ptp_error (params,
-		"PTP: request code 0x%04x getting data error 0x%04x",
-			ptp->Code, ret);
-	}*/
-	return ret;
+		free(buf);
+		return ret;
+	} else {
+		if(!gdparams->ret_data) {
+			gdparams->ret_data=malloc(total_len);
+		}
+		if(!gdparams->ret_data) {
+			return PTP_ERROR_NOMEM;
+		}
+		return params->read_data_func(params, total_len, gdparams->ret_data);
+	}
 }
 
 uint16_t
 ptp_usb_getresp (PTPParams* params, PTPContainer* resp)
 {
-	static uint16_t ret = PTP_RC_OK;
-	static PTPUSBBulkContainer usbresp;
-
-	int rsize;
+	uint16_t ret = PTP_RC_OK;
+	PTPUSBBulkContainer usbresp;
 
 	PTP_CNT_INIT(usbresp);
-	/* read response, it should never be longer than sizeof(usbresp) */
-	rsize=params->read_func((unsigned char *)&usbresp,
-				sizeof(usbresp), params->data);
 
-	if (rsize < 0) {
-		ret = PTP_ERROR_IO;
-	} else
+	ret = params->read_control_func(params,&usbresp);
+	if(ret != PTP_RC_OK) {
+		return ret;
+	}
 	if (dtoh16(usbresp.type)!=PTP_USB_CONTAINER_RESPONSE) {
 		ret = PTP_ERROR_RESP_EXPECTED;
 	} else
@@ -533,10 +779,20 @@ ptp_transaction (PTPParams* params, PTPContainer* ptp,
 			CHECK_PTP_RC(params->senddata_func(params, ptp,
 				(unsigned char*)*data, sendlen));
 			break;
-		case PTP_DP_GETDATA:
-			CHECK_PTP_RC(params->getdata_func(params, ptp,
-				(unsigned char**)data));
+		case PTP_DP_GETDATA: {
+			PTPGetdataParams gdparams;
+			gdparams.handler = NULL;
+			gdparams.ret_data = *data;
+			uint16_t ret = params->getdata_func(params, ptp,&gdparams);
+			// if allocated by getdata, set
+			if(!*data) {
+				*data = gdparams.ret_data;
+			}
+			if(ret != PTP_RC_OK) {
+				return ret;
+			}
 			break;
+		}
 		case PTP_DP_NODATA:
 			break;
 		default:
@@ -549,100 +805,20 @@ ptp_transaction (PTPParams* params, PTPContainer* ptp,
 
 /*
  * reyalp - added more flexible data transfer - read chunks and send to callback instead of buffering all
+ * TODO this is mostly a copy / paste of ptp_transaction now
  */
-struct PTPGetDataParams_s;
-typedef uint16_t (* PTPGetDataFn)(unsigned char *bytes, unsigned int size, struct PTPGetDataParams_s *gdparams);
-
-typedef struct PTPGetDataParams_s {
-	PTPGetDataFn fn;
-	size_t buf_size;
-	void *fn_data;
-	uint32_t data_len; // output - total length from PTP
-} PTPGetDataParams;
-
-static uint16_t ptp_getdata_transaction(PTPParams* params, PTPContainer* ptp, PTPGetDataParams *gdparams )
+static uint16_t ptp_getdata_transaction(PTPParams* params, PTPContainer* ptp, PTPGetdataParams *gdparams )
 {
 	if ((params==NULL) || (ptp==NULL) || (gdparams==NULL)) 
 		return PTP_ERROR_BADPARAM;
-	
-	size_t buf_size;
-	unsigned char *buf = NULL;
-	gdparams->data_len = 0;
-	if (gdparams->buf_size == 0) {
-		buf_size = 1024*1024*2; // TODO
-	} else if (gdparams->buf_size < params->max_packet_size) {
-		buf_size = params->max_packet_size;
-	} else {
-		buf_size = gdparams->buf_size;
-	}
 
 	ptp->Transaction_ID=params->transaction_id++;
 	ptp->SessionID=params->session_id;
+
 	/* send request */
-	CHECK_PTP_RC(params->sendreq_func (params, ptp));
-
-	uint16_t ret = PTP_RC_OK;
-	PTPUSBBulkContainer usbdata;
-
-	int rsize;
-
-	PTP_CNT_INIT(usbdata);
-	do {
-		uint32_t len;
-		/* read first(?) part of data */
-		rsize=params->read_func((unsigned char *)&usbdata, sizeof(usbdata), params->data);
-		if (rsize < 0) {
-			ret = PTP_ERROR_IO;
-			break;
-		} else if (dtoh16(usbdata.type)!=PTP_USB_CONTAINER_DATA) {
-			ret = PTP_ERROR_DATA_EXPECTED;
-			break;
-		} else if (dtoh16(usbdata.code)!=ptp->Code) {
-			ret = dtoh16(usbdata.code);
-			break;
-		}
-		/* evaluate data length */
-		len=dtoh32(usbdata.length)-PTP_USB_BULK_HDR_LEN;
-		gdparams->data_len = len;
-		/* if it fit in the initial payload process and finish */
-		if(len+PTP_USB_BULK_HDR_LEN<=sizeof(usbdata)) {
-			ret = gdparams->fn(usbdata.payload.data,len,gdparams);
-			break;
-		} else if(len < buf_size) {
-			buf_size = len;
-		}
-		/* process the first chunk of data' */
-		// TODO combining this with the first full buf_size might be more efficient
-		ret=gdparams->fn(usbdata.payload.data,PTP_USB_BULK_PAYLOAD_LEN,gdparams);
-		if (ret!=PTP_RC_OK) {
-			break;
-		}
-		buf = malloc(buf_size);
-		if(!buf) {
-			ret = PTP_ERROR_NOMEM;
-			break;
-		}
-		uint32_t remaining = len - PTP_USB_BULK_PAYLOAD_LEN;
-		/* read and process the rest of the data */
-		while(remaining>0) {
-			uint32_t rbytes = remaining < buf_size ? remaining:buf_size;
-
-			rsize=params->read_func(buf, rbytes, params->data);
-			if (rsize < 0) {
-				ret = PTP_ERROR_IO;
-				break;
-			}
-			ret=gdparams->fn(buf,rbytes,gdparams);
-			if (ret!=PTP_RC_OK) {
-				break;
-			}
-			remaining -= rbytes;
-		}
-	} while (0);
-	free(buf);
-	if(ret!=PTP_RC_OK) {
-		return ret;
-	}
+	CHECK_PTP_RC(params->sendreq_func(params, ptp));
+	/* get dataphase assumed */
+	CHECK_PTP_RC(params->getdata_func(params, ptp, gdparams));
 	/* get response */
 	CHECK_PTP_RC(params->getresp_func(params, ptp));
 	return PTP_RC_OK;
@@ -2043,8 +2219,8 @@ int ptp_chdk_upload(PTPParams* params, char *local_fn, char *remote_fn)
   return 1;
 }
 
-static uint16_t gd_to_file(unsigned char *bytes,unsigned len, PTPGetDataParams *gdparams) {
-	FILE *f = (FILE *)gdparams->fn_data;
+static uint16_t gd_to_file(PTPParams* params, PTPGetdataParams *gdparams, unsigned len, unsigned char *bytes) {
+	FILE *f = (FILE *)gdparams->handler_data;
 	size_t count=fwrite(bytes,1,len,f);
 	if(count != len) {
 		return PTP_ERROR_IO;
@@ -2056,7 +2232,7 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
 {
   uint16_t ret;
   PTPContainer ptp;
-  PTPGetDataParams gdparams;
+  PTPGetdataParams gdparams;
   FILE *f;
 
   f = fopen(local_fn,"wb");
@@ -2084,9 +2260,11 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_DownloadFile;
 
-  gdparams.fn = gd_to_file;
-  gdparams.buf_size = 0; // default
-  gdparams.fn_data = f;
+  PTP_CNT_INIT(gdparams);
+
+  gdparams.handler = gd_to_file;
+  gdparams.block_size = 0; // default
+  gdparams.handler_data = f;
   ret=ptp_getdata_transaction(params, &ptp, &gdparams);
   fclose(f);
   if ( ret != 0x2001 )

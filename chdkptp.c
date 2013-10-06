@@ -182,10 +182,16 @@ ptp_usb_read_func (unsigned char *bytes, unsigned max_size, void *data)
 			toread = PTPCAM_USB_URB;
 		else
 			toread = rbytes;
+		//printf("read h:0x%p inep:0x%x b:0x%p c:%d to:%d\n",
+		//			ptp_cs->usb.handle, ptp_cs->usb.inep,(char *)bytes, toread,ptp_cs->timeout);
+
+
 		result=USB_BULK_READ(ptp_cs->usb.handle, ptp_cs->usb.inep,(char *)bytes, toread,ptp_cs->timeout);
 		/* sometimes retry might help */
-		if (result==0)
+		if (result==0) {
+			printf("read retry\n");
 			result=USB_BULK_READ(ptp_cs->usb.handle, ptp_cs->usb.inep,(char *)bytes, toread,ptp_cs->timeout);
+		}
 		if (result < 0)
 			break;
 
@@ -193,6 +199,8 @@ ptp_usb_read_func (unsigned char *bytes, unsigned max_size, void *data)
 		ptp_cs->read_count += toread;
 		rbytes-=PTPCAM_USB_URB;
 	} while (rbytes>0);
+
+	//printf("read result=%d size=%d max=%d\n",result,read_size,max_size);
 
 	if (result >= 0) {
 		return read_size;
@@ -377,6 +385,8 @@ int init_ptp_tcp(PTPParams* params, PTP_CON_STATE* ptp_cs) {
 	params->read_func=ptp_tcp_read_func;
 	params->check_int_func=ptp_tcp_check_int;
 	params->check_int_fast_func=ptp_tcp_check_int;
+	params->read_control_func=ptp_tcp_read_control;
+	params->read_data_func=ptp_tcp_read_data;
 	params->error_func=ptpcam_error;
 	params->debug_func=ptpcam_debug;
 	params->sendreq_func=ptp_tcp_sendreq;
@@ -386,6 +396,7 @@ int init_ptp_tcp(PTPParams* params, PTP_CON_STATE* ptp_cs) {
 	params->data=ptp_cs;
 	params->transaction_id=0;
 	params->byteorder = PTP_DL_LE;
+	params->pkt_buf.pos = params->pkt_buf.len = 0;
 
 	ptp_cs->write_count = ptp_cs->read_count = 0;
 
@@ -477,7 +488,7 @@ int init_ptp_tcp(PTPParams* params, PTP_CON_STATE* ptp_cs) {
 	printf("opening session\n");
 	short ret = ptp_opensession(params,1);
 	if(ret!=PTP_RC_OK) {
-		printf("opensession failed");
+		printf("opensession failed 0x%x\n",ret);
 		return 0;
 	}
 
@@ -501,6 +512,8 @@ init_ptp_usb (PTPParams* params, PTP_CON_STATE* ptp_cs, struct usb_device* dev)
 	params->read_func=ptp_usb_read_func;
 	params->check_int_func=ptp_usb_check_int;
 	params->check_int_fast_func=ptp_usb_check_int;
+	params->read_control_func=ptp_usb_read_control;
+	params->read_data_func=ptp_usb_read_data;
 	params->error_func=ptpcam_error;
 	params->debug_func=ptpcam_debug;
 	params->sendreq_func=ptp_usb_sendreq;
@@ -510,6 +523,7 @@ init_ptp_usb (PTPParams* params, PTP_CON_STATE* ptp_cs, struct usb_device* dev)
 	params->data=ptp_cs;
 	params->transaction_id=0;
 	params->byteorder = PTP_DL_LE;
+	params->pkt_buf.pos = params->pkt_buf.len = 0;
 
 	device_handle = usb_open(dev);
 	if (!device_handle) {
