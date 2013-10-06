@@ -750,13 +750,13 @@ typedef struct _PTPParams PTPParams;
 
 typedef struct _PTPGetdataParams PTPGetdataParams;
 typedef uint16_t (* PTPGetdataHandlerFunc)(PTPParams* params, PTPGetdataParams *gdparams, unsigned size, unsigned char *data);
-typedef struct _PTPGetdataParams {
+struct _PTPGetdataParams {
 	PTPGetdataHandlerFunc handler; // handler, optional
 	unsigned block_size; // buffer / call handler with chunks up to size
 	void *ret_data; // no handler, data returned in buffer, allocated if needed
 	void *handler_data; // parameters for handler
 	uint64_t total_size; // total size of data in this operation, set before handler call
-} PTPGetdataParams;
+};
 
 /* raw write functions */
 typedef int (* PTPIOReadFunc)	(unsigned char *bytes, unsigned max_size, void *data);
