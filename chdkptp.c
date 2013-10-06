@@ -44,6 +44,10 @@
 #endif
 #else
 #include <sys/mman.h>
+#ifdef CHDKPTP_PTPIP
+#include <sys/socket.h>
+#include <netdb.h>
+#endif
 #endif
 #include <usb.h>
 
