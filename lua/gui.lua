@@ -53,7 +53,7 @@ function gui.execquick(code,opts)
 	gui.exec(code,opts)
 end
 
-local function update_mode_dropdown(cur)
+function gui.update_mode_dropdown(cur)
 	gui.dbgmsg('update mode dropdown %s\n',tostring(cur))
 	gui.mode_dropdown["1"] = nil -- empty the list
 	if not gui.mode_list or not cur or cur == 0 then
@@ -76,10 +76,10 @@ end
 local function clear_mode_list()
 	gui.mode_list = nil
 	gui.mode_map = nil
-	update_mode_dropdown()
+	gui.update_mode_dropdown()
 end
 
-local function update_mode_list()
+function gui.update_mode_list()
 	gui.mode_list = nil
 	gui.mode_map = nil
 	local status,modes,cur = con:execwait([[
@@ -101,7 +101,7 @@ return l,capmode.get()
 	else
 		add_status(false,modes)
 	end
-	update_mode_dropdown(cur)
+	gui.update_mode_dropdown(cur)
 end
 
 function gui.update_connection_status()
@@ -111,7 +111,7 @@ function gui.update_connection_status()
 		connect_label.title = string.format("host:%d.%d cam:%d.%d",
 											chdku.apiver.MAJOR,chdku.apiver.MINOR,
 											con.apiver.MAJOR,con.apiver.MINOR)
-		update_mode_list()
+		gui.update_mode_list()
 	else
 		connect_icon.active = "NO"
 		btn_connect.title = "Connect"
@@ -210,7 +210,7 @@ return capmode.get()
 			add_status(false,capmode)
 		end
 	end
-	update_mode_dropdown(capmode)
+	gui.update_mode_dropdown(capmode)
 end
 -- creates a button
 btn_exec = iup.button{ 

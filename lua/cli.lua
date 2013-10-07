@@ -328,6 +328,20 @@ function cli:run()
 	end
 end
 
+-- update gui for cli commands
+-- TODO should be a generic event system
+function cli:connection_status_change()
+	if gui then
+		gui.update_connection_status()
+	end
+end
+
+function cli:mode_change()
+	if gui then
+		gui.update_mode_list()
+	end
+end
+
 --[[
 process options common to shoot and remoteshoot
 ]]
@@ -1129,19 +1143,22 @@ cli:add_commands{
 					end
 				end
 			end
+			local status, err
 			if lcon then
 				con = lcon
 				if not con:is_connected() then
-					local status,err
 					status, err = con:connect()
-					if not status then
-						return false,err
-					end
 				end
-				-- TODO this should be verbose option
-				return true,string.format('connected: %s, max packet size %d',con.ptpdev.model,con.ptpdev.max_packet_size)
+				if con:is_connected() then
+					cli.infomsg('connected: %s, max packet size %d\n',con.ptpdev.model,con.ptpdev.max_packet_size)
+					status = true
+				end
+			else 
+				status = false
+				err = "no matching devices found"
 			end
-			return false,"no matching devices found"
+			cli:connection_status_change()
+			return status,err
 		end,
 	},
 	{
@@ -1150,14 +1167,18 @@ cli:add_commands{
 		-- NOTE camera may connect to a different device,
 		-- will detect and fail if serial, model or pid don't match
 		func=function(self,args) 
-			return con:reconnect()
+			local status, err = con:reconnect()
+			cli:connection_status_change()
+			return status,err
 		end,
 	},
 	{
 		names={'disconnect','dis'},
 		help='disconnect from device',
 		func=function(self,args) 
-			return con:disconnect()
+			local status, err = con:disconnect()
+			cli:connection_status_change()
+			return status,err
 		end,
 	},
 	{
@@ -1654,10 +1675,19 @@ cli:add_commands{
 			local status,rstatus,rerr = con:execwait([[
 if not get_mode() then
 	switch_mode_usb(1)
+	local i=0
+	while not get_mode() and i < 300 do
+		sleep(10)
+		i=i+1
+	end
+	if not get_mode() then
+		return false, 'switch failed'
+	end
 	return true
 end
 return false,'already in rec'
 ]])
+			cli:mode_change()
 			if not status then
 				return false,rstatus
 			end
@@ -1671,10 +1701,18 @@ return false,'already in rec'
 			local status,rstatus,rerr = con:execwait([[
 if get_mode() then
 	switch_mode_usb(0)
+	while get_mode() and i < 300 do
+		sleep(10)
+		i=i+1
+	end
+	if get_mode() then
+		return false, 'switch failed'
+	end
 	return true
 end
 return false,'already in play'
 ]])
+			cli:mode_change()
 			if not status then
 				return false,rstatus
 			end
