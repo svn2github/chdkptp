@@ -70,7 +70,7 @@ function m.remote_capture_ui()
                 fgcolor="255 0 0",
                 tip="Does not work for all cameras!",
                 action=function(self)
-                    local cmd="rs "..m.dest
+                    local cmd="rs '"..m.dest.."'"
                     add_status(cli:execute(cmd))
                 end,
             },
@@ -79,7 +79,7 @@ function m.remote_capture_ui()
                 size="75x15",
                 fgcolor="255 0 0",
                 action=function(self)
-                    local cmd="rs "..m.dest.." -dng"
+                    local cmd="rs '"..m.dest.."' -dng"
                     add_status(cli:execute(cmd))
                 end,
             },
