@@ -514,6 +514,118 @@ m.init_cli = function()
 		end,
 	},
 	{
+		names={'dnglistpixels'},
+		help='generate a list of pixel coordinates',
+		arghelp="[options] [image num]",
+		args=cli.argparser.create({
+			min=false,
+			max=false,
+			out=false,
+			reg='active',
+			coords='abs',
+			fmt='chdk',
+		}),
+		-- TODO add default crop as region, badpixel.bin format
+		help_detail=[[
+ options:
+  -min=N   list pixels with value >= N
+  -max=N   list pixels with value <= N
+  -out=<file> 
+  	<file> is name of output file
+  -fmt=<chdk|rt|dcraw>
+  	format badpixel list for chdk badpixel.txt, raw therapee, or dcraw
+  -reg=<active|all>
+  	region of image to search, either active area (default) or all
+  -coords=<abs|rel>
+    output coordinates relative to region, or absolute
+	use rel for raw therapee and dcraw
+]],
+		func=function(self,args) 
+			local d = m.get_sel_batch(args[1])
+			if not d then
+				return false, 'no file selected'
+			end
+			local vmin = tonumber(args.min)
+			local vmax = tonumber(args.max)
+			if not vmin and not args.max then
+				return false, 'must specify min or max'
+			end
+
+			local ifd=d.raw_ifd
+
+			if not vmax then
+				vmax = ifd.byname.WhiteLevel:getel()
+			end
+			if not vmin then
+				vmin = 0
+			end
+			local top,left,bottom,right
+			if args.reg == 'all' then
+				top = 0
+				left = 0
+				bottom = ifd.byname.ImageLength:getel()
+				right = ifd.byname.ImageWidth:getel()
+			elseif args.reg == 'active' then
+				top=ifd.byname.ActiveArea:getel(0)
+				left=ifd.byname.ActiveArea:getel(1)
+				bottom=ifd.byname.ActiveArea:getel(2)
+				right=ifd.byname.ActiveArea:getel(3)
+			else
+				return false, 'invalid region'
+			end
+
+			local xoff = 0
+			local yoff = 0
+			if args.coords == 'rel' then
+				xoff = left
+				yoff = top
+			elseif args.coords ~= 'abs' then
+				return false, 'invalid coords'
+			end
+			local fmt
+			if args.fmt == 'chdk' then
+				fmtstr = '%d,%d\n'
+			elseif args.fmt == 'rt' then
+				fmtstr = '%d %d\n'
+			elseif args.fmt == 'dcraw' then
+				fmtstr = '%d %d 0\n' -- TODO final value can be timestamp for dcraw
+			else
+				return false, 'invalid format'
+			end
+
+			local fh
+			local outfn
+			if args.out then
+				local err
+				fh,err = io.open(args.out,'wb')
+				if not fh then return
+					false, err
+				end
+
+				outfn = function(fmt,x,y)
+					fh:write(string.format(fmt,x,y))
+				end
+			else
+				outfn = printf
+			end
+			local total = 0
+			for y = top, bottom-1 do
+				for x = left, right-1 do
+					local v = d.img:get_pixel(x,y)
+					if v >= vmin and v <= vmax then
+						outfn(fmtstr,x-xoff,y-yoff)
+						total = total+1
+					end
+				end
+			end
+			printf("%d matching pixels\n",total)
+			if fh then
+				fh:close()
+			end
+			return true
+		end,
+	},
+	{
 		names={'dnglist'},
 		help='list loaded dng files',
 		func=function(self,args) 

@@ -189,7 +189,7 @@ mkdir        <directory> : - create directories on camera
 version (ver) [-p]        : - print API and program versions
  -p print program version
 
-connect (c)  [-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] : - connect to device
+connect (c)  [-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] | -h=host [-p=port]: - connect to device
  If no options are given, connects to the first available device.
  <pid> is the USB product ID, as a decimal or hexadecimal number.
  All other options are treated as a Lua pattern. For alphanumerics, this is a case sensitive substring match.
@@ -282,6 +282,20 @@ dnginfo      [options] [image num]: - display information about a dng
            raw, exif, main, or 0, 0.0 etc. default 0
    -r   recurse into sub-ifds
    -v   display ifd values, except image data (TODO not implemented!)
+
+dnglistpixels [options] [image num]: - generate a list of pixel coordinates
+ options:
+  -min=N   list pixels with value >= N
+  -max=N   list pixels with value <= N
+  -out=<file>
+        <file> is name of output file
+  -fmt=<chdk|rt|dcraw>
+        format badpixel list for chdk badpixel.txt, raw therapee, or dcraw
+  -reg=<active|all>
+        region of image to search, either active area (default) or all
+  -coords=<abs|rel>
+    output coordinates relative to region, or absolute
+        use rel for raw therapee and dcraw
 
 dnglist                  : - list loaded dng files
 dngsel       <number>    : - select dng
