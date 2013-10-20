@@ -355,7 +355,7 @@ ptp_tcp_getdata (PTPParams* params, PTPContainer* ptp, PTPGetdataParams *gdparam
 	// get overall length
 	total_len=pkt.datactl.data_length;//TODO dtoh64(pkt.datactl.data_length)
 
-	unsigned char *buf;
+	unsigned char *buf = NULL;
 	unsigned char *p;
 	uint32_t block_size;
 	if(gdparams->handler) {
