@@ -279,9 +279,10 @@ dnginfo      [options] [image num]: - display information about a dng
    -s   summary info, default if no other options given
    -h   tiff header
    -ifd[=<ifd>]
-           raw, exif, main, or 0, 0.0 etc. default 0
+         raw, exif, main, or 0, 0.0 etc. default 0
    -r   recurse into sub-ifds
-   -v   display ifd values, except image data (TODO not implemented!)
+   -vals[=N]
+     display up to N values for each IFD entry, default 20
 
 dnglistpixels [options] [image num]: - generate a list of pixel coordinates
  options:
@@ -329,7 +330,7 @@ dngbatch     [options] [files] { command ; command ... }: - manipulate multiple 
    -maxdepth=n       only recurse into N levels of directory (default 1, only those specified in command)
    -ext=string       only files with specified extension, default dng, * for all. Not a pattern
  commands:
-   mod dump save info
+   mod dump save info listpixels
   take the same options as the corresponding standalone commands
   load and unload are implicitly called for each file
 

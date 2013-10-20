@@ -454,16 +454,17 @@ m.init_cli = function()
 			ifd=false,
 			h=false,
 			r=false,
-			v=false,
+			vals=0,
 		}),
 		help_detail=[[
  options:
    -s   summary info, default if no other options given
    -h   tiff header
    -ifd[=<ifd>]
-   	   raw, exif, main, or 0, 0.0 etc. default 0
+   	 raw, exif, main, or 0, 0.0 etc. default 0
    -r   recurse into sub-ifds
-   -v   display ifd values, except image data (TODO not implemented!)
+   -vals[=N]
+     display up to N values for each IFD entry, default 20
 ]],
 		func=function(self,args) 
 			local d = m.get_sel_batch(args[1])
@@ -505,10 +506,15 @@ m.init_cli = function()
 					})
 					ifd = d:get_ifd(path)
 				end
+				if args.vals == true then
+					args.vals = 20
+				else
+					args.vals = tonumber(args.vals)
+				end
 				if not ifd then
 					return false, 'could not find ifd ',tostring(args.ifd)
 				end
-				d:print_ifd(ifd,{recurse=args.r})
+				d:print_ifd(ifd,{recurse=args.r,maxvals=args.vals})
 			end
 			return true
 		end,
@@ -751,7 +757,7 @@ m.init_cli = function()
    -maxdepth=n       only recurse into N levels of directory (default 1, only those specified in command)
    -ext=string       only files with specified extension, default dng, * for all. Not a pattern
  commands:
-   mod dump save info
+   mod dump save info listpixels
   take the same options as the corresponding standalone commands
   load and unload are implicitly called for each file
 ]],

@@ -232,20 +232,48 @@ local ifd_entry_methods = {
 		end
 		return t.lb_get(self._lb,v_off)
 	end,
+	getel_array = function(self,start,count)
+		local r = {}
+		if not start then
+			start = 0
+		elseif start >= self.count then
+			return r
+		end
+		if not count then
+			count = self.count
+		elseif count > self.count then
+			count = self.count
+		end
+		for i = start,count do
+			table.insert(r,self:getel(i))
+		end
+		return r
+	end,
 	-- get bytes as a lua string
 	get_byte_str = function(self)
 		local v_off = self:get_data_off()
 		return self._lb:string(v_off+1,v_off+self:type().size*self.count)
 	end,
-	-- get ascii string field ass array of strings
-	get_ascii_all = function(self)
+	-- get ascii string field as array of strings
+	get_ascii_array = function(self,start,max)
 		if not self:type().string then
 			return nil
 		end
+		if not start then
+			start = 0
+		end
+
 		local bytes = self:get_byte_str()
 		local strings = {} -- every ascii field can theoretically contain multiple null terminated strings
+		local n = 0
 		for s in string.gmatch(bytes,'[^%z]+') do
-			table.insert(strings,s)
+			if max and #strings >= max then
+				break
+			end
+			if n >= start then
+				table.insert(strings,s)
+			end
+			n = n + 1
 		end
 		return strings
 	end,
@@ -253,7 +281,14 @@ local ifd_entry_methods = {
 		if not index then
 			index = 0
 		end
-		return (self:get_ascii_all())[index+1]
+		return (self:get_ascii_array())[index+1]
+	end,
+	getval_array = function(self,start,max)
+		if self:type().string then
+			return self:get_ascii_array(start,max)
+		else
+			return self:getel_array(start,max)
+		end
 	end,
 }
 function m.bind_ifd_entry(d,ifd,i)
@@ -367,6 +402,7 @@ function dng_methods.print_ifd(self,ifd,opts)
 		depth=0,
 		maxvals=20,
 		recurse=false,
+		inlinevals=true,
 	},opts)
 
 	local indent = string.rep(' ',opts.depth)
@@ -386,6 +422,26 @@ function dng_methods.print_ifd(self,ifd,opts)
 	printf('%sifd%s offset=0x%x entries=%d\n',indent,pathstr,ifd.off,ifd.n_entries)
 	for j, e in ipairs(ifd.entries) do
 		printf('%s %s\n',indent,e:describe())
+		-- TODO undefined we know about should be sub-classed in a way that allows displaying
+		if opts.maxvals > 0 and e:type().name ~= 'UNDEFINED' and (not e:is_inline() or e.count > 1) then
+			local i = 0
+			local vals = e:getval_array(0,opts.maxvals)
+			for i,v in ipairs(vals) do
+				local str
+				if e:type().string then
+					str = string.format('"%s"',v)
+				elseif e:type().rational then
+					str = string.format('%d/%d',v[1],v[2])
+					if v[2] ~= 0 then
+						str = string.format('%23s %12f',str,v[1]/v[2])
+					end
+				else
+					str = string.format('%12d 0x%08x',v,v)
+				end
+				printf("%s %4d: %s\n",indent,i-1,str)
+			end
+			-- TODO inidicate if full count not reach (problematic for strings)
+		end
 	end
 	if opts.recurse then
 		if ifd.sub then
