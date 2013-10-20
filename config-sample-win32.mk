@@ -8,7 +8,7 @@ CD_SUPPORT=1
 # To actually render with contextplus, set gui_context_plus=true in your startup file
 # this uses gdiplus on windows, better image scaling but slower / larger exe
 #CD_USE_PLUS=gdiplus
-# should this build included PTP/IP (wifi camera) support (not implemented yet!)
+# should this build include PTP/IP (wifi camera) support (not implemented yet!)
 PTPIP_SUPPORT=0
 
 # root directories of various packages, used to set subdirs below.
