@@ -381,12 +381,14 @@ m.init_cli = function()
 		arghelp="[options] [image num] [file]",
 		args=cli.argparser.create({
 			over=false,
+			keepmtime=false,
 		}),
 		help_detail=[[
  file:       file or directory to write to
    defaults to loaded name. if directory, appends original filename
  options:
    -over     overwrite existing files
+   -keepmtime preserve existing modification time
 ]],
 		func=function(self,args) 
 			local filename
@@ -409,14 +411,25 @@ m.init_cli = function()
 				return true
 			end
 
+			local mtime
+
+			if args.keepmtime then
+				-- new file will return nil
+				mtime = lfs.attributes(filename,'modification')
+			end
+
 			local fh,err = io.open(filename,'wb')
 			if not fh then
 				return false, err
 			end
+
 			local status, err = d._lb:fwrite(fh)
 			fh:close()
 			if status then
 				printf('wrote %s\n',filename)
+				if mtime then
+					lfs.touch(filename,mtime)
+				end
 				return true
 			end
 			return false, err
