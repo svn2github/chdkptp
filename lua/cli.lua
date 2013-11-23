@@ -1652,7 +1652,7 @@ cli:add_commands{
 			elseif wstatus.timeout then
 				warnf('timed out waiting for shot script\n')
 			end
-			printf("wait time %.4f\n",ustime.diff(t0)/1000000)
+			cli.dbgmsg("script wait time %.4f\n",ustime.diff(t0)/1000000)
 
 			local ustatus, uerr = con:exec('init_usb_capture(0)') -- try to uninit
 			-- if uninit failed, combine with previous status
