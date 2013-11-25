@@ -854,6 +854,7 @@ opts={
 	listall=bool, 
 	msglimit=number,
 	match="pattern",
+	dirsonly=bool
 }
 stat
 	false/nil, return an array of names without stating at all
@@ -868,11 +869,12 @@ match
 	pattern, file names matching with string.match will be returned
 listall 
 	passed as second arg to os.listdir
+dirsonly
+    only list directories, error if path is a file
 
 may run out of memory on very large directories,
 msglimit can help but os.listdir itself could use all memory
 TODO message timeout is not checked
-TODO handle case if 'path' is a file
 ]]
 {
 	name='ls',
@@ -882,20 +884,41 @@ function ls(path,opts_in)
 	local opts={
 		msglimit=50,
 		msgtimeout=100000,
+		dirsonly=true
 	}
 	if opts_in then
 		for k,v in pairs(opts_in) do
 			opts[k]=v
 		end
 	end
-	local t,msg=os.listdir(path,opts.listall)
-	if not t then
-		return false,msg
+	local st, err = os.stat(path)
+	if not st then
+		return false, err
 	end
+
 	local b=msg_batcher{
 		batchsize=opts.msglimit,
 		timeout=opts.msgtimeout
 	}
+
+	if not st.is_dir then
+		if opts.dirsonly then
+			return false, 'not a directory'
+		end
+		if opts.stat == '*' then
+			st.name=path
+			b:write(st)
+		else
+			b:write(path)
+		end
+		b:flush()
+		return true
+	end
+
+	local t,msg=os.listdir(path,opts.listall)
+	if not t then
+		return false,msg
+	end
 	for i,v in ipairs(t) do
 		if not opts.match or string.match(v,opts.match) then
 			if opts.stat then
@@ -914,7 +937,7 @@ function ls(path,opts_in)
 					b:write(st)
 				end
 			else
-				b:write(t[i])
+				b:write(v)
 			end
 		end
 	end

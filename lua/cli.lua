@@ -1195,6 +1195,7 @@ cli:add_commands{
 			else
 				listopts = { stat='/' }
 			end
+			listopts.dirsonly=false
 			local list,msg = con:listdir(path,listopts)
 			if type(list) == 'table' then
 				local r = ''

@@ -141,11 +141,14 @@ function con_methods:listdir(path,opts)
 	end
 	local results={}
 	local i=1
-	local status,err=self:execwait("return ls('"..path.."'"..opts..")",{
+	local status,rstatus,err=self:execwait("return ls('"..path.."'"..opts..")",{
 		libs='ls',
 		msgs=chdku.msg_unbatcher(results),
 	})
 	if not status then
+		return false,rstatus
+	end
+	if not rstatus then
 		return false,err
 	end
 
