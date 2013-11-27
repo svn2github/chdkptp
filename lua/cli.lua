@@ -1702,6 +1702,7 @@ return false,'already in rec'
 			local status,rstatus,rerr = con:execwait([[
 if get_mode() then
 	switch_mode_usb(0)
+	local i=0
 	while get_mode() and i < 300 do
 		sleep(10)
 		i=i+1
