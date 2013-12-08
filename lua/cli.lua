@@ -608,6 +608,44 @@ cli:add_commands{
 		end,
 	},
 	{
+		names={'killscript'},
+		help='kill running remote script',
+		args=argparser.create{
+			noflush=false,
+			force=false,
+		},
+		arghelp='[-noflush][-force][-nowait]',
+		help_detail=[[
+ Terminate any runnings cript on the camera
+   -noflush: don't discard script messages
+   -force: force kill even if camera does not support (crash / memory leaks likely!)
+]],
+		func=function(self,args) 
+			if not con:is_ver_compatible(2,6) then
+				if not args.force then
+					return false,'camera does not support clean kill, use -force if you are sure'
+				end
+				warnf("camera does not support clean kill, crashes likely\n")
+			end
+			-- execute an empty script with kill options set
+			-- wait ensures it will be all done
+			local flushmsgs = not args.noflush;
+			local status,err = con:exec("",{
+					flush_cam_msgs=flushmsgs,
+					flush_host_msgs=flushmsgs,
+					clobber=true})
+			if not status then
+				return false, err
+			end
+			-- use standalone wait_status because we don't want execwait message handling
+			status, err = con:wait_status{run=false}
+			if not status then
+				return false, err
+			end
+			return true
+		end,
+	},
+	{
 		names={'rmem'},
 		help='read memory',
 		args=argparser.create{i32=false}, -- word

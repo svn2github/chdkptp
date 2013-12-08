@@ -493,7 +493,7 @@ function con_methods:get_error_msg()
 			return false
 		end
 		if msg.type == 'error' and msg.script_id == self:get_script_id() then
-			return msg.value
+			return msg
 		end
 		warnf("chdku.get_error_msg: ignoring message %s\n",chdku.format_script_msg(msg))
 	end
@@ -502,7 +502,12 @@ end
 --[[
 format a remote lua error from chdku.exec using line number information
 ]]
-local function format_exec_error(libs,code,errmsg)
+local function format_exec_error(libs,code,msg)
+	local errmsg = msg.value
+	-- internally generated message, no line number
+	if msg.subtype == 'init' then
+		return errmsg
+	end
 	local lnum=tonumber(string.match(errmsg,'^%s*:(%d+):'))
 	if not lnum then
 		print('no match '..errmsg)
@@ -570,9 +575,10 @@ opts {
 	wait=bool -- wait for script to complete, return values will be returned after status if true
 	nodefaultlib=bool -- don't automatically include default rlibs
 	clobber=bool -- if false, will check script-status and refuse to execute if script is already running
-				-- clobbering is likely to result in crashes / memory leaks in current versions of CHDK!
-	flushmsgs=bool -- if true (default) read and silently discard any pending messages before running script
-					-- not applicable if clobber is true, since the running script could just spew messages indefinitely
+				-- clobbering is likely to result in crashes / memory leaks in chdk prior to 1.3
+	flush_cam_msgs=bool -- if true (default) read and silently discard any pending messages from previous script before running script
+					-- Prior to 1.3, ignored if clobber is true, since the running script could just spew messages indefinitely
+	flush_host_msgs=bool -- Only supported in 1.3 and later, flush any message from the host unread by previous script
 	-- below only apply if with wait
 	msgs={table|callback} -- table or function to receive user script messages
 	rets={table|callback} -- table or function to receive script return values, instead of returning them
@@ -590,6 +596,13 @@ chdku.default_libs={
 	'serialize_msgs',
 }
 
+-- script execute flags, for proto 2.6 and later
+chdku.execflags={
+	nokill=0x100,
+	flush_cam_msgs=0x200,
+	flush_host_msgs=0x400,
+}
+
 --[[
 convenience, defaults wait=true
 ]]
@@ -599,7 +612,7 @@ end
 
 function con_methods:exec(code,opts_in)
 	-- setup the options
-	local opts = extend_table({flushmsgs=true},opts_in)
+	local opts = extend_table({flush_cam_msgs=true,flush_host_msgs=true},opts_in)
 	local liblist={}
 	-- add default libs, unless disabled
 	-- TODO default libs should be per connection
@@ -613,22 +626,36 @@ function con_methods:exec(code,opts_in)
 		extend_table(liblist,opts.libs)
 	end
 
-	-- check for already running script and flush messages
-	if not opts.clobber then
-		-- TODO this causes a round trip.
-		-- Could track locally if a script has been started since last script_status call showed complete/no messages
-		-- wouldn't be safe vs scripts started in cam ui
-		local status,err = self:script_status()
-		if not status then
-			return false,err
+	local execflags = 0
+	-- in protocol 2.6 and later, handle kill and message flush in script exec call
+	if self:is_ver_compatible(2,6) then
+		if not opts.clobber then
+			execflags = chdku.execflags.nokill
 		end
-		if status.run then
-			return false,"a script is already running"
+		-- TODO this doesn't behave the same as flushmsgs in pre 2.6
+		-- works whether or not clobber is set, flushes both inbound and outbound
+		if opts.flush_cam_msgs then
+			execflags = execflags + chdku.execflags.flush_cam_msgs
 		end
-		if opts.flushmsgs and status.msg then
-			status,err=self:flushmsgs()
+		if opts.flush_host_msgs then
+			execflags = execflags + chdku.execflags.flush_host_msgs
+		end
+	else
+		-- check for already running script and flush messages
+		if not opts.clobber then
+			-- this requires an extra PTP round trip per exec call
+			local status,err = self:script_status()
 			if not status then
 				return false,err
+			end
+			if status.run then
+				return false,"a script is already running"
+			end
+			if opts.flush_cam_msgs and status.msg then
+				status,err=self:flushmsgs()
+				if not status then
+					return false,err
+				end
 			end
 		end
 	end
@@ -638,7 +665,7 @@ function con_methods:exec(code,opts_in)
 	code = libs:code() .. code
 
 	-- try to start the script
-	local status,err=self:execlua(code)
+	local status,err=self:execlua(code,execflags)
 	if not status then
 		-- syntax error, try to fetch the error message
 		if err == 'syntax' then
@@ -709,7 +736,7 @@ function con_methods:exec(code,opts_in)
 					i=i+1
 				end
 			elseif msg.type == 'error' then
-				return false, format_exec_error(libs,code,msg.value)
+				return false, format_exec_error(libs,code,msg)
 			else
 				return false, 'unexpected message type'
 			end

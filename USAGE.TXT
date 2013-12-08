@@ -104,6 +104,11 @@ luar (=)     <lua code>  : - execute remote lua, wait for result
  Execute Lua code on the camera, waiting for the script to end.
  Return values or error messages are printed after the script completes.
 
+killscript   [-noflush][-force][-nowait]: - kill running remote script
+ Terminate any runnings cript on the camera
+   -noflush: don't discard script messages
+   -force: force kill even if camera does not support (crash / memory leaks likely!)
+
 rmem         <address> [count] [-i32[=fmt]]: - read memory
  Dump <count> bytes or words starting at <address>
   -i32 display as 32 bit words rather than byte oriented hex dump
@@ -272,6 +277,7 @@ dngsave      [options] [image num] [file]: - save a dng file
    defaults to loaded name. if directory, appends original filename
  options:
    -over     overwrite existing files
+   -keepmtime preserve existing modification time
 
 dngunload    [image num] : - unload dng file
 dnginfo      [options] [image num]: - display information about a dng

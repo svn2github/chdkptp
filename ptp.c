@@ -2333,17 +2333,16 @@ int ptp_chdk_rcgetchunk(PTPParams* params, int fmt, ptp_chdk_rc_chunk *chunk)
 	return 1;
 }
 
-int ptp_chdk_exec_lua(PTPParams* params, char *script, int *script_id)
+int ptp_chdk_exec_lua(PTPParams* params, char *script, int flags, int *script_id)
 {
   uint16_t r;
   PTPContainer ptp;
 
   PTP_CNT_INIT(ptp);
   ptp.Code=PTP_OC_CHDK;
-  ptp.Nparam=3;
+  ptp.Nparam=2;
   ptp.Param1=PTP_CHDK_ExecuteScript;
-  ptp.Param2=PTP_CHDK_SL_LUA;
-  ptp.Param3=0;
+  ptp.Param2=PTP_CHDK_SL_LUA | flags;
 
   r=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, strlen(script)+1, &script);
 
