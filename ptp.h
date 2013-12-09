@@ -996,7 +996,7 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn);
 int ptp_chdk_rcisready(PTPParams* params, int *isready,int *imgnum);
 int ptp_chdk_rcgetchunk(PTPParams* params,int fmt, ptp_chdk_rc_chunk *chunk);
 
-int ptp_chdk_exec_lua(PTPParams* params, char *script, int flags, int *script_id);
+int ptp_chdk_exec_lua(PTPParams* params, char *script, int flags, int *script_id,int *status);
 int ptp_chdk_get_version(PTPParams* params, int *major, int *minor);
 int ptp_chdk_get_script_support(PTPParams* params, unsigned *status);
 int ptp_chdk_get_script_status(PTPParams* params, unsigned *status);

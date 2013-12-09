@@ -2333,7 +2333,7 @@ int ptp_chdk_rcgetchunk(PTPParams* params, int fmt, ptp_chdk_rc_chunk *chunk)
 	return 1;
 }
 
-int ptp_chdk_exec_lua(PTPParams* params, char *script, int flags, int *script_id)
+int ptp_chdk_exec_lua(PTPParams* params, char *script, int flags, int *script_id, int *status)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2350,10 +2350,12 @@ int ptp_chdk_exec_lua(PTPParams* params, char *script, int flags, int *script_id
   {
     ptp_error(params,"unexpected return code 0x%x",r);
     *script_id = 0;
+	*status = 0;
     return 0;
   }
   *script_id = ptp.Param1;
-  return (ptp.Param2 == PTP_CHDK_S_ERRTYPE_NONE);
+  *status = ptp.Param2;
+  return (*status == PTP_CHDK_S_ERRTYPE_NONE);
 }
 
 int ptp_chdk_get_version(PTPParams* params, int *major, int *minor)

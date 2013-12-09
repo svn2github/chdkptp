@@ -47,7 +47,7 @@ enum ptp_chdk_command {
                             // param2 is language of script
                             //  in proto 2.6 and later, language is the lower byte, rest is used for PTP_CHDK_SCRIPT_FL* flags
                             // return param1 is script id, like a process id
-                            // return param2 is status, PTP_CHDK_S_ERRTYPE*
+                            // return param2 is status from ptp_chdk_script_error_type
   PTP_CHDK_ScriptStatus,    // Script execution status
                             // return param1 bits
                             // PTP_CHDK_SCRIPT_STATUS_RUN is set if a script running, cleared if not
@@ -180,7 +180,8 @@ enum ptp_chdk_script_error_type {
     PTP_CHDK_S_ERRTYPE_NONE = 0,
     PTP_CHDK_S_ERRTYPE_COMPILE,
     PTP_CHDK_S_ERRTYPE_RUN,
-    PTP_CHDK_S_ERRTYPE_INIT, // script startup error not related to content of the script
+    // the following are for ExecuteScript status only, not message types
+    PTP_CHDK_S_ERR_SCRIPTRUNNING = 0x1000, // script already running with NOKILL
 };
 
 // message status

@@ -1256,12 +1256,15 @@ static int chdk_execlua(lua_State *L) {
 		return 2;
 	}
 
-	if(!ptp_chdk_exec_lua(params,(char *)luaL_optstring(L,2,""),luaL_optnumber(L,3,0),&ptp_cs->script_id)) {
+	int status;
+	if(!ptp_chdk_exec_lua(params,(char *)luaL_optstring(L,2,""),luaL_optnumber(L,3,0),&ptp_cs->script_id,&status)) {
 		lua_pushboolean(L,0);
 		// TODO this is hacky
 		// if we got a script id, script request got as far as the the camera
-		if(ptp_cs->script_id) {
-			lua_pushstring(L,"syntax"); // caller can check messages for details, may not actually be syntax
+		if(status == PTP_CHDK_S_ERRTYPE_COMPILE) {
+			lua_pushstring(L,"compile"); // caller can check messages for details
+		} else if(status == PTP_CHDK_S_ERR_SCRIPTRUNNING) {
+			lua_pushstring(L,"scriptrun"); // caller can check messages for details
 		} else {
 			lua_pushstring(L,"failed");
 		}
@@ -1620,7 +1623,7 @@ static const char* script_msg_data_type_to_name(unsigned type_id) {
 }
 
 static const char* script_msg_error_type_to_name(unsigned type_id) {
-	const char *names[]={"none","compile","runtime","init"};
+	const char *names[]={"none","compile","runtime"};
 	if(type_id >= sizeof(names)/sizeof(names[0])) {
 		return "unknown_error_subtype";
 	}

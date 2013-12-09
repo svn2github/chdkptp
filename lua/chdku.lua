@@ -504,10 +504,6 @@ format a remote lua error from chdku.exec using line number information
 ]]
 local function format_exec_error(libs,code,msg)
 	local errmsg = msg.value
-	-- internally generated message, no line number
-	if msg.subtype == 'init' then
-		return errmsg
-	end
 	local lnum=tonumber(string.match(errmsg,'^%s*:(%d+):'))
 	if not lnum then
 		print('no match '..errmsg)
@@ -668,11 +664,13 @@ function con_methods:exec(code,opts_in)
 	local status,err=self:execlua(code,execflags)
 	if not status then
 		-- syntax error, try to fetch the error message
-		if err == 'syntax' then
+		if err == 'compile' then
 			local msg = self:get_error_msg()
 			if msg then
 				return false,format_exec_error(libs,code,msg)
 			end
+		elseif err == 'scriptrun' then
+			return false, "a script is already running"
 		end
 		--  other unspecified error, or fetching syntax/compile error message failed
 		return false,err
