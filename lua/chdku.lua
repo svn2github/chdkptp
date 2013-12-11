@@ -115,6 +115,8 @@ check if connection API is major and >= minor
 todo might want to allow major >= in some cases
 ]]
 function con_methods:is_ver_compatible(major,minor)
+	-- API ver not initialized
+	-- TODO maybe it should just be an error to call without connecting?
 	if not self.apiver then
 		return false
 	end
