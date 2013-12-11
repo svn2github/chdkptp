@@ -115,6 +115,9 @@ check if connection API is major and >= minor
 todo might want to allow major >= in some cases
 ]]
 function con_methods:is_ver_compatible(major,minor)
+	if not self.apiver then
+		return false
+	end
 	if self.apiver.MAJOR ~= major or self.apiver.MINOR < minor then
 		return false
 	end
