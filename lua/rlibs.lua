@@ -1151,7 +1151,7 @@ putm exec print(message)
 msg_shell={}
 msg_shell.done=false
 msg_shell.sleep=10
-msg_shell.msg_wait=10000
+msg_shell.read_msg_timeout=10000
 msg_shell.cmds={
 	quit=function(msg)
 		msg_shell.done=true

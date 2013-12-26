@@ -709,7 +709,7 @@ function con_methods:exec(code,opts_in)
 				return false, err
 			end
 			if msg.script_id ~= self:get_script_id() then
-				warnf("chdku.exec: message from unexpected script %s\n",msg.script_id,chdku.format_script_msg(msg))
+				warnf("chdku.exec: message from unexpected script %d %s\n",msg.script_id,chdku.format_script_msg(msg))
 			elseif msg.type == 'user' then
 				if type(opts.msgs) == 'function' then
 					local status,err = opts.msgs(msg,opts.fdata)

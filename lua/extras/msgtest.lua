@@ -33,7 +33,7 @@ function m.load()
 		return false,err
 	end
 	return con:write_msg([[exec
-msg_shell.msg_wait = nil
+msg_shell.read_msg_timeout = nil
 msg_shell.default_cmd=function(msg)
 	if msgtest_gc then
 		collectgarbage(msgtest_gc)
