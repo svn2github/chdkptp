@@ -117,4 +117,39 @@ function m.execwaittime(opts)
 		wall_time, opts.count / wall_time)
 end
 
+--[[
+repeatedly time memory transfers from cam
+opts:{
+	count=number -- number of iterations
+	size=number  -- size to transfer
+	addr=number  -- address to transfer from (default 0x1900)
+}
+]]
+function m.xfermem(opts)
+	opts = util.extend_table({count=100, size=1024*1024,addr=0x1900},opts)
+	if not con:is_connected() then
+		error('not connected')
+	end
+	local times={}
+	local tstart = ustime.new()
+	for i=1,opts.count do
+		local t0 = ustime.new()
+		local v,msg=con:getmem(opts.addr,opts.size)
+		if not v then
+			error('getmem failed '..tostring(err))
+		end
+		table.insert(times,ustime.diff(t0)/1000000)
+	end
+	local wall_time = ustime.diff(tstart)/1000000
+	local stats = m.make_stats(times)
+	printf("%d x %d bytes mean %.4f min %.4f max %.4f total %.4f (%d byte/sec) wall %.4f (%d byte/sec)\n",
+		opts.count,
+		opts.size,
+		stats.mean,
+		stats.min,
+		stats.max,
+		stats.total, opts.count*opts.size / stats.total, 
+		wall_time, opts.count*opts.size / wall_time)
+end
+
 return m
