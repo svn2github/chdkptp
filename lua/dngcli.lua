@@ -551,8 +551,8 @@ m.init_cli = function()
   -max=N   list pixels with value <= N
   -out=<file> 
   	<file> is name of output file
-  -fmt=<chdk|rt|dcraw>
-  	format badpixel list for chdk badpixel.txt, raw therapee, or dcraw
+  -fmt=<chdk|rt|dcraw|count>
+  	format badpixel list for chdk badpixel.txt, raw therapee, dcraw, or just count them
   -reg=<active|all>
   	region of image to search, either active area (default) or all
   -coords=<abs|rel>
@@ -608,13 +608,17 @@ m.init_cli = function()
 				fmtstr = '%d %d\n'
 			elseif args.fmt == 'dcraw' then
 				fmtstr = '%d %d 0\n' -- TODO final value can be timestamp for dcraw
+			elseif args.fmt == 'count' then
+				fmtstr = nil
 			else
 				return false, 'invalid format'
 			end
 
 			local fh
 			local outfn
-			if args.out then
+			if args.fmt == 'count' then
+				outfn = function() end
+			elseif args.out then
 				local err
 				fh,err = io.open(args.out,'wb')
 				if not fh then return
