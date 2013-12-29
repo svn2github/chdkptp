@@ -499,6 +499,42 @@ function dng_methods.print_info(self)
 	end
 end
 
+--[[
+convenience function
+maximum value for bit depth
+probably the same as white level
+]]
+function dng_methods.max_value(self)
+	return 2^self.img:bpp() - 1
+end
+--[[
+build a histogram from a rectangle of the image, default active area
+not bayer aware
+]]
+function dng_methods.build_histogram(self,opts)
+	local ifd=self.raw_ifd
+	opts = util.extend_table({
+		top=ifd.byname.ActiveArea:getel(0),
+		left=ifd.byname.ActiveArea:getel(1),
+		bottom=ifd.byname.ActiveArea:getel(2),
+		right=ifd.byname.ActiveArea:getel(3),
+	},opts);
+	local h={}
+	for i=0,self:max_value() do
+		h[i]=0
+	end
+	local total = 0
+	for y = opts.top, opts.bottom-1 do
+		for x = opts.left, opts.right-1 do
+			local v = self.img:get_pixel(x,y)
+			h[v] = h[v] + 1
+			total = total+1
+		end
+	end
+	h.total = total
+	return h
+end
+
 -- for testing rawimg
 function dng_methods.print_img_info(self)
 	local img = self.img

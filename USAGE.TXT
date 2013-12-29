@@ -290,14 +290,25 @@ dnginfo      [options] [image num]: - display information about a dng
    -vals[=N]
      display up to N values for each IFD entry, default 20
 
+dnghist      [options] [image num]: - generate a histogram
+ options:
+  -min=N   list pixels with value >= N
+  -max=N   list pixels with value <= N
+  -reg=<active|all>
+        region of image to search, either active area (default) or all
+  -bin=<n>
+    number of values in histogram bin
+  -fmt=<count|%>
+    format for output
+
 dnglistpixels [options] [image num]: - generate a list of pixel coordinates
  options:
   -min=N   list pixels with value >= N
   -max=N   list pixels with value <= N
   -out=<file>
         <file> is name of output file
-  -fmt=<chdk|rt|dcraw>
-        format badpixel list for chdk badpixel.txt, raw therapee, or dcraw
+  -fmt=<chdk|rt|dcraw|count>
+        format badpixel list for chdk badpixel.txt, raw therapee, dcraw, or just count them
   -reg=<active|all>
         region of image to search, either active area (default) or all
   -coords=<abs|rel>

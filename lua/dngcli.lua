@@ -533,6 +533,119 @@ m.init_cli = function()
 		end,
 	},
 	{
+		names={'dnghist'},
+		help='generate a histogram',
+		arghelp="[options] [image num]",
+		args=cli.argparser.create({
+			min=false,
+			max=false,
+--			out=false,
+			reg='active',
+			fmt='count',
+--			coords='abs',
+			bin=1,
+		}),
+		-- TODO arbitrary rect
+		-- text or netpbm file output
+		--[[
+  -out=<file> 
+  	<file> is name of output file
+	]]
+		
+		help_detail=[[
+ options:
+  -min=N   list pixels with value >= N
+  -max=N   list pixels with value <= N
+  -reg=<active|all>
+  	region of image to search, either active area (default) or all
+  -bin=<n>
+    number of values in histogram bin
+  -fmt=<count|%>
+    format for output
+]],
+		func=function(self,args) 
+			local d = m.get_sel_batch(args[1])
+			if not d then
+				return false, 'no file selected'
+			end
+
+			local ifd=d.raw_ifd
+
+			local vmin = 0 
+			local vmax = ifd.byname.WhiteLevel:getel()
+
+			if args.min then
+				vmin = tonumber(args.min)
+			end
+			if args.max then
+				vmax = tonumber(args.max)
+			end
+
+			local top,left,bottom,right
+			if args.reg == 'all' then
+				top = 0
+				left = 0
+				bottom = ifd.byname.ImageLength:getel()
+				right = ifd.byname.ImageWidth:getel()
+			elseif args.reg == 'active' then
+				top=ifd.byname.ActiveArea:getel(0)
+				left=ifd.byname.ActiveArea:getel(1)
+				bottom=ifd.byname.ActiveArea:getel(2)
+				right=ifd.byname.ActiveArea:getel(3)
+			else
+				return false, 'invalid region'
+			end
+
+			if args.fmt ~= '%' and args.fmt ~= 'count' then
+				return false, 'invalid format'
+			end
+
+			local h = d:build_histogram({top=top,left=left,bottom=bottom,right=right})
+			local binsize = tonumber(args.bin)
+			
+			local fmt_range
+			local fmt_count
+			if args.fmt == '%' then
+				fmt_count = function(count)
+					return string.format('%f',(count / h.total) * 100)
+				end
+			else
+				fmt_count = function(count)
+					return tostring(count)
+				end
+			end
+			if binsize == 1 then
+				fmt_range = function(v1)
+					return tostring(v1)
+				end
+			else
+				fmt_range = function(v1,v2)
+					return string.format('%d-%d',v1,v2)
+				end
+			end
+
+			local outfn=function(count,v1,v2)
+				printf("%s %s\n",fmt_range(v1,v2),fmt_count(count))
+			end
+
+			local v = vmin
+
+			while v <= vmax do
+				local count = 0
+				for i=0,binsize - 1 do
+					-- bin size may not evenly divide range
+					if v+i <= vmax then
+						count = count + h[v+i]
+					end
+				end
+				outfn(count,v,v+binsize-1)
+				v = v + binsize
+			end
+			return true
+		end,
+	},
+
+	{
 		names={'dnglistpixels'},
 		help='generate a list of pixel coordinates',
 		arghelp="[options] [image num]",
