@@ -128,6 +128,7 @@ m.cli_cmds = {
 				end
 			end
 
+			opts.cap_timeout=60000 -- 1 minute
 			opts.shoot_hook_timeout=10000
 
 			local opts_s = serialize(opts)
@@ -206,11 +207,12 @@ m.cli_cmds = {
 						return false, err
 					end
 				end
+				-- TODO could check if remotecap has timed out here
 				status, err = con:write_msg(line)
 				if not status then
 					done=true
 					warnf('write_msg failed %s\n',tostring(err))
-					-- TODO might have remotecap data, but
+					-- TODO might have remotecap data, but probably won't be able to read it if msg failed
 					break
 				end
 				status,err = con:capture_get_data(rcopts)
