@@ -345,7 +345,7 @@ end
 --[[
 process options common to shoot and remoteshoot
 ]]
-local function get_shoot_common_opts(args)
+function cli:get_shoot_common_opts(args)
 	if not con:is_connected() then
 		return false, 'not connected'
 	end
@@ -1404,7 +1404,7 @@ cli:add_commands{
   Any exposure paramters not set use camera defaults
 ]],
 		func=function(self,args) 
-			local opts,err = get_shoot_common_opts(args)
+			local opts,err = self:get_shoot_common_opts(args)
 			if not opts then
 				return false,err
 			end
@@ -1566,7 +1566,7 @@ cli:add_commands{
 				end
 			end
 
-			local opts,err = get_shoot_common_opts(args)
+			local opts,err = self:get_shoot_common_opts(args)
 			if not opts then
 				return false,err
 			end

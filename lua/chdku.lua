@@ -546,6 +546,49 @@ function con_methods:flushmsgs()
 end
 
 --[[
+read all pending messages, processing as specified by opts
+opts {
+	all=handler -- for all not matched by a specific handler
+	user=handler
+	return=handler
+	error=handler
+}
+handler = table or function(msg,opts)
+]]
+function con_methods:read_all_msgs(opts)
+	opts = util.extend_table({},opts)
+	-- if an 'all' handler is given, use it for any that don't have a specific handler
+	if opts.all then
+		for i,mtype in ipairs({'user','return','error'}) do
+			if not opts[mtype] then
+				opts[mtype] = opts.all
+			end
+		end
+	end
+	while true do
+		local msg,err=self:read_msg()
+		if not msg then
+			return false, err
+		end
+		if msg.type == 'none' then
+			break
+		end
+		local handler = opts[msg.type]
+		if type(handler) == 'table' then
+			table.insert(handler,msg)
+		elseif type(handler) == 'function' then
+			local status, err = handler(msg,opts)
+			if not status then
+				return false, err
+			end
+		elseif handler then -- nil or false = ignore
+			error('invalid handler')
+		end
+	end
+	return true
+end
+
+--[[
 return a closure to be used with as a chdku.exec msgs function, which unbatches messages msg_batcher into t
 ]]
 function chdku.msg_unbatcher(t)
@@ -1235,6 +1278,7 @@ function con_methods:wait_status(opts)
 			if not status.rsdata then
 				return false,msg
 			end
+			-- TODO may want to handle PTP_CHDK_CAPTURE_NOTSET differently
 			if status.rsdata ~= 0 then
 				status.rsimgnum = msg
 				return status
