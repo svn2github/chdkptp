@@ -240,7 +240,7 @@ m.cli_cmds = {
 			cli.dbgmsg("script wait time %.4f\n",ustime.diff(t0)/1000000)
 			-- TODO check messages
 
-			local ustatus, uerr = con:exec('init_usb_capture(0)') -- try to uninit
+			local ustatus, uerr = con:execwait('init_usb_capture(0)') -- try to uninit
 			-- if uninit failed, combine with previous status
 			if not ustatus then
 				uerr = 'uninit '..tostring(uerr)
