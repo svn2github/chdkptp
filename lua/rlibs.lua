@@ -1064,13 +1064,13 @@ end
 {
 	name='rs_shoot',
 	depend={'rlib_shoot_common'},
-	-- TODO cont doesn't handle exposure counter wrap!
+-- TODO should use shoot hook count for chdk 1.3, exp count may have issues in some ports
 	code=[[
 function rs_shoot_single()
 	shoot()
 end
 function rs_shoot_cont(opts)
-	local last = get_exp_count() + opts.cont
+	local last_exp_count = get_exp_count()
 	press('shoot_half')
 	repeat
 		m=read_usb_msg(10)
@@ -1081,9 +1081,15 @@ function rs_shoot_cont(opts)
 	end
 	sleep(20)
 	press('shoot_full')
+	local shots = 0
 	repeat
 		m=read_usb_msg(10)
-	until get_exp_count() >= last or m == 'stop'
+		local exp_count = get_exp_count()
+		if last_exp_count ~= exp_count then
+			shots = shots + 1
+			last_exp_count = exp_count
+		end
+	until shots >= opts.cont or m == 'stop'
 	release('shoot_full')
 end
 function rs_shoot(opts)
