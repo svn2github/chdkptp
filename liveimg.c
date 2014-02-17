@@ -655,6 +655,65 @@ static int pimg_blend_to_cd_canvas(lua_State *L) {
 
 #endif
 
+/*
+convert pimg to to packed
+in some cases it would be better to do this directly from lv data,
+but code needs to be untangled from pimg
+*/
+static int pimg_to_packed(lua_State *L,int alpha) {
+	liveimg_pimg_t *im = (liveimg_pimg_t *)luaL_checkudata(L,1,LIVEIMG_PIMG_META);
+	lBuf_t *buf = lbuf_getlbuf(L,2);
+	char *data = NULL;
+	unsigned depth=(alpha)?4:3;
+	unsigned data_size = im->width*im->height*depth;
+	if(buf && buf->len == data_size) {
+		// could re-size the data of the same lbuf if size mismatched
+		data = buf->bytes;
+		lua_pushvalue(L,2); // copy it to stack top for return
+	} else {
+		data=malloc(data_size);
+		if(!data) {
+			return luaL_error(L,"malloc failed");
+		}
+		lbuf_create(L,data,data_size,LBUF_FL_FREE);
+	}
+	uint8_t *r = im->r;
+	uint8_t *g = im->g;
+	uint8_t *b = im->b;
+	uint8_t *a = im->a;
+	int x,y;
+	// start at bottom to flip
+	for(y=im->height;y;y--) {
+		uint8_t *p = (uint8_t *)data + (y-1)*im->width*depth;
+		for(x=0;x<im->width;x++) {
+			*p++ = *r++;
+			*p++ = *g++;
+			*p++ = *b++;
+			if(alpha) {
+				if(a) {
+					*p++ = *a++;
+				} else {
+					*p++ = 255;
+				}
+			}
+		}
+	}
+	return 1;
+}
+
+/*
+convert to packed rgb
+lbuf=pimg:to_lbuf_packed_rbg([lbuf_reuse])
+lbuf_reuse: lbuf to re-use, if possible
+*/
+static int pimg_to_lbuf_packed_rgb(lua_State *L) {
+	return pimg_to_packed(L,0);
+}
+
+static int pimg_to_lbuf_packed_rgba(lua_State *L) {
+	return pimg_to_packed(L,1);
+}
+
 static const luaL_Reg liveimg_funcs[] = {
   {"get_bitmap_pimg", liveimg_get_bitmap_pimg},
   {"get_viewport_pimg", liveimg_get_viewport_pimg},
@@ -666,6 +725,8 @@ static const luaL_Reg pimg_methods[] = {
   {"put_to_cd_canvas", pimg_put_to_cd_canvas},
   {"blend_to_cd_canvas", pimg_blend_to_cd_canvas},
 #endif
+  {"to_lbuf_packed_rgb", pimg_to_lbuf_packed_rgb},
+  {"to_lbuf_packed_rgba", pimg_to_lbuf_packed_rgba},
   {"width", pimg_get_width},
   {"height", pimg_get_height},
   {"kill", pimg_kill},
