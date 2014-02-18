@@ -223,7 +223,7 @@ m.cli_cmds = {
 				end
 				local s,e,cmd = string.find(line,'^[%c%s]*([%w_]+)[%c%s]*')
 				local rest = string.sub(line,e+1)
-				printf("cmd [%s] rest [%s]\n",cmd,rest);
+				-- printf("cmd [%s] rest [%s]\n",cmd,rest);
 				if cmd == 'path' then
 					if rest == '' then
 						rest = nil
