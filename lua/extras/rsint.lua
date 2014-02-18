@@ -18,6 +18,57 @@ interactive remote shoot in continuous mode
 --]]
 local m={}
 
+--[[
+initializer remotecap handlers and path
+]]
+function init_handlers(args,opts)
+	local dst = args[1]
+	local dst_dir
+	if dst then
+		if string.match(dst,'[\\/]+$') then
+			-- explicit / treat it as a directory
+			-- and check if it is
+			dst_dir = string.sub(dst,1,-2)
+			if lfs.attributes(dst_dir,'mode') ~= 'directory' then
+				cli.dbgmsg('mkdir %s\n',dst_dir)
+				local status,err = fsutil.mkdir_m(dst_dir)
+				if not status then
+					return false,err
+				end
+			end
+			dst = nil
+		elseif lfs.attributes(dst,'mode') == 'directory' then
+			dst_dir = dst
+			dst = nil
+		end
+	end
+	local rcopts={}
+	if args.jpg then
+		rcopts.jpg=chdku.rc_handler_file(dst_dir,dst)
+	end
+	if args.dng then
+		local badpix = args.badpix
+		if badpix == true then
+			badpix = 0
+		end
+		local dng_info = {
+			lstart=opts.lstart,
+			lcount=opts.lcount,
+			badpix=badpix,
+		}
+		rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
+		rcopts.raw = chdku.rc_handler_raw_dng_file(dst_dir,dst,'dng',dng_info)
+	else
+		if args.raw then
+			rcopts.raw=chdku.rc_handler_file(dst_dir,dst)
+		end
+		if args.dnghdr then
+			rcopts.dng_hdr=chdku.rc_handler_file(dst_dir,dst)
+		end
+	end
+	return rcopts
+end
+
 -- cli command copied from regular remoteshoot
 m.cli_cmds = {
 	{
@@ -62,27 +113,6 @@ m.cli_cmds = {
    -cmdwait=n   wait n seconds for command, default 60
 ]],
 		func=function(self,args)
-			local dst = args[1]
-			local dst_dir
-			if dst then
-				if string.match(dst,'[\\/]+$') then
-					-- explicit / treat it as a directory
-					-- and check if it is
-					dst_dir = string.sub(dst,1,-2)
-					if lfs.attributes(dst_dir,'mode') ~= 'directory' then
-						cli.dbgmsg('mkdir %s\n',dst_dir)
-						local status,err = fsutil.mkdir_m(dst_dir)
-						if not status then
-							return false,err
-						end
-					end
-					dst = nil
-				elseif lfs.attributes(dst,'mode') == 'directory' then
-					dst_dir = dst
-					dst = nil
-				end
-			end
-
 			local opts,err = cli:get_shoot_common_opts(args)
 			if not opts then
 				return false,err
@@ -130,6 +160,12 @@ m.cli_cmds = {
 				end
 			end
 
+			local rcopts
+			rcopts,err = init_handlers(args,opts)
+			if not rcopts then
+				return false, err
+			end
+
 			-- wait time for remotecap
 			opts.cap_timeout=30000
 			-- wait time for shoot hook
@@ -149,30 +185,6 @@ m.cli_cmds = {
 			-- rs_shoot should not initialize remotecap if there's an error, so no need to uninit
 			if not status then
 				return false,err
-			end
-
-			local rcopts={}
-			if args.jpg then
-				rcopts.jpg=chdku.rc_handler_file(dst_dir,dst)
-			end
-			if args.dng then
-				if args.badpix == true then
-					args.badpix = 0
-				end
-				local dng_info = {
-					lstart=opts.lstart,
-					lcount=opts.lcount,
-					badpix=args.badpix,
-				}
-				rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
-				rcopts.raw = chdku.rc_handler_raw_dng_file(dst_dir,dst,'dng',dng_info)
-			else
-				if args.raw then
-					rcopts.raw=chdku.rc_handler_file(dst_dir,dst)
-				end
-				if args.dnghdr then
-					rcopts.dng_hdr=chdku.rc_handler_file(dst_dir,dst)
-				end
 			end
 
 			done = false
@@ -209,20 +221,32 @@ m.cli_cmds = {
 					warnf('script not running\n')
 					break
 				end
-				-- TODO could check if remotecap has timed out here
-				status, err = con:write_msg(line)
-				if not status then
-					done=true
-					warnf('write_msg failed %s\n',tostring(err))
-					-- TODO might have remotecap data, but probably won't be able to read it if msg failed
-					break
-				end
-				status,err = con:capture_get_data(rcopts)
-				if not status then
-					warnf('capture_get_data error %s\n',tostring(err))
-				end
-				if line == 'l' then
-					done=true
+				local s,e,cmd = string.find(line,'^[%c%s]*([%w_]+)[%c%s]*')
+				local rest = string.sub(line,e+1)
+				printf("cmd [%s] rest [%s]\n",cmd,rest);
+				if cmd == 'path' then
+					if rest == '' then
+						rest = nil
+					end
+					args[1] = rest
+					rcopts,err = init_handlers(args,opts)
+					-- TODO handle error, should send l to script
+				elseif cmd == 's' or cmd == 'l' then
+					-- TODO could check if remotecap has timed out here
+					status, err = con:write_msg(cmd)
+					if not status then
+						done=true
+						warnf('write_msg failed %s\n',tostring(err))
+						-- TODO might have remotecap data, but probably won't be able to read it if msg failed
+						break
+					end
+					status,err = con:capture_get_data(rcopts)
+					if not status then
+						warnf('capture_get_data error %s\n',tostring(err))
+					end
+					if cmd == 'l' then
+						done=true
+					end
 				end
 			until done
 
