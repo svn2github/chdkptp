@@ -1300,7 +1300,7 @@ cli:add_commands{
 		end,
 	},
 	{
-		names={'dumpframes'},
+		names={'lvdump','dumpframes'},
 		help='dump camera display frames to file',
 		arghelp="[options] [file]",
 		args=argparser.create({
@@ -1314,8 +1314,7 @@ cli:add_commands{
 		}),
 		help_detail=[[
  file:
- 	optional output file name, defaults to chdk_<pid>_<date>_<time>.lvdump for lvdump
-	with -pbm treated as a prefix for vp_date_time_n.ppm / bm_date_time_n.pam
+ 	optional output file name, defaults to chdk_<pid>_<date>_<time>.lvdump
  options:
    -count=<N> number of frames to dump
    -wait=<N>  wait N ms between frames
@@ -1323,7 +1322,6 @@ cli:add_commands{
    -nobm      don't get ui overlay data
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
-   -pbm       output frames in netpbm ppm/pam format 
 ]],
 		func=function(self,args) 
 			local dumpfile=args[1]
@@ -1340,84 +1338,203 @@ cli:add_commands{
 			if what == 0 then
 				return false,'nothing selected'
 			end
+			if args.wait then
+				args.wait = tonumber(args.wait)
+			end
+			if args.count then
+				args.count = tonumber(args.count)
+			end
 			local status,err
 			if not con:live_is_api_compatible() then
 				return false,'incompatible api'
 			end
-			if args.pbm then
-				if not dumpfile then
-					dumpfile = '';
+			status, err = con:live_dump_start(dumpfile)
+			if not status then
+				return false,err
+			end
+			for i=1,args.count do
+				if not args.quiet then
+					printf('grabbing frame %d\n',i)
 				end
-				-- TODO create directories if needed
-				-- TODO names should be timestamp based, otherwise numbers will overwrite between calls
-				local vp_fname = dumpfile .. 'vp';
-				local bm_fname = dumpfile .. 'bm';
-
-				local frame, vp_pimg, bm_pimg, vp_lb, bm_lb
-				-- TODO conversion code should be split out to allow dumping from existing lvdump file
-				for i=1,args.count do
-					frame, err = con:get_live_data(frame,what)
-					if not frame then
-						return false, err
-					end
-					local datestamp = os.date('%Y%m%d_%H%M%S')
-					if not args.novp then
-						vp_pimg = liveimg.get_viewport_pimg(vp_pimg,frame,false)
-						vp_lb = vp_pimg:to_lbuf_packed_rgb(vp_lb)
-						local fh
-						fh, err = io.open(string.format("%s_%s_%d.ppm",vp_fname,datestamp,i),'wb')
-						if not fh then
-							return false,err
-						end
-						fh:write(string.format('P6\n%d\n%d\n%d\n',
-							vp_pimg:width(),
-							vp_pimg:height(),255))
-						vp_lb:fwrite(fh)
-						fh:close()
-					end
-					if not args.nobm then
-						bm_pimg = liveimg.get_bitmap_pimg(bm_pimg,frame,false)
-						bm_lb = bm_pimg:to_lbuf_packed_rgba(bm_lb)
-						local fh
-						fh, err = io.open(string.format("%s_%s_%06d.pam",bm_fname,datestamp,i),'wb')
-						if not fh then
-							return false,err
-						end
-						fh:write(string.format(
-							'P7\nWIDTH %d\nHEIGHT %d\nDEPTH %d\nMAXVAL %d\nTUPLTYPE RGB_ALPHA\nENDHDR\n',
-							bm_pimg:width(),
-							bm_pimg:height(),
-							4,255))
-						bm_lb:fwrite(fh)
-						fh:close()
-					end
-				end
-				return true
-			else
-				status, err = con:live_dump_start(dumpfile)
+				status, err = con:live_get_frame(what)
 				if not status then
-					return false,err
+					break
 				end
-				for i=1,args.count do
-					if not args.quiet then
-						printf('grabbing frame %d\n',i)
-					end
-					status, err = con:live_get_frame(what)
-					if not status then
-						break
-					end
-					status, err = con:live_dump_frame()
-					if not status then
-						break
-					end
+				status, err = con:live_dump_frame()
+				if not status then
+					break
+				end
+				if args.wait and i < args.count then
 					sys.sleep(args.wait)
 				end
-				con:live_dump_end()
-				if status then
-					err = string.format('%d bytes recorded to %s\n',tonumber(con.live.dump_size),tostring(con.live.dump_fn))
-				end
+			end
+			con:live_dump_end()
+			if status then
+				err = string.format('%d bytes recorded to %s\n',tonumber(con.live.dump_size),tostring(con.live.dump_fn))
 			end
 			return status,err
+		end,
+	},
+	{
+		names={'lvdumpimg'},
+		help='dump camera display frames to images',
+		arghelp="[options]",
+		args=argparser.create({
+--			infile=false,
+			count=1,
+			wait=100,
+			vp=false,
+			bm=false,
+			nopal=false,
+			quiet=false,
+		}),
+-- TODO
+--   -infile=<file> lvdump file to use as source instead of camera
+		help_detail=[[
+ options:
+   -count=<N> number of frames to dump, default 1
+   -wait=<N>  wait N ms between frames
+   -vp[=file] get viewfinder data to file
+   -bm[=file] get ui overlay data to file
+   -nopal     don't get palette for ui overlay
+   -quiet     don't print progress
+  file may include substitution pattern
+   ${date,datefmt}  current time formatted with os.date()
+   ${frame,strfmt}  current frame number formatted with string.format
+   ${time,strfmt}   current time in seconds, as float, formatted with string.format
+   default vp_${time,%014.3f}.pbm bm_${time,%014.3f}.pam for viewfinder and ui respectively 
+]],
+		func=function(self,args) 
+			local what = 0
+			if args.vp then
+				what = 1
+			end
+			if args.bm then
+				what = what + 4
+				if not args.nopal then
+					what = what + 8
+				end
+			end
+			if what == 0 then
+				return false,'nothing selected'
+			end
+			if args.wait then
+				args.wait = tonumber(args.wait)
+			end
+			if args.count then
+				args.count = tonumber(args.count)
+			end
+			local status,err
+			if not con:live_is_api_compatible() then
+				return false,'incompatible api'
+			end
+			local vp_spec
+			local bm_spec
+
+			if args.vp == true then
+				vp_spec = 'vp_${time,%014.3f}.ppm'
+			else
+				vp_spec = args.vp
+			end
+
+			if args.bm == true then
+				bm_spec = 'bm_${time,%014.3f}.pam'
+			else
+				bm_spec = args.bm
+			end
+			-- TODO check if spec is a directory?
+
+			local frame, vp_pimg, bm_pimg, vp_lb, bm_lb
+
+			-- closure upvalues for substitutions
+			local frame_time
+			local frame_ustime
+			local frame_num
+
+			local subst_funcs = {
+				frame=function(argstr)
+					if not argstr then 
+						argstr='%06d'
+					end
+					return string.format(argstr,frame_num)
+				end,
+				time=function(argstr)
+					if not argstr then 
+						argstr='%d'
+					end
+					return string.format(argstr,frame_ustime)
+				end,
+				date=function(argstr)
+					if not argstr then 
+						argstr='%Y%m%d_%H%M%S'
+					end
+					return os.date(argstr,frame_time)
+				end,
+			}
+			local varsubst=require'varsubst'
+			-- TODO frame source should be split out to allow dumping from existing lvdump file
+			for i=1,args.count do
+				frame, err = con:get_live_data(frame,what)
+
+				if not frame then
+					return false, err
+				end
+
+				frame_num = i
+				-- time values are recorded per frame, so to avoid varying between files
+				frame_time = os.time()
+				frame_ustime = ustime.new():float()
+
+				if args.vp then
+					vp_pimg = liveimg.get_viewport_pimg(vp_pimg,frame,false)
+					vp_lb = vp_pimg:to_lbuf_packed_rgb(vp_lb)
+
+					local fpath = varsubst.run(vp_spec,subst_funcs)
+					-- TODO ensure directory
+
+					local fh
+
+					fh, err = io.open(fpath,'wb')
+					if not fh then
+						return false,err
+					end
+					if not args.quiet then
+						cli.infomsg('%s\n',fpath)
+					end
+					fh:write(string.format('P6\n%d\n%d\n%d\n',
+						vp_pimg:width(),
+						vp_pimg:height(),255))
+					vp_lb:fwrite(fh)
+					fh:close()
+				end
+				if args.bm then
+					bm_pimg = liveimg.get_bitmap_pimg(bm_pimg,frame,false)
+					bm_lb = bm_pimg:to_lbuf_packed_rgba(bm_lb)
+					local fpath = varsubst.run(bm_spec,subst_funcs)
+					-- TODO ensure directory
+
+					local fh
+					-- TODO pipe support
+					fh, err = io.open(fpath,'wb')
+					if not fh then
+						return false,err
+					end
+					if not args.quiet then
+						cli.infomsg('%s\n',fpath)
+					end
+					fh:write(string.format(
+						'P7\nWIDTH %d\nHEIGHT %d\nDEPTH %d\nMAXVAL %d\nTUPLTYPE RGB_ALPHA\nENDHDR\n',
+						bm_pimg:width(),
+						bm_pimg:height(),
+						4,255))
+					bm_lb:fwrite(fh)
+					fh:close()
+				end
+				if args.wait and i < args.count then
+					sys.sleep(args.wait)
+				end
+			end
+			return true
 		end,
 	},
 	{

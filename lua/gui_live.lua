@@ -581,7 +581,7 @@ function m.init()
 					iup.button{
 						title="Quick dump",
 						action=function()
-							add_status(cli:execute('dumpframes'))
+							add_status(cli:execute('lvdump'))
 						end,
 					},
 				},

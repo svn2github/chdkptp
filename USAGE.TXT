@@ -218,8 +218,9 @@ reboot       [options] [file]: - reboot the camera
    -norecon  don't try to reconnect
    -wait=<N> wait N ms before attempting to reconnect, default 3500
 
-dumpframes   [options] [file]: - dump camera display frames to file
- file: optional output file name, defaults to chdk_<pid>_<date>_<time>.lvdump
+lvdump (dumpframes) [options] [file]: - dump camera display frames to file
+ file:
+        optional output file name, defaults to chdk_<pid>_<date>_<time>.lvdump
  options:
    -count=<N> number of frames to dump
    -wait=<N>  wait N ms between frames
@@ -227,6 +228,20 @@ dumpframes   [options] [file]: - dump camera display frames to file
    -nobm      don't get ui overlay data
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
+
+lvdumpimg    [options]   : - dump camera display frames to images
+ options:
+   -count=<N> number of frames to dump, default 1
+   -wait=<N>  wait N ms between frames
+   -vp[=file] get viewfinder data to file
+   -bm[=file] get ui overlay data to file
+   -nopal     don't get palette for ui overlay
+   -quiet     don't print progress
+  file may include substitution pattern
+   ${date,datefmt}  current time formatted with os.date()
+   ${frame,strfmt}  current frame number formatted with string.format
+   ${time,strfmt}   current time in seconds, as float, formatted with string.format
+   default vp_${time,%014.3f}.pbm bm_${time,%014.3f}.pam for viewfinder and ui respectively
 
 shoot        [options]   : - shoot a picture with specified exposure
  options:
