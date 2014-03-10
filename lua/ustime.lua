@@ -103,6 +103,10 @@ function proto:addms(ms)
 	self:addus(1000*ms)
 end
 
+function proto:float()
+	return (self.sec + self.usec/1000000)
+end
+
 proto.diff = ustime.diff
 proto.diffms = ustime.diffms
 proto.format = ustime.format
