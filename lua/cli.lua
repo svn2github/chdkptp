@@ -616,7 +616,7 @@ cli:add_commands{
 		},
 		arghelp='[-noflush][-force][-nowait]',
 		help_detail=[[
- Terminate any runnings script on the camera
+ Terminate any running script on the camera
    -noflush: don't discard script messages
    -force: force kill even if camera does not support (crash / memory leaks likely!)
 ]],
