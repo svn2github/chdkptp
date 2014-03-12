@@ -231,21 +231,24 @@ m.cli_cmds = {
 					args[1] = rest
 					rcopts,err = init_handlers(args,opts)
 					-- TODO handle error, should send l to script
-				elseif cmd == 's' or cmd == 'l' then
+				else
+					-- remaining commands assumed to be cam side
 					-- TODO could check if remotecap has timed out here
-					status, err = con:write_msg(cmd)
+					status, err = con:write_msg(cmd..' '..rest)
 					if not status then
 						done=true
 						warnf('write_msg failed %s\n',tostring(err))
 						-- TODO might have remotecap data, but probably won't be able to read it if msg failed
 						break
 					end
-					status,err = con:capture_get_data(rcopts)
-					if not status then
-						warnf('capture_get_data error %s\n',tostring(err))
-					end
-					if cmd == 'l' then
-						done=true
+ 					if cmd == 's' or cmd == 'l' then
+						status,err = con:capture_get_data(rcopts)
+						if not status then
+							warnf('capture_get_data error %s\n',tostring(err))
+						end
+						if cmd == 'l' then
+							done=true
+						end
 					end
 				end
 			until done
@@ -308,6 +311,41 @@ function rsint_init(opts)
 	return rs_init(opts)
 end
 
+-- from msg_shell
+cmds={
+	echo=function(msg)
+		if write_usb_msg(msg) then
+			print("ok")
+		else 
+			print("fail")
+		end
+	end,
+	exec=function(msg)
+		local f,err=loadstring(string.sub(msg,5));
+		if f then 
+			local r={f()} -- pcall would be safer but anything that yields will fail
+			for i, v in ipairs(r) do
+				write_usb_msg(v)
+			end
+		else
+			write_usb_msg(err)
+			print("loadstring:"..err)
+		end
+	end,
+	pcall=function(msg)
+		local f,err=loadstring(string.sub(msg,6));
+		if f then 
+			local r={pcall(f)}
+			for i, v in ipairs(r) do
+				write_usb_msg(v)
+			end
+		else
+			write_usb_msg(err)
+			print("loadstring:"..err)
+		end
+	end,
+}
+
 function rsint_run(opts)
 	press('shoot_half')
 
@@ -322,8 +360,19 @@ function rsint_run(opts)
 	while true do
 		local next_shot
 		local msg=read_usb_msg(10)
-		if msg == 's' or msg == 'l' then
+
+		local cmd=nil
+		if msg then
+			cmd = string.match(msg,'^%w+')
+		end
+		if cmd == 's' or cmd == 'l' then
 			next_shot = true
+		elseif msg then
+			if type(cmds[cmd]) == 'function' then
+				cmds[cmd](msg)
+			else
+				write_usb_msg('unknown command '..tostring(cmd))
+			end
 		end
 		if next_shot then
  			if hook_shoot.is_ready() then
@@ -338,7 +387,7 @@ function rsint_run(opts)
 				return false, 'timeout waiting for command'
 			end
 		end
-		if msg == 'l' then
+		if cmd == 'l' then
 			break
 		end
 	end
