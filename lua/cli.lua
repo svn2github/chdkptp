@@ -531,7 +531,7 @@ cli:add_commands{
 		help='quit program',
 		func=function() 
 			cli.finished = true
-			return true,"bye"
+			return true
 		end,
 	},
 	{
@@ -1564,7 +1564,7 @@ cli:add_commands{
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value. In standard units, Canon "real" ISO
-   -av=<v>    Aperature value. In standard units, f number
+   -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
    -raw[=1|0] Force raw on or off, defaults to current camera setting
@@ -1573,7 +1573,7 @@ cli:add_commands{
    -nowait    don't wait for shot to complete
    -dl        download shot file(s)
    -rm        remove file after shooting
-  Any exposure paramters not set use camera defaults
+  Any exposure parameters not set use camera defaults
 ]],
 		func=function(self,args) 
 			local opts,err = cli:get_shoot_common_opts(args)
@@ -1704,13 +1704,13 @@ cli:add_commands{
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value. In standard units, Canon "real" ISO
-   -av=<v>    Aperature value. In standard units, f number
+   -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
    -jpg         jpeg, default if no other options (not supported on all cams)
    -raw         framebuffer dump raw
    -dng         DNG format raw
-   -dnghdr      save DNG header to a seperate file, ignored with -dng
+   -dnghdr      save DNG header to a separate file, ignored with -dng
    -s=<start>   first line of for subimage raw
    -c=<count>   number of lines for subimage
    -cont=<num>  shoot num shots in continuous mode

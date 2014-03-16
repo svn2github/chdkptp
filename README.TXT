@@ -10,7 +10,11 @@ Binary snapshot builds are available from http://www.assembla.com/spaces/chdkptp
 Roadmap is under development in http://www.assembla.com/spaces/chdkptp/tickets
 Changelog is at http://www.assembla.com/wiki/show/chdkptp/Changelog
 
+This README is primarily intended for developers.
+
 Documentation for end users can be found in USAGE.TXT
+
+Installation information can be found in INSTALL.TXT
 
 Information about the Raspberry pi binary builds can be found in README-RASPI.TXT
 

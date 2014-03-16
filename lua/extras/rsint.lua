@@ -100,7 +100,7 @@ m.cli_cmds = {
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value. In standard units, Canon "real" ISO
-   -av=<v>    Aperature value. In standard units, f number
+   -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
    -jpg         jpeg, default if no other options (not supported on all cams)
