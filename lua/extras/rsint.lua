@@ -354,12 +354,19 @@ function rsint_run(opts)
 		return false, err
 	end
 
+	local errmsg
+
 	hook_shoot.set(opts.shoot_hook_timeout)
 	local shoot_count = hook_shoot.count()
 	press('shoot_full')
 	while true do
 		local next_shot
 		local msg=read_usb_msg(10)
+
+		if type(get_usb_capture_target) == 'function' and get_usb_capture_target() == 0 then
+			errmsg = 'remote capture cancelled'
+			break
+		end
 
 		local cmd=nil
 		if msg then
@@ -382,9 +389,8 @@ function rsint_run(opts)
 			end
 		else
 			if hook_shoot.count() > shoot_count and not hook_shoot.is_ready() then
-				hook_shoot.set(0)
-				release('shoot_full')
-				return false, 'timeout waiting for command'
+				errmsg = 'timeout waiting for command'
+				break
 			end
 		end
 		if cmd == 'l' then
@@ -393,6 +399,9 @@ function rsint_run(opts)
 	end
 	hook_shoot.set(0)
 	release('shoot_full')
+	if errmsg then
+		return false, errmsg
+	end
 	return true
 end
 ]]}

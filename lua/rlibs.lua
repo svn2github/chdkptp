@@ -1089,6 +1089,9 @@ function rs_shoot_cont(opts)
 			shots = shots + 1
 			last_exp_count = exp_count
 		end
+		if type(get_usb_capture_target) == 'function' and get_usb_capture_target() == 0 then
+			break
+		end
 	until shots >= opts.cont or m == 'stop'
 	release('shoot_full')
 end
