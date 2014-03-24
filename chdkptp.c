@@ -96,6 +96,15 @@
 #include "liveimg.h"
 #include "rawimg.h"
 
+// workaround for error building with CD using recent mingw
+// d:/devel/cd-5.7/lib\libcdcontextplus.a(cdwinp.o):cdwinp.cpp:(.text+0x8dca): undefined reference to `_GdipFontFamilyCachedGenericSansSerif'
+// these are defined "extern" in mingw include/gdiplus/gdiplusimpl.h
+#if defined(CHDKPTP_CD) && defined(CHDKPTP_GDIP_FONT_HACK)
+void *_GdipFontFamilyCachedGenericMonospace;
+void *_GdipFontFamilyCachedGenericSansSerif;
+void *_GdipFontFamilyCachedGenericSerif;
+#endif
+
 /* some defines comes here */
 
 /* CHDK additions */

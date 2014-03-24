@@ -34,17 +34,15 @@ the CHDKDE ptpcam source may be found at http://tools.assembla.com/chdkde/browse
 chdkptp includes software from several other projects, see THANKS.TXT for details.
 
 =Dependencies=
-- IUP version 3.5 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work)
+- IUP version 3.10.1 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work)
   Optional, edit config.mk to build without IUP GUI support
-- CD Version 5.5 http://www.tecgraf.puc-rio.br/cd/ (earlier 5.x versions may also work)
+- CD Version 5.7 http://www.tecgraf.puc-rio.br/cd/ (earlier 5.x versions may also work)
   Optional, used for remote display
 - Lua version 5.1 http://www.lua.org/
 - LibUSB (libusb-win32 on windows)
-- CHDK source for PTP protocol header from the appropriate branch, e.g.
-  http://tools.assembla.com/chdk/browser/trunk
 
 =Windows development environment=
-Mingw with gcc 4.6+ is the primary development environment. 
+Mingw with gcc 4.8+ is the primary development environment. 
 All instructions below assume you are using this.
 Using a mingw bash shell for development is suggested.
 
@@ -53,12 +51,10 @@ http://www.mingw.org/
 Download the gui installer. Install at least mingw C compiler.
 C++ support is required to use CD "context plus", not required or used by default.
 Msys is suggested, and may be required
-http://sourceforge.net/projects/mingw/files/Installer/mingw-get-inst/
 
 ==Installing IUP libraries==
 Get the mingw4 binary package of IUP, 
-http://sourceforge.net/projects/iup/files/3.5/Windows%20Libraries/
-file iup-3.5_Win32_mingw4_lib.zip
+http://sourceforge.net/projects/iup/files/
 
 Note, this package has the libraries in the root, with etc/ and include/ subdirectories.
 You may want to put the libraries in /lib to match the IUP recommended filesystem layout

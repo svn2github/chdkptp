@@ -12,7 +12,7 @@ endif
 
 ifeq ($(OSTYPE),Windows)
 SYS_LIBS=ws2_32 kernel32
-IUP_SYS_LIBS=comctl32 ole32 gdi32 comdlg32
+IUP_SYS_LIBS=comctl32 ole32 gdi32 comdlg32 uuid
 endif
 
 ifeq ("$(PTPIP_SUPPORT)","1")

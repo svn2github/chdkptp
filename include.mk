@@ -2,8 +2,9 @@ HOSTPLATFORM:=$(patsubst MINGW%,MINGW,$(shell uname -s))
 ifeq ($(HOSTPLATFORM),MINGW)
 OSTYPE=Windows
 EXE=.exe
-# Note may be freetype6 depending on your CD version, zlib requried for 5.5 and later
-CD_FREETYPE_LIB=freetype z
+# Note may be freetype or freetype6 depending on your CD version, zlib requried for 5.5 and later
+CD_FREETYPE_LIB=freetype6 z
+#CD_FREETYPE_LIB=freetype z
 else
 ifeq ($(HOSTPLATFORM),Linux)
 OSTYPE=Linux
@@ -42,6 +43,10 @@ else
 CFLAGS+=-O2
 endif
 
+ifdef CD_GDIP_FONT_HACK
+CFLAGS+=-DCHDKPTP_GDIP_FONT_HACK=1
+endif
+
 # use included headers if not specified
 ifndef CHDK_SRC_DIR
 CHDK_SRC_DIR=$(TOPDIR)/chdk_headers
@@ -50,7 +55,6 @@ endif
 ifeq ("$(CD_USE_PLUS)","gdiplus")
 CD_PLUS_SYS_LIBS=$(GDI_PLUS_LIBS)
 endif
-# TODO not tested
 ifeq ("$(CD_USE_PLUS)","cairo")
 CD_PLUS_LIB+=cairo cdcairo cdx11
 endif

@@ -6,7 +6,7 @@ IUP_SUPPORT=0
 CD_SUPPORT=0
 # enable "plus" context support with cairo, you will need libcairo2-dev or similar
 #CD_USE_PLUS=cairo
-# should this build include PTP/IP (wifi camera) support (not implemented yet!)
+# should this build include PTP/IP (wifi camera) support
 PTPIP_SUPPORT=0
 
 LUA_INCLUDE_DIR=/usr/include/lua5.1

@@ -21,12 +21,16 @@ TODO might want to just use luasocket code
 */
 
 #ifdef WIN32
+// some mingw versions may require the following, instead of the two includes below
+/*
 // required for getaddrinfo, we don't support pre-XP anyway
 #define WINVER 0x0502
-
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+*/
+#include <winsock2.h>
+#include <windows.h>
 #else
 #include <errno.h>
 #include <sys/socket.h>
