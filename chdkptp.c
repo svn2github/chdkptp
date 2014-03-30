@@ -50,6 +50,10 @@
 #endif
 #endif
 #include <usb.h>
+#ifdef CHDKPTP_READLINE
+#include <readline/readline.h>
+#include <readline/history.h>
+#endif
 
 #ifdef WIN32
 #define usleep(usec) Sleep((usec)/1000)
@@ -2005,6 +2009,27 @@ static int syslib_gettimeofday(lua_State *L) {
 	return 2;
 }
 
+#ifdef CHDKPTP_READLINE
+static int readlinelib_line(lua_State *L) {
+	const char *prompt=luaL_optstring(L,1,NULL);
+	char *line=readline(prompt);
+	if(line) {
+		lua_pushstring(L,line);
+		free(line);
+	} else {
+		lua_pushboolean(L,0);
+	}
+	return 1;
+}
+static int readlinelib_add_history(lua_State *L) {
+	const char *str=luaL_checkstring(L,1);
+	char *buf=malloc(strlen(str)+1);
+	strcpy(buf,str);
+	add_history(buf);
+	return 0;
+}
+#endif
+
 /*
 global copies of argc, argv for lua
 */
@@ -2063,6 +2088,13 @@ static const luaL_Reg lua_syslib[] = {
   {"getenv",syslib_getenv},
   {NULL, NULL}
 };
+#ifdef CHDKPTP_READLINE
+static const luaL_Reg lua_readlinelib[] = {
+  {"line",readlinelib_line},
+  {"add_history",readlinelib_add_history},
+  {NULL, NULL}
+};
+#endif
 
 // getters/setters for variables exposed to lua
 static const luaL_Reg lua_corevar[] = {
@@ -2149,6 +2181,10 @@ static int chdkptp_registerlibs(lua_State *L) {
 	luaL_register(L, "chdk", chdklib);
 
 	luaL_register(L, "sys", lua_syslib);
+#ifdef CHDKPTP_READLINE
+	luaL_register(L, "readline", lua_readlinelib);
+//	using_history();
+#endif
 	luaL_register(L, "corevar", lua_corevar);
 	luaL_register(L, "guisys", lua_guisyslib);
 

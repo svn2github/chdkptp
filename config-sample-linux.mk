@@ -9,6 +9,16 @@ CD_SUPPORT=0
 # should this build include PTP/IP (wifi camera) support
 PTPIP_SUPPORT=0
 
+# include gnu readline support (command history+editing)
+READLINE_SUPPORT=1
+
+# the follwing may be set if your readline is not in a standard location
+#READLINE_LIB_DIR=/path/to/readline/libs
+# note code expects for find readline/readline.h
+#READLINE_INCLUDE_DIR=/path/to/readline/headers
+# library names for -llibfoo
+#READLINE_LIB=readline history
+
 LUA_INCLUDE_DIR=/usr/include/lua5.1
 LUA_LIB=lua5.1
 

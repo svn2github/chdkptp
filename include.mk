@@ -27,6 +27,8 @@ IUP_LIB=iup
 IUP_LUA_LIB=iuplua51
 LIBUSB_LIB=usb
 
+READLINE_LIB=readline history
+
 CD_LIB=cd
 CD_LUA_LIB=cdlua51
 IUP_CD_LIB=iupcd

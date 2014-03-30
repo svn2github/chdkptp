@@ -11,6 +11,17 @@ CD_SUPPORT=1
 # should this build include PTP/IP (wifi camera) support
 #PTPIP_SUPPORT=1
 
+# include gnu readline support (command history+editing)
+# on windows, native command history works so this isn't needed
+#READLINE_SUPPORT=1
+
+# the follwing may be set if your readline is not in a standard location
+#READLINE_LIB_DIR=/path/to/readline/libs
+# note code expects for find readline/readline.h
+#READLINE_INCLUDE_DIR=/path/to/readline/headers
+# library names for -llibfoo
+#READLINE_LIB=readline history
+
 # root directories of various packages, used to set subdirs below.
 # Not required by main makefile
 IUP_DIR=/d/devel/iup

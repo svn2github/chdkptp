@@ -40,6 +40,8 @@ chdkptp includes software from several other projects, see THANKS.TXT for detail
   Optional, used for remote display
 - Lua version 5.1 http://www.lua.org/
 - LibUSB (libusb-win32 on windows)
+- GNU readline
+  Optional, recommended on Linux
 
 =Windows development environment=
 Mingw with gcc 4.8+ is the primary development environment. 
@@ -93,6 +95,10 @@ libusb-1.0-0
 libusb-dev (may be called libusb-1.0-dev ?)
 liblua5.1-0-dev
 liblua5.1-0
+
+GNU readline 
+You need the development package, probably called something like 
+libreadline6-dev or something like that
 
 IUP - using precompiled binaries
 Download the appropriate IUP library for your platform from 

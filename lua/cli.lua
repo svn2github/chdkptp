@@ -323,9 +323,17 @@ function cli:print_status(status,msg)
 	return status,msg
 end
 
-function cli.readline(prompt)
-	printf("%s",prompt)
-	return io.read()
+if readline then
+	cli.readline = readline.line
+	cli.addhistory = readline.add_history
+else
+	function cli.readline(prompt)
+		printf("%s",prompt)
+		return io.read()
+	end
+-- noop
+	function cli.add_history(line)
+	end
 end
 
 function cli:run()
@@ -333,6 +341,9 @@ function cli:run()
 		line = cli.readline(self:get_prompt())
 		if not line then
 			break
+		end
+		if line:len() > 0 then
+			cli.addhistory(line)
 		end
 		self:print_status(self:execute(line))
 		if self.finished then
