@@ -2227,7 +2227,7 @@ int main(int argc, char ** argv)
 	/* register signal handlers */
 //	signal(SIGINT, ptpcam_siginthandler);
 	usb_init();
-	lua_State *L = lua_open();
+	lua_State *L = luaL_newstate();
 	luaL_openlibs(L);
 	luaopen_lfs(L);
 	lbuf_open(L);

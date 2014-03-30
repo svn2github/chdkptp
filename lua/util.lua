@@ -611,6 +611,8 @@ the value is sandboxed in an empty function environment
 returns the resulting value, or false + an error message on failure
 check the message, since the serialized value might be false or nil!
 ]]
+-- lua 5.1
+if type(setfenv) == 'function' then
 function util.unserialize(s)
 	local f,err=loadstring('return ' .. s)
 	if not f then
@@ -622,6 +624,20 @@ function util.unserialize(s)
 		return r
 	end
 	return false,r
+end
+else
+-- lua 5.2
+function util.unserialize(s)
+	local f,err=load('return ' .. s,nil,'t',{})
+	if not f then
+		return false, err
+	end
+	local status,r=pcall(f)
+	if status then
+		return r
+	end
+	return false,r
+end
 end
 
 --[[
