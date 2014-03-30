@@ -22,21 +22,28 @@ LDFLAGS=
 #LD=ld
 
 #default lib names, can be overridden in config
+#LUA_SFX will be set below and expanded correctly later
 LUA_LIB=lua
 IUP_LIB=iup
-IUP_LUA_LIB=iuplua51
+IUP_LUA_LIB=iuplua$(LUA_SFX)
 LIBUSB_LIB=usb
 
 READLINE_LIB=readline history
 
 CD_LIB=cd
-CD_LUA_LIB=cdlua51
+CD_LUA_LIB=cdlua$(LUA_SFX)
 IUP_CD_LIB=iupcd
-IUP_CD_LUA_LIB=iupluacd51
-CD_PLUS_LIB=cdcontextplus cdluacontextplus51
+IUP_CD_LUA_LIB=iupluacd$(LUA_SFX)
+CD_PLUS_LIB=cdcontextplus cdluacontextplus$(LUA_SFX)
 GDI_PLUS_LIBS=gdiplus stdc++
 #see config-sample-*.mk
 -include $(TOPDIR)/config.mk
+
+ifeq ("$(USE_LUA_52)","1")
+LUA_SFX=52
+else
+LUA_SFX=51
+endif
 
 ifdef DEBUG
 CFLAGS+=-g

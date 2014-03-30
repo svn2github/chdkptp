@@ -2183,7 +2183,6 @@ static int chdkptp_registerlibs(lua_State *L) {
 	luaL_register(L, "sys", lua_syslib);
 #ifdef CHDKPTP_READLINE
 	luaL_register(L, "readline", lua_readlinelib);
-//	using_history();
 #endif
 	luaL_register(L, "corevar", lua_corevar);
 	luaL_register(L, "guisys", lua_guisyslib);

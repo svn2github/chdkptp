@@ -1,5 +1,10 @@
 # configurable build settings
 # these can be set on the command line or config.mk
+
+# use Lua 5.2 
+# experimental, sets correct suffix for IUP and CD libs
+#USE_LUA_52=1
+
 # should IUP gui be built ?
 IUP_SUPPORT=0
 # should CD support be built

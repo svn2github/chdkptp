@@ -26,6 +26,18 @@ to allow overriding, e.g. for gui
 util.util_stderr = io.stderr
 util.util_stdout = io.stdout
 
+-- return version components as numbers
+-- _VERSION does not usally contain final (release) number
+function util.lua_version()
+	if type(_VERSION) ~= 'string' then
+		error('missing _VERSION')
+	end
+	local major,minor = string.match(_VERSION,'(%d+)%.(%d+)')
+	return tonumber(major),tonumber(minor)
+end
+
+util.lua_ver_major,util.lua_ver_minor = util.lua_version()
+
 function util.fprintf(f,...)
 	local args={...}
 	if #args == 0 or type(args[1]) ~= 'string' then

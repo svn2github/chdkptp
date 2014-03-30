@@ -405,9 +405,9 @@ function rsint_run(opts)
 	return true
 end
 ]]}
-	-- can't use xpcall with gui readline
+	-- can't use xpcall with gui readline in 5.1
 	-- TODO this won't work if module is loaded before gui
-	if gui then
+	if gui and util.lua_ver_minor < 2 then
 		m.cli_cmds[1].noxpcall = true 
 	end
 	cli:add_commands(m.cli_cmds)
