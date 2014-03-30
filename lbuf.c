@@ -448,7 +448,7 @@ TODO support negative offset to indicate from end?
 static int lbuf_fill(lua_State *L) {
 	lBuf_t *buf = (lBuf_t *)luaL_checkudata(L,1,LBUF_META);
 	const char *fill_val;
-	unsigned fill_len;
+	size_t fill_len;
 	if(lua_type(L,2) == LUA_TUSERDATA) {
 		lBuf_t *buf2 = (lBuf_t *)luaL_checkudata(L,2,LBUF_META);
 		fill_val = buf2->bytes;
