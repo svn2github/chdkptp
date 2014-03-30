@@ -190,10 +190,10 @@ m.cli_cmds = {
 			done = false
 			local status,err
 			repeat
-				printf("rsint> ")
-				local line = io.read()
+--				local line = io.read()
+				local line = cli.readline('rsint> ')
 				if not line then
-					warnf('io.read failed\n')
+					warnf('cli.readline failed / eof\n')
 					break
 				end
 				status, err = con:script_status()
@@ -405,6 +405,11 @@ function rsint_run(opts)
 	return true
 end
 ]]}
+	-- can't use xpcall with gui readline
+	-- TODO this won't work if module is loaded before gui
+	if gui then
+		m.cli_cmds[1].noxpcall = true 
+	end
 	cli:add_commands(m.cli_cmds)
 end
 return m

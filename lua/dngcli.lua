@@ -207,7 +207,7 @@ local function dngbatch_docmd(cmd,dargs)
 	-- TODO based on cli.execute
 	local cstatus,status,msg = xpcall(
 		function()
-			return cli.names[cmd.name](cmd.args)
+			return cli.names[cmd.name]:func(cmd.args)
 		end,
 		util.err_traceback)
 	if not cstatus then

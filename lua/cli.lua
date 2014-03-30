@@ -177,9 +177,6 @@ cli.cmd_meta = {
 	__index = function(cmd, key)
 		return cli.cmd_proto[key]
 	end,
-	__call = function(cmd,...)
-		return cmd:func(...)
-	end,
 }
 
 function cli:add_commands(cmds)
@@ -203,17 +200,21 @@ function cli:add_commands(cmds)
 	end
 end
 
-function cli:prompt()
+function cli:get_prompt()
 	if con:is_connected() then
 		local script_id = con:get_script_id()
 		if script_id then
-			printf("con %d> ",script_id)
+			return string.format("con %d> ",script_id)
 		else
-			printf("con> ")
+			return "con> "
 		end
 	else
-		printf("___> ")
+		return "___> "
 	end
+end
+
+function cli:prompt()
+	printf("%s",self:get_prompt())
 end
 
 -- execute command given by a single line
@@ -236,11 +237,16 @@ function cli:execute(line)
 			local cstatus
 			local t0=ustime.new()
 			con:reset_counters()
-			cstatus,status,msg = xpcall(
-				function()
-					return self.names[cmd](args)
-				end,
-				util.err_traceback)
+			if self.names[cmd].noxpcall then
+				cstatus = true
+				status,msg = self.names[cmd]:func(args)
+			else
+				cstatus,status,msg = xpcall(
+					function()
+						return self.names[cmd]:func(args)
+					end,
+					util.err_traceback)
+			end
 			local tdiff = ustime.diff(t0)/1000000;
 			if prefs.cli_time then
 				printf("time %.4f\n",tdiff)
@@ -317,14 +323,21 @@ function cli:print_status(status,msg)
 	return status,msg
 end
 
+function cli.readline(prompt)
+	printf("%s",prompt)
+	return io.read()
+end
+
 function cli:run()
-	self:prompt()
-	for line in io.lines() do
+	while true do
+		line = cli.readline(self:get_prompt())
+		if not line then
+			break
+		end
 		self:print_status(self:execute(line))
 		if self.finished then
 			break
 		end
-		self:prompt()
 	end
 end
 

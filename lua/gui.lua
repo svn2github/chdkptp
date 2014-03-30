@@ -602,12 +602,17 @@ function add_status(status,msg)
 	end
 end
 
+-- resume with input line, yield returns as result
+-- currently the only place it should yield
+function gui.cli_readline(prompt)
+	return coroutine.yield()
+end
+
 function btn_exec:action()
 	printf('> %s\n',inputtext.value)
 	cmd_history:add(inputtext.value)
-	add_status(cli:execute(inputtext.value))
+	gui.cli_thread(inputtext.value)
 	inputtext.value=''
-	-- handle cli exit
 	if cli.finished then
 		dlg:hide()
 	end
@@ -625,6 +630,10 @@ function gui:run()
 	do_execute_option()
 	live.on_dlg_run()
 	gui.resize_for_content()
+
+	cli.readline = gui.cli_readline
+	gui.cli_thread = coroutine.wrap(function() cli:run() end)
+	gui.cli_thread_status = gui.cli_thread()
 
 	if (iup.MainLoopLevel()==0) then
 	  iup.MainLoop()
