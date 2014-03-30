@@ -325,7 +325,7 @@ end
 
 if readline then
 	cli.readline = readline.line
-	cli.addhistory = readline.add_history
+	cli.add_history = readline.add_history
 else
 	function cli.readline(prompt)
 		printf("%s",prompt)
@@ -343,7 +343,7 @@ function cli:run()
 			break
 		end
 		if line:len() > 0 then
-			cli.addhistory(line)
+			cli.add_history(line)
 		end
 		self:print_status(self:execute(line))
 		if self.finished then
