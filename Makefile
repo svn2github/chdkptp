@@ -95,6 +95,11 @@ endif
 # iup
 endif
 
+# needed for linking static lua lib on linux, should be harmless if dynamic linking
+ifneq ($(OSTYPE),Windows)
+LINK_LIBS+=m dl
+endif
+
 INC_PATHS+=-I$(CHDK_SRC_DIR)
 
 CFLAGS+=$(INC_PATHS) -DCHDKPTP_BUILD_NUM=$(SVNREV) -DCHDKPTP_REL_DESC="\"alpha\""
