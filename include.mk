@@ -41,6 +41,8 @@ GDI_PLUS_LIBS=gdiplus stdc++
 
 ifeq ("$(USE_LUA_52)","1")
 LUA_SFX=52
+# must also have been defined when built, is by default
+CFLAGS+=-DLUA_COMPAT_ALL=1
 else
 LUA_SFX=51
 endif
