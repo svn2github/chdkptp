@@ -8,10 +8,10 @@ it should look something like this
 
 #!/bin/sh
 CHDKPTP_DIR=/home/pi/pietest
-export LD_LIBRARY_PATH=$CHDKPTP_DIR/libs/cd:$CHDKPTP_DIR/libs/iup
+export LD_LIBRARY_PATH=$CHDKPTP_DIR/cd/lib:$CHDKPTP_DIR/iup/lib
 export LUA_PATH="$CHDKPTP_DIR/lua/?.lua"
 "$CHDKPTP_DIR/chdkptp_gui" "$@"
 
-The cli build should run as long as you have the raspbian lua and libusb packages installed
+The CLI build should have no external dependencies that aren't part of the standard system
 
 Information on building the libraries can be found in README-RASPI-LIBS.TXT

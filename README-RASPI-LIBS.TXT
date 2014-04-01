@@ -1,71 +1,144 @@
-IUP and CD compiled for raspberry pi, raspbian hard float 
-Binaries to support chdkptp http://www.assembla.com/wiki/show/chdkptp
+The chdkptp raspberry pi library package provides Lua 5.1, Lua 5.2, IUP and CD
+compiled for the raspbian distribution. The latest package can be found
+in the chdkptp files area:
+https://www.assembla.com/spaces/chdkptp/documents
 
-For information about IUP, see
+Information about chdkptp can be found at:
+http://www.assembla.com/wiki/show/chdkptp
+
+For information about Lua, CD and IUP, see
+http://www.lua.org/
 http://www.tecgraf.puc-rio.br/iup/
 http://www.tecgraf.puc-rio.br/cd/
 
-These are pretty much untested, and the IUP build is missing a
-few libs (not required for chdkptp)
+The zip is arranged into directories for each library:
+lua5.1, lua52, cd and iup respectively
+
+See COPYRIGHT file or doc subdirectory in each directory for copyright
+information.
+
+These files are intended to allow you to run the chdkptp GUI binary on
+raspberry pi, or build your own chdkptp without building the GUI libraries.
+Some files not required by CHDK are included, but these are not complete
+distributions of Lua, CD and IUP, and are not thoroughly tested. 
+
+Using the libraries with chdkptp:
+See README-RASPI.TXT in the chdkptp package or source.
+
+Using the libraries to build chdkptp:
+Use something like the following in your config.mk
+
+TEC_LIBS=/path/to/zip/contents
+
+ifeq ("$(USE_LUA_52)","1")
+LUA_INCLUDE_DIR=$(TEC_LIBS)/lua52/include
+LUA_LIB_DIR=$(TEC_LIBS)/lua52/lib
+else
+LUA_INCLUDE_DIR=$(TEC_LIBS)/lua5.1/include
+LUA_LIB_DIR=$(TEC_LIBS)/lua5.1/lib
+endif
+
+# lib paths - only needed if you haven't installed in system directories
+IUP_LIB_DIR=$(TEC_LIBS)/iup/lib
+IUP_INCLUDE_DIR=$(TEC_LIBS)/iup/include
+CD_LIB_DIR=$(TEC_LIBS)/cd/lib
+CD_INCLUDE_DIR=$(TEC_LIBS)/cd/include
+
 
 Build notes:
-I managed to build the gui for raspberry pi. Since there was some trial and error and I didn't restart from the beginning with each change, the notes that follow may not be complete.
+The libraries were built on 2014-01-07-wheezy-raspbian.zip
+While there are a few pi specifics, the following may also be useful
+building on other distros.
 
-I did this using the raspbian distro announced here http://www.raspberrypi.org/archives/1605, most of it should apply to building the libs on other Debian based distros, on pi or pc.
+The build mostly follows the directions given at
+http://www.tecgraf.puc-rio.br/iup/en/building.html
+but several additional workarounds are required. The build was done
+without using the distro provided Lua packages, and without using tecmake.
 
-Add  the following packages (in addition to the ones required to build chdkptp without gui)
+Both Lua 5.1 and Lua 5.2 are used, to simplify building the other libraries,
+and to provide the ability to build chdkptp with Lua 5.2
+
+The following packages should be installed
+libreadline-dev
+libncurses5-dev
+libfreetype6-dev
 libx11-dev
 libxpm-dev
 libxmu-dev
 libxft-dev
 libgtk2.0-dev
 libgl1-mesa-dev
-libwebkitgtk-dev
 libglu1-mesa-dev
-libncurses5-dev
+libwebkitgtk-dev
 
-These are mostly from the list found at http://www.tecgraf.puc-rio.br/iup/en/building.htm except
-- I left out the motif related ones, since I don't care about motif.
-- libglu1-mesa-dev was not mentioned, but is required for GL support.
-- libncurses5-dev was not mentioned, but was required for something in iup.
-libwebkitgtk-dev may have been a mistake, since I couldn't get the iupweb component to build and ended up commenting it out. From what I could tell, USE_PKGCONFIG=Yes giving the wrong location.
+Download the source packages
+$ wget http://www.lua.org/ftp/lua-5.1.5.tar.gz
+$ wget http://www.lua.org/ftp/lua-5.2.3.tar.gz
+$ wget http://sourceforge.net/projects/imtoolkit/files/3.8.2/Docs%20and%20Sources/im-3.8.2_Sources.tar.gz
+$ wget http://sourceforge.net/projects/canvasdraw/files/5.7/Docs%20and%20Sources/cd-5.7_Sources.tar.gz
+$ wget http://sourceforge.net/projects/iup/files/3.10.1/Docs%20and%20Sources/iup-3.10.1_Sources.tar.gz
 
-Get and extract the IM, CD and IUP sources:
-wget http://sourceforge.net/projects/imtoolkit/files/3.8/Docs%20and%20Sources/im-3.8_Sources.tar.gz
-wget http://sourceforge.net/projects/canvasdraw/files/5.5.1/Docs%20and%20Sources/cd-5.5.1_Sources.tar.gz
-wget http://sourceforge.net/projects/iup/files/3.6/Docs%20and%20Sources/iup-3.6_Sources.tar.gz
-tar -xzf im-3.8_Sources.tar.gz
-tar -xzf cd-5.5.1_Sources.tar.gz
-tar -xzf iup-3.6_Sources.tar.gz
+$ tar -xzf lua-5.1.5.tar.gz
 
-Note, I used the liblua5.1-0-dev package to provide lua. This caused me some problems, it might be better to build lua along with the rest of the libs. In this case, you'd probably also want to link chkdptp with the locally built instead of the debian package.
+$ tar -xzf lua-5.2.3.tar.gz
 
-Now build the libraries in this order IM, CD, IUP
-The documentation mentions that you can build individual libraries. However, for IM and CD, it's not immediately clear which are needed to support IUP, so I just tried to build everything, running make in the top level src directory.
+$ tar -xzf im-3.8.2_Sources.tar.gz
+$ tar -xzf cd-5.7_Sources.tar.gz
+$ tar -xzf iup-3.10.1_Sources.tar.gz
 
-To the distro lua package, the following needs to be set
-export LUA_SUFFIX=
-export LUA_INC=/usr/include/lua5.1
+The IM, CD and IUP tar files did not have execute permissions on the directories.
+This can be fixed with the following:
 
-IM built with just 
-make 
+$ find im cd iup -type d -exec chmod a+x {} \;
 
-CD
-needs to be built with 
-make USE_PKGCONFIG=Yes
-to find the correct GTK stuff
+The default tekmake.mak files do not properly detect the raspbian as arm,
+which in turn makes it define TEC_BIGENDIAN. Apply the included
+tecmake.mak.patch patch with
 
-IUP
-I had multiple problems with this one.
-Edit the to level makefile to remove iupweb from do_all
-create the following symlink to allow the distro installed lua lib to be found
-ln -s /usr/lib/arm-linux-gnueabihf/liblua5.1.a /usr/lib/liblua.a
-In srcconsole/Makefile, comment out the @$(TECMAKE_CMD) USE_LUA52=Yes in the iuplua5 target
+$ for d in im cd iup ; do pushd $d ; patch -p0 <../tecmake.mak.patch ; popd ; done
 
-in the IUP directory
-make USE_PKGCONFIG=Yes
+Build Lua
+cd lua-5.1.5
+make linux
+make INSTALL_TOP=/home/pi/teclibs/lua5.1 install
 
-Only building the iup libraries actually needed by chdkptp would probably be a smarter approach.
+cd lua-5.2.3
+make linux
+make INSTALL_TOP=/home/pi/teclibs/lua52 install
 
-chdkptp doesn't currently use IM, but some of the CD and IUP stuff depends on it. It might be possible to build whats needed for chdkptp without IM.
+The different naming conventions above are intentional, to conform to the
+pattern expected by the other libraries.
 
+The IUP build expects a different sub-path than the above install creates.
+Use the following to put symlinks in the required location
+
+$ mkdir lua5.1/lib/Linux310
+$ ln -s ../liblua.a lua5.1/lib/Linux310/liblua5.1.a
+$ mkdir lua52/lib/Linux310
+$ ln -s ../liblua.a lua52/lib/Linux310/liblua52.a
+
+Several includes are not found correctly in the IUP and CD build processes.
+Set the following before building. This is probably distro specific, adjust
+if you continue to get include errors.
+
+$ export CPATH=/usr/include/gtk-unix-print-2.0:/usr/include/webkitgtk-1.0:/usr/include/libsoup-2.4:/usr/lib/arm-linux-gnueabihf/glib-2.0/include
+
+Build IM (not directly required by chdkptp, but required by the other libs)
+
+$ cd im && make
+
+Build CD
+
+$ cd cd && make USE_PKGCONFIG=Yes
+
+Build additional CD components required for "context plus" (optional)
+
+$ cd cd/src && make USE_PKGCONFIG=Yes cdx11 cdcontextplus cdluacontextplus5 cdcairo
+
+Build IUP
+
+cd iup && make USE_PKGCONFIG=Yes
+
+The default CD and IUP builds make a lot of libraries that are not currently
+required by chdkptp. It might be better to just build the required libraries
+individually.

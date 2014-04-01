@@ -93,7 +93,7 @@ mkdir stage/lua52/doc
 cp "$LUA51_SRC"/doc/* stage/lua52/doc
 
 cp "$CHDKPTP_DIR"/README-RASPI-LIBS.TXT stage
-#cp "$CHDKPTP_DIR"/misc/tecmake.mak.patch stage
+cp "$CHDKPTP_DIR"/misc/tecmake.mak.patch stage
 
 echo files copied
 
