@@ -20,7 +20,7 @@ lua helper functions for working with the chdk.* c api
 
 local chdku={}
 chdku.rlibs = require('rlibs')
-
+chdku.sleep = sys.sleep -- to allow override
 -- format a script message in a human readable way
 function chdku.format_script_msg(msg)
 	if msg.type == 'none' then
@@ -1252,7 +1252,7 @@ function con_methods:wait_status(opts)
 		sleeptime = opts.poll
 	end
 	if opts.initwait then
-		sys.sleep(opts.initwait)
+		chdku.sleep(opts.initwait)
 		timeleft = timeleft - opts.initwait
 	end
 	-- if waiting on remotecap state, make sure it's supported
@@ -1299,7 +1299,7 @@ function con_methods:wait_status(opts)
 			if timeleft < sleeptime then
 				sleeptime = timeleft
 			end
-			sys.sleep(sleeptime)
+			chdku.sleep(sleeptime)
 			timeleft = timeleft - sleeptime
 		else
 			status.timeout=true
@@ -1365,7 +1365,7 @@ function con_methods:reconnect(opts)
 	local ptpdev = self.ptpdev
 	local condev = self.condev
 	-- appears to be needed to avoid device numbers changing (reset too soon ?)
-	sys.sleep(opts.wait)
+	chdku.sleep(opts.wait)
 	local status,err = self:connect()
 	if not status then
 		return status,err
