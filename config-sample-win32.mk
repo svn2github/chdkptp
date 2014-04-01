@@ -24,7 +24,7 @@ CD_SUPPORT=1
 #READLINE_LIB_DIR=/path/to/readline/libs
 # note code expects for find readline/readline.h
 #READLINE_INCLUDE_DIR=/path/to/readline/headers
-# library names for -llibfoo
+# library names for -llibfoo, only needed to override defaults
 #READLINE_LIB=readline history
 
 # root directories of various packages, used to set subdirs below.

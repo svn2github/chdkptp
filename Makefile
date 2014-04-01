@@ -1,3 +1,7 @@
+# main makefile
+#
+# build-time configuration should be done in config.mk
+# see the config-sameple*.mk files for examples
 TOPDIR=.
 include include.mk
 

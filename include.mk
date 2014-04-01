@@ -1,3 +1,8 @@
+# common macros and targets
+#
+# build-time configuration should be done in config.mk
+# see the config-sameple*.mk files for examples
+
 HOSTPLATFORM:=$(patsubst MINGW%,MINGW,$(shell uname -s))
 ifeq ($(HOSTPLATFORM),MINGW)
 OSTYPE=Windows
