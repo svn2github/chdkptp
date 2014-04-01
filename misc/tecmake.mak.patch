@@ -1,0 +1,12 @@
+--- tecmake.mak.orig	2014-03-30 19:39:21.166501506 -0700
++++ tecmake.mak	2014-03-30 19:39:51.215584771 -0700
+@@ -69,6 +69,9 @@
+   ifeq ($(TEC_SYSARCH), amd64)
+     TEC_SYSARCH:=x64
+   endif
++  ifeq ($(TEC_SYSARCH), armv6l)
++    TEC_SYSARCH:=arm
++  endif
+ 
+   # Compose
+   TEC_SYSRELEASE:=$(TEC_SYSVERSION).$(TEC_SYSMINOR)
