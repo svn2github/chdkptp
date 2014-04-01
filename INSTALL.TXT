@@ -1,4 +1,4 @@
-Binaries fro some platforms are available from the assembla files area
+Binaries for some platforms are available from the assembla files area
 https://www.assembla.com/spaces/chdkptp/documents
 
 There is no installer, just unzip the file wherever you want.
@@ -9,13 +9,16 @@ h2. Windows
   available on the CHDK wiki at
   http://chdk.wikia.com/wiki/PTP_Extension#LibUSB_Driver_for_Windows
 * After the driver is configured, simply run the executable. If you double
-  click on the .exe, the gui will start. If you want to start from the command
-  line, simply run chdkptp -i
+  click on the .exe, the GUI will start. If you want to start the cli,
+  run chdkptp -i
 
 h2. Linux
 
 If a binary for your particular flavor of Linux is not available, you must build
 from source. Some instructions can be found in README.TXT
+
+To use the GUI in the raspberry pi package, you must also download the raspberry
+pi library package and set your LD_LIBRARY_PATH appropriately.
 
 h3. Environment
 
@@ -25,8 +28,6 @@ some environment variables. chdkptp-sample.sh in the zip provides an example.
   containing the chdkptp binary)
 * If you are using a GUI build and the IUP and CD libraries are not on your
   default LD_LIBRARY_PATH, add them to LD_LIBRARY_PATH. 
-* The raspberry pi packages include the GUI libraries, so LD_LIBRARY_PATH can
-  be set as follows LD_LIBRARY_PATH=$CHDKPTP_DIR/libs/cd:$CHDKPTP_DIR/libs/iup
 
 h3. Interactions with default software 
 

@@ -39,6 +39,7 @@ chdkptp includes software from several other projects, see THANKS.TXT for detail
 - CD Version 5.7 http://www.tecgraf.puc-rio.br/cd/ (earlier 5.x versions may also work)
   Optional, used for remote display
 - Lua version 5.1 http://www.lua.org/
+  There is also experimental support for Lua 5.2
 - LibUSB (libusb-win32 on windows)
 - GNU readline
   Optional, recommended on Linux
@@ -83,18 +84,25 @@ If in doubt, build your own Lua with the same compiler you build chdkptp with.
 ==Installing LibUSB development package==
 TODO
 describe filter driver installation
-http://sourceforge.net/projects/libusb-win32/files/libusb-win32-releases/1.2.2.0/
-libusb-win32-bin-1.2.2.0.zip
+http://sourceforge.net/projects/libusb-win32/files/libusb-win32-releases/1.2.4.0/
+libusb-win32-bin-1.2.4.0.zip
 Unzip somewhere convenient
-or is it libusb-win32-devel-filter-1.2.2.0.exe ?
+
+Some earlier and later versions will also probably work
 
 =Linux development environment=
 The following is based on Ubuntu 10.04, 64 bit. YMMV
 Install the following packages and any required dependencies 
 libusb-1.0-0
 libusb-dev (may be called libusb-1.0-dev ?)
+
+Lua
+Packages will be called something like
 liblua5.1-0-dev
 liblua5.1-0
+
+Alternately, you may download and build your own. This is suggested
+if you are building IUP and CD from source.
 
 GNU readline 
 You need the development package, probably called something like 
@@ -110,8 +118,8 @@ You will also need a fully working gcc environment.
 CD - similar to IUP
 
 ==Building IUP and CD==
-If available, using pre-compiled libraries is suggested, but some notes can be found
-in README-RASPI-LIBS.TXT
+If available, using pre-compiled libraries is suggested, but if you want to
+build from source some notes can be found in README-RASPI-LIBS.TXT
 
 =Configuring the source (all platforms)=
 Edit config.mk to reflect the installation directories of the above packages and
