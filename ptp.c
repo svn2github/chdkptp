@@ -2144,7 +2144,7 @@ char* ptp_chdk_get_memory(PTPParams* params, int start, int num)
   ptp.Param2=start;
   ptp.Param3=num;
   ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
-  if ( ret != 0x2001 )
+  if ( ret != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",ret);
     free(buf);
@@ -2166,7 +2166,7 @@ int ptp_chdk_set_memory_long(PTPParams* params, int addr, int val)
   ptp.Param2=addr;
   ptp.Param3=4;
   ret=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, 4, &buf);
-  if ( ret != 0x2001 )
+  if ( ret != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",ret);
     return 0;
@@ -2211,7 +2211,7 @@ int ptp_chdk_upload(PTPParams* params, char *local_fn, char *remote_fn)
 
   free(buf);
 
-  if ( ret != 0x2001 )
+  if ( ret != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",ret);
     return 0;
@@ -2248,7 +2248,7 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
   ptp.Param1=PTP_CHDK_TempData;
   ptp.Param2=0;
   ret=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, strlen(remote_fn), &remote_fn);
-  if ( ret != 0x2001 )
+  if ( ret != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",ret);
 	fclose(f);
@@ -2267,7 +2267,7 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
   gdparams.handler_data = f;
   ret=ptp_getdata_transaction(params, &ptp, &gdparams);
   fclose(f);
-  if ( ret != 0x2001 )
+  if ( ret != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",ret);
     return 0;
@@ -2294,7 +2294,7 @@ int ptp_chdk_rcisready(PTPParams* params, int *isready,int *imgnum)
   ptp.Param1=PTP_CHDK_RemoteCaptureIsReady;
 
   ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-  if ( ret != 0x2001 )
+  if ( ret != PTP_RC_OK )
   {
       ptp_error(params,"RemoteCaptureIsReady: unexpected return code 0x%x",ret);
       return 0;
@@ -2322,7 +2322,7 @@ int ptp_chdk_rcgetchunk(PTPParams* params, int fmt, ptp_chdk_rc_chunk *chunk)
 
 	// TODO should allow ptp_getdata_transaction to send chunks directly to file, or to mem
 	ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &chunk->data);
-	if ( ret != 0x2001 )
+	if ( ret != PTP_RC_OK )
 	{
 	  ptp_error(params,"RemoteCaptureGetData: unexpected return code 0x%x",ret);
 	  return 0;
@@ -2346,7 +2346,7 @@ int ptp_chdk_exec_lua(PTPParams* params, char *script, int flags, int *script_id
 
   r=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, strlen(script)+1, &script);
 
-  if ( r != 0x2001 )
+  if ( r != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",r);
     *script_id = 0;
@@ -2368,7 +2368,7 @@ int ptp_chdk_get_version(PTPParams* params, int *major, int *minor)
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_Version;
   r=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-  if ( r != 0x2001 )
+  if ( r != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",r);
     return 0;
@@ -2387,7 +2387,7 @@ int ptp_chdk_get_script_status(PTPParams* params, unsigned *status)
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_ScriptStatus;
   r=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-  if ( r != 0x2001 )
+  if ( r != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",r);
     return 0;
@@ -2405,7 +2405,7 @@ int ptp_chdk_get_script_support(PTPParams* params, unsigned *status)
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_ScriptSupport;
   r=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-  if ( r != 0x2001 )
+  if ( r != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",r);
     return 0;
@@ -2431,7 +2431,7 @@ int ptp_chdk_write_script_msg(PTPParams* params, char *data, unsigned size, int 
   ptp.Param2=target_script_id;
 
   r=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, size, &data);
-  if ( r != 0x2001 )
+  if ( r != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",r);
     *status = 0;
@@ -2453,7 +2453,7 @@ int ptp_chdk_read_script_msg(PTPParams* params, ptp_chdk_script_msg **msg)
 
   // camera will always send data, otherwise getdata will cause problems
   r=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &data);
-  if ( r != 0x2001 )
+  if ( r != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",r);
     free(data);
@@ -2484,7 +2484,7 @@ int ptp_chdk_get_live_data(PTPParams* params, unsigned flags,char **data,unsigne
   *data_size = 0;
 
   r=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, data);
-  if ( r != 0x2001 )
+  if ( r != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",r);
     free(*data);
@@ -2506,7 +2506,7 @@ int ptp_chdk_call_function(PTPParams* params, int *args, int size, int *ret)
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_CallFunction;
   r=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, size*sizeof(int), (char **) &args);
-  if ( r != 0x2001 )
+  if ( r != PTP_RC_OK )
   {
     ptp_error(params,"unexpected return code 0x%x",r);
     return 0;
