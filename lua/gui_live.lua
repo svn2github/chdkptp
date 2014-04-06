@@ -741,14 +741,12 @@ end
 function m.on_dlg_run()
 	m.set_frame_time(100)
 end
--- TODO need external var to store pref if we use a callback
-local pref_live_sched
 prefs._add('gui_live_sched','boolean','use scheduler for live updates',false,
-	function()
-		return pref_live_sched
+	function(self)
+		return self.val
 	end,
-	function(val) 
-		pref_live_sched = val
+	function(self,val) 
+		self.val = val
 		if m.frame_time then
 			m.set_frame_time(m.frame_time)
 		end

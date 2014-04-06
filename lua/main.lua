@@ -213,7 +213,14 @@ local function do_no_gui_startup()
 		return cli:run()
 	end
 end
-prefs._add('core_verbose','number','ptp core verbosity',0,corevar.get_verbose,corevar.set_verbose)
+prefs._add('core_verbose','number','ptp core verbosity',0,
+	function(self)
+		return corevar.get_verbose()
+	end,
+	function(self,val)
+		corevar.set_verbose(val)
+	end
+)
 
 con=chdku.connection()
 dngcli.init_cli()

@@ -22,13 +22,13 @@ local prefs={}
 local order={}
 local vtypes={
 	boolean={
-		-- allow "true" "false"
+		-- allow "true" "false", 0,1
 		parse=function(val)
 			val = val:lower()
-			if val == 'true' then
+			if val == 'true' or tonumber(val) == 1 then
 				return true,true
 			end
-			if val == 'false' then
+			if val == 'false' or tonumber(val) == 0 then
 				return true,false
 			end
 			return false,"invalid value"
@@ -88,17 +88,17 @@ function m._add(name,vtype,desc,default,get_fn,set_fn)
 		get=get_fn,
 	}
 	if p.set==nil then
-		p.set = function(val)
-			p.value=val
+		p.set = function(self,val)
+			self.value=val
 		end
 	end
 	if p.get==nil then
-		p.get = function(val)
-			return p.value
+		p.get = function(self)
+			return self.value
 		end
 	end
 	prefs[name]=p
-	p.set(val)
+	p:set(val)
 end
 function m._each()
 	local i=0
@@ -112,7 +112,7 @@ function m._describe(name,mode)
 	if not prefs[name] then
 		return false,'invalid pref: '..tostring(name)
 	end
-	local r=string.format('%s=%s',name,tostring(prefs[name].get()))
+	local r=string.format('%s=%s',name,tostring(prefs[name]:get()))
 	if mode == 'full' then
 		r=string.format('%-20s - %s: %s',r,prefs[name].vtype,prefs[name].desc)
 	elseif mode == 'cmd' then
@@ -128,7 +128,7 @@ function m._set(name,value)
 	if p then
 		local status,value = read_val(p.vtype,value)
 		if status then
-			p.set(value)
+			p:set(value)
 			return true
 		end
 		return false,value
@@ -137,7 +137,7 @@ function m._set(name,value)
 end
 function m._get(name)
 	if prefs[name] then
-		return true,prefs[name].get()
+		return true,prefs[name]:get()
 	end
 	return false,'invalid pref: ' .. tostring(name)
 end
