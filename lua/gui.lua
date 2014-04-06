@@ -31,6 +31,20 @@ btn_connect = iup.button{
 	size = "48x"
 }
 
+gui.cam_dropdown = iup.list{
+	VISIBLECOLUMNS="10",
+	DROPDOWN="YES",
+}
+
+function gui.cam_dropdown:valuechanged_cb()
+	gui.dbgmsg('cam_dropdown set %s\n',tostring(self.value))
+
+	con=chdku.connection(gui.cached_devs[tonumber(self.value)])
+	con:update_connection_info()
+	-- TODO cams should be in the tree
+	gui.tree.get_container().state = 'COLLAPSED' -- force refresh when switching cams
+end
+
 --[[
 info printf - message to be printed at normal verbosity
 ]]
@@ -128,10 +142,36 @@ function gui.update_connection_status()
 	gui.set_connection_status(con:is_connected())
 end
 
+function gui.update_cam_list(devs)
+	gui.cam_dropdown["1"] = nil -- empty the list
+	local curid
+	for i,dev in ipairs(devs) do
+		-- TODO name would be nice, but will might hose other connections
+		local s=string.format("%s:%s",dev.bus,dev.dev)
+		gui.cam_dropdown[tostring(i)] =s
+		gui.dbgmsg('cam_dropdown %d:%s\n',i,s)
+		if con.condev and con.condev.dev == dev.dev and con.condev.bus == dev.bus then
+			gui.dbgmsg('cur %d\n',i)
+			curid = i 
+		end
+	end
+	gui.cached_devs = devs
+	if #devs > 0 and not curid then
+		gui.cam_dropdown.value = 1
+		gui.cam_dropdown:valuechanged_cb()
+	else
+		gui.cam_dropdown.value = curid
+	end
+end
+
 local function timer_update_connection_status()
 	local new_status = con:is_connected()
 	if new_status ~= gui.last_connection_status then
 		gui.set_connection_status(new_status)
+	end
+	local devs = chdk.list_usb_devices()
+	if not util.compare_values(devs,gui.cached_devs) then
+		gui.update_cam_list(devs)
 	end
 end
 
@@ -139,8 +179,9 @@ function btn_connect:action()
 	if con:is_connected() then
 		con:disconnect()
 	else
-		-- TODO temp, connect to the "first" device, need to add cam selection
-		-- mostly copied from cli connect
+		-- just connect to the 'con' selected by the dropdown
+		add_status(con:connect())
+		--[[
 		local devs = chdk.list_usb_devices()
 		if #devs > 0 then
 			con = chdku.connection(devs[1])
@@ -148,6 +189,7 @@ function btn_connect:action()
 		else
 			add_status(false,"no devices available")
 		end
+		]]
 	end
 	gui.update_connection_status()
 end
@@ -498,6 +540,7 @@ dlg = iup.dialog{
 			connect_icon,
 			connect_label,
 			iup.fill{},
+			gui.cam_dropdown,
 			btn_connect;
 			nmargin="4x2",
 		},
