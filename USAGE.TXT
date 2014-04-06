@@ -294,6 +294,27 @@ remoteshoot (rs) [local] [options]: - shoot and download without saving to SD (r
    -cont=<num>  shoot num shots in continuous mode
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
 
+rsint        [local] [options]: - shoot and download in continuous mode with interactive control
+ [local]       local destination directory or filename (w/o extension!)
+ options:
+   -u=<s|a|96>
+      s   standard units (default)
+      a   APEX
+      96  APEX*96
+   -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
+   -sv=<v>    ISO value. In standard units, Canon "real" ISO
+   -av=<v>    Aperture value. In standard units, f number
+   -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
+   -nd=<in|out> set ND filter state
+   -jpg         jpeg, default if no other options (not supported on all cams)
+   -raw         framebuffer dump raw
+   -dng         DNG format raw
+   -dnghdr      save DNG header to a seperate file, ignored with -dng
+   -s=<start>   first line of for subimage raw
+   -c=<count>   number of lines for subimage
+   -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
+   -cmdwait=n   wait n seconds for command, default 60
+
 rec                      : - switch camera to shooting mode
 play                     : - switch camera to playback mode
 dngload      [options] <file>: - load a dng file
