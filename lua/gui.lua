@@ -105,8 +105,9 @@ return l,capmode.get()
 	gui.update_mode_dropdown(cur)
 end
 
-function gui.update_connection_status()
-	if con:is_connected() then
+function gui.set_connection_status(status)
+	if status then
+		gui.last_connection_status = true
 		connect_icon.active = "YES"
 		btn_connect.title = "Disconnect"
 		connect_label.title = string.format("host:%d.%d cam:%d.%d",
@@ -114,12 +115,24 @@ function gui.update_connection_status()
 											con.apiver.MAJOR,con.apiver.MINOR)
 		gui.update_mode_list()
 	else
+		gui.last_connection_status = false
 		connect_icon.active = "NO"
 		btn_connect.title = "Connect"
 		connect_label.title = string.format("host:%d.%d cam:-.-",chdku.apiver.MAJOR,chdku.apiver.MINOR)
 		clear_mode_list()
 	end
 	live.on_connect_change(con)
+end
+
+function gui.update_connection_status()
+	gui.set_connection_status(con:is_connected())
+end
+
+local function timer_update_connection_status()
+	local new_status = con:is_connected()
+	if new_status ~= gui.last_connection_status then
+		gui.set_connection_status(new_status)
+	end
 end
 
 function btn_connect:action()
@@ -676,6 +689,9 @@ function gui:run()
 	end
 	gui.sched.init_timer(20)
 	chdku.sleep = gui.chdku_sleep
+	
+	-- TODO should be controlled by pref
+	gui.connection_check = gui.sched.run_repeat(500,timer_update_connection_status)
 
 	if (iup.MainLoopLevel()==0) then
 		iup.MainLoop()
