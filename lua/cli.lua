@@ -445,7 +445,7 @@ function cli:get_shoot_common_opts(args)
 end
 
 -- TODO should have a system to split up command code
-local rsint=require'extras/rsint'
+local rsint=require'rsint'
 rsint.register_rlib()
 
 cli:add_commands{
