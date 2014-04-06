@@ -13,6 +13,7 @@ local icon = require('gui_icon')
 gui.live = live
 gui.tree = tree
 gui.user = user
+gui.sched = require('gui_sched')
 
 connect_icon = iup.label{
 	image = icon.on,
@@ -605,17 +606,50 @@ end
 -- resume with input line, yield returns as result
 -- currently the only place it should yield
 function gui.cli_readline(prompt)
-	return coroutine.yield()
+	return coroutine.yield('readline')
 end
 
 function btn_exec:action()
 	printf('> %s\n',inputtext.value)
 	cmd_history:add(inputtext.value)
-	gui.cli_thread(inputtext.value)
+	if string.find(inputtext.value,'^!') then
+		add_status(cli:execute(inputtext.value))
+	else
+		if gui.cli_thread_status == 'readline' then
+			local s
+			s,gui.cli_thread_status=coroutine.resume(gui.cli_thread,inputtext.value)
+		else
+			printf('busy %s\n',tostring(gui.cli_thread_status))
+		end
+	end
 	inputtext.value=''
 	if cli.finished then
 		dlg:hide()
 	end
+end
+
+function gui.chdku_sleep(time)
+	-- in lua 5.1 just use sys.sleep
+	if util.lua_ver_minor < 2 then
+		sys.sleep(time)
+		return
+	end
+	-- if not in the cli thread, can't yield
+	if coroutine.status(gui.cli_thread) ~= 'running' then
+		sys.sleep(time)
+		return
+	end
+	-- if time is less than scheduler interval, just sleep
+	-- TODO might want to fudge a bit
+	if time < tonumber(gui.sched.timer.time) then
+		sys.sleep(time)
+		return
+	end
+	gui.sched.run_after(time,function()
+		local s 
+		s,gui.cli_thread_status=coroutine.resume(gui.cli_thread)
+	end)
+	coroutine.yield('sleep')
 end
 
 function gui:run()
@@ -632,11 +666,15 @@ function gui:run()
 	gui.resize_for_content()
 
 	cli.readline = gui.cli_readline
-	gui.cli_thread = coroutine.wrap(function() cli:run() end)
-	gui.cli_thread_status = gui.cli_thread()
+	gui.cli_thread = coroutine.create(function() cli:run() end)
+	local s
+	s,gui.cli_thread_status = coroutine.resume(gui.cli_thread)
+
+	gui.sched.init_timer(20)
+	chdku.sleep = gui.chdku_sleep
 
 	if (iup.MainLoopLevel()==0) then
-	  iup.MainLoop()
+		iup.MainLoop()
 	end
 end
 prefs._add('gui_verbose','number','control verbosity of gui',1)

@@ -32,6 +32,7 @@ bm_active -- bitmap streaming selected
 timer -- timer for fetching updates
 statslabel -- text for stats
 ]]
+	active=false, -- should frames update
 }
 
 local screen_aspects = {
@@ -381,6 +382,9 @@ end
 
 
 local function timer_action(self)
+	if not m.active then
+		return
+	end
 	if update_should_run() then
 		stats:start()
 		local what=get_fb_selection()
@@ -410,6 +414,66 @@ local function timer_action(self)
 	m.statslabel.title = stats:get()
 end
 
+function m.set_frame_time(time)
+	m.frame_time = time
+	if prefs.gui_live_sched then
+		if m.timer then
+			iup.Destroy(m.timer)
+			m.timer=nil
+		end
+		if not m.sched then
+			m.sched=gui.sched.run_repeat(m.frame_time,function()
+				local cstatus,msg = xpcall(timer_action,util.err_traceback)
+				if not cstatus then
+					printf('live timer update error\n%s',tostring(msg))
+					-- TODO could stop live updates here, for now just spam the console
+				end
+			end)
+		else
+			m.sched.time = m.frame_time
+		end
+	else
+		if m.sched then
+			m.sched:cancel()
+			m.sched=nil
+		end
+		if m.timer then
+			iup.Destroy(m.timer)
+		end
+		m.timer = iup.timer{ 
+			time = tostring(m.frame_time),
+			action_cb = function()
+				-- use xpcall so we don't get a popup every frame
+				local cstatus,msg = xpcall(timer_action,util.err_traceback)
+				if not cstatus then
+					printf('live timer update error\n%s',tostring(msg))
+					-- TODO could stop live updates here, for now just spam the console
+				end
+			end,
+		}
+	end
+	m.update_run_state()
+end
+
+--[[
+local function schedule_frames(time)
+	if not m.sched then
+		m.sched=gui.sched.run_repeat(time,function()
+			if not m.active then
+				return
+			end
+			local cstatus,msg = xpcall(timer_action,util.err_traceback)
+			if not cstatus then
+				printf('live timer update error\n%s',tostring(msg))
+				-- TODO could stop live updates here, for now just spam the console
+			end
+		end)
+	else
+		m.sched.time = time
+	end
+end
+]]
+--[[
 local function init_timer(time)
 	if not time then
 		time = "100"
@@ -430,6 +494,7 @@ local function init_timer(time)
 	}
 	m.update_run_state()
 end
+]]
 
 local function update_fps(val)
 	val = tonumber(val)
@@ -437,10 +502,9 @@ local function update_fps(val)
 		return
 	end
 	val = math.floor(1000/val)
-	if val ~= tonumber(m.timer.time) then
-		-- reset stats
+	if val ~= m.frame_time then
 		stats:stop()
-		init_timer(val)
+		m.set_frame_time(val)
 	end
 end
 
@@ -649,10 +713,16 @@ function m.update_run_state(state)
 		state = (m.tabs.value == m.container)
 	end
 	if state then
-		m.timer.run = "YES"
+		if m.timer then
+			m.timer.run = "YES"
+		end
+		m.active = true
 		stats:start()
 	else
-		m.timer.run = "NO"
+		if m.timer then
+			m.timer.run = "NO"
+		end
+		m.active = false
 		stats:stop()
 	end
 end
@@ -669,8 +739,21 @@ end
 
 -- for anything that needs to be intialized when everything is started
 function m.on_dlg_run()
-	init_timer()
+	m.set_frame_time(100)
 end
+-- TODO need external var to store pref if we use a callback
+local pref_live_sched
+prefs._add('gui_live_sched','boolean','use scheduler for live updates',false,
+	function()
+		return pref_live_sched
+	end,
+	function(val) 
+		pref_live_sched = val
+		if m.frame_time then
+			m.set_frame_time(m.frame_time)
+		end
+	end
+)
 prefs._add('gui_dump_palette','boolean','dump live palette data on state change')
 prefs._add('gui_context_plus','boolean','use IUP context plus if available')
 prefs._add('gui_force_replay_palette','number','override palette type dump replay, -1 disable',-1)
