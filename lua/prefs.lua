@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2011 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -18,8 +18,15 @@
 simple system for handling prefrences
 ]]
 local m={}
+-- preference objects
 local prefs={}
+-- array to order them
 local order={}
+-- unregistered pref values to be picked up on later _add calls
+local unreg={}
+-- accept unregistered or error?
+local allow_unreg
+
 local vtypes={
 	boolean={
 		-- allow "true" "false", 0,1
@@ -74,6 +81,10 @@ function m._add(name,vtype,desc,default,get_fn,set_fn)
 	end
 	if default==nil then
 		default=false
+	end
+	if unreg[name] then
+		default=unreg[name]
+		unreg[name]=nil
 	end
 	local status,val = read_val(vtype,default)
 	if not status then
@@ -133,7 +144,14 @@ function m._set(name,value)
 		end
 		return false,value
 	end
+	if allow_unreg then
+		unreg[name] = value
+		return true
+	end
 	return false,'invalid pref: ' .. tostring(name)
+end
+function m._allow_unreg(allow)
+	allow_unreg = allow
 end
 function m._get(name)
 	if prefs[name] then

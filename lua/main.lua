@@ -167,7 +167,9 @@ function do_rc_file(name)
 		end
 		return false
 	end
+	prefs._allow_unreg(true) -- allow currently unknown prefs to be set
 	local status, msg=cli:execfile(path)
+	prefs._allow_unreg(false)
 	if not status then
 		warnf('rc %s failed: %s\n',path,tostring(msg))
 		return false
