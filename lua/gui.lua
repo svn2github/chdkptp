@@ -670,6 +670,10 @@ function gui:run()
 	local s
 	s,gui.cli_thread_status = coroutine.resume(gui.cli_thread)
 
+	-- TODO in lua 5.1, can't use xpcall because rsint needs to yield in readline
+	if util.lua_ver_minor < 2 and cli.names.rsint then
+		cli.names.rsint.noxpcall=true
+	end
 	gui.sched.init_timer(20)
 	chdku.sleep = gui.chdku_sleep
 

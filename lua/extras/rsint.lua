@@ -68,222 +68,176 @@ function init_handlers(args,opts)
 	end
 	return rcopts
 end
+m.cli_cmd_func = function(self,args)
+	local opts,err = cli:get_shoot_common_opts(args)
+	if not opts then
+		return false,err
+	end
 
--- cli command copied from regular remoteshoot
-m.cli_cmds = {
-	{
-		names={'rsint'},
-		help='shoot and download in continuous mode with interactive control',
-		arghelp="[local] [options]",
-		args=cli.argparser.create{
-			u='s',
-			tv=false,
-			sv=false,
-			av=false,
-			isomode=false,
-			nd=false,
-			jpg=false,
-			raw=false,
-			dng=false,
-			dnghdr=false,
-			s=false,
-			c=false,
-			badpix=false,
-			cmdwait=60
-		},
-		help_detail=[[
- [local]       local destination directory or filename (w/o extension!)
- options:
-   -u=<s|a|96>
-      s   standard units (default)
-      a   APEX
-      96  APEX*96
-   -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
-   -sv=<v>    ISO value. In standard units, Canon "real" ISO
-   -av=<v>    Aperture value. In standard units, f number
-   -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
-   -nd=<in|out> set ND filter state
-   -jpg         jpeg, default if no other options (not supported on all cams)
-   -raw         framebuffer dump raw
-   -dng         DNG format raw
-   -dnghdr      save DNG header to a seperate file, ignored with -dng
-   -s=<start>   first line of for subimage raw
-   -c=<count>   number of lines for subimage
-   -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
-   -cmdwait=n   wait n seconds for command, default 60
-]],
-		func=function(self,args)
-			local opts,err = cli:get_shoot_common_opts(args)
-			if not opts then
-				return false,err
+	util.extend_table(opts,{
+		fformat=0,
+		lstart=0,
+		lcount=0,
+	})
+	-- fformat required for init
+	if args.jpg then
+		opts.fformat = opts.fformat + 1
+	end
+	if args.dng then
+		opts.fformat = opts.fformat + 6
+	else
+		if args.raw then
+			opts.fformat = opts.fformat + 2
+		end
+		if args.dnghdr then
+			opts.fformat = opts.fformat + 4
+		end
+	end
+	-- default to jpeg TODO won't be supported on cams without raw hook
+	if opts.fformat == 0 then
+		opts.fformat = 1
+		args.jpg = true
+	end
+
+	if args.badpix and not args.dng then
+		util.warnf('badpix without dng ignored\n')
+	end
+
+	if args.s or args.c then
+		if args.dng or args.raw then
+			if args.s then
+				opts.lstart = tonumber(args.s)
 			end
+			if args.c then
+				opts.lcount = tonumber(args.c)
+			end
+		else
+			util.warnf('subimage without raw ignored\n')
+		end
+	end
 
-			util.extend_table(opts,{
-				fformat=0,
-				lstart=0,
-				lcount=0,
+	local rcopts
+	rcopts,err = init_handlers(args,opts)
+	if not rcopts then
+		return false, err
+	end
+
+	-- wait time for remotecap
+	opts.cap_timeout=30000
+	-- wait time for shoot hook
+	opts.shoot_hook_timeout=args.cmdwait * 1000
+
+	local opts_s = serialize(opts)
+	cli.dbgmsg('rs_init\n')
+	local status,rstatus,rerr = con:execwait('return rsint_init('..opts_s..')',{libs={'rsint'}})
+	if not status then
+		return false,rstatus
+	end
+	if not rstatus then
+		return false,rerr
+	end
+
+	local status,err = con:exec('return rsint_run('..opts_s..')',{libs={'rsint'}})
+	-- rs_shoot should not initialize remotecap if there's an error, so no need to uninit
+	if not status then
+		return false,err
+	end
+
+	done = false
+	local status,err
+	repeat
+--				local line = io.read()
+		local line = cli.readline('rsint> ')
+		if not line then
+			warnf('cli.readline failed / eof\n')
+			break
+		end
+		status, err = con:script_status()
+		if not status then 
+			warnf('script_status failed %s\n',tostring(err))
+			break
+		end
+		if status.msg then
+			local status, err = con:read_all_msgs({
+				['return']=function(msg,opts)
+					printf("script return %s\n",tostring(msg.value))
+				end,
+				user=function(msg,opts)
+					printf("script msg %s\n",tostring(msg.value))
+				end,
+				error=function(msg,opts)
+					return false,msg.value
+				end,
 			})
-			-- fformat required for init
-			if args.jpg then
-				opts.fformat = opts.fformat + 1
-			end
-			if args.dng then
-				opts.fformat = opts.fformat + 6
-			else
-				if args.raw then
-					opts.fformat = opts.fformat + 2
-				end
-				if args.dnghdr then
-					opts.fformat = opts.fformat + 4
-				end
-			end
-			-- default to jpeg TODO won't be supported on cams without raw hook
-			if opts.fformat == 0 then
-				opts.fformat = 1
-				args.jpg = true
-			end
-
-			if args.badpix and not args.dng then
-				util.warnf('badpix without dng ignored\n')
-			end
-
-			if args.s or args.c then
-				if args.dng or args.raw then
-					if args.s then
-						opts.lstart = tonumber(args.s)
-					end
-					if args.c then
-						opts.lcount = tonumber(args.c)
-					end
-				else
-					util.warnf('subimage without raw ignored\n')
-				end
-			end
-
-			local rcopts
-			rcopts,err = init_handlers(args,opts)
-			if not rcopts then
+			if not status then
 				return false, err
 			end
-
-			-- wait time for remotecap
-			opts.cap_timeout=30000
-			-- wait time for shoot hook
-			opts.shoot_hook_timeout=args.cmdwait * 1000
-
-			local opts_s = serialize(opts)
-			cli.dbgmsg('rs_init\n')
-			local status,rstatus,rerr = con:execwait('return rsint_init('..opts_s..')',{libs={'rsint'}})
+		end
+		if not status.run then 
+			warnf('script not running\n')
+			break
+		end
+		local s,e,cmd = string.find(line,'^[%c%s]*([%w_]+)[%c%s]*')
+		local rest = string.sub(line,e+1)
+		-- printf("cmd [%s] rest [%s]\n",cmd,rest);
+		if cmd == 'path' then
+			if rest == '' then
+				rest = nil
+			end
+			args[1] = rest
+			rcopts,err = init_handlers(args,opts)
+			-- TODO handle error, should send l to script
+		else
+			-- remaining commands assumed to be cam side
+			-- TODO could check if remotecap has timed out here
+			status, err = con:write_msg(cmd..' '..rest)
 			if not status then
-				return false,rstatus
+				done=true
+				warnf('write_msg failed %s\n',tostring(err))
+				-- TODO might have remotecap data, but probably won't be able to read it if msg failed
+				break
 			end
-			if not rstatus then
-				return false,rerr
-			end
-
-			local status,err = con:exec('return rsint_run('..opts_s..')',{libs={'rsint'}})
-			-- rs_shoot should not initialize remotecap if there's an error, so no need to uninit
-			if not status then
-				return false,err
-			end
-
-			done = false
-			local status,err
-			repeat
---				local line = io.read()
-				local line = cli.readline('rsint> ')
-				if not line then
-					warnf('cli.readline failed / eof\n')
-					break
+			if cmd == 's' or cmd == 'l' then
+				status,err = con:capture_get_data(rcopts)
+				if not status then
+					warnf('capture_get_data error %s\n',tostring(err))
 				end
-				status, err = con:script_status()
-				if not status then 
-					warnf('script_status failed %s\n',tostring(err))
-					break
-				end
-				if status.msg then
-					local status, err = con:read_all_msgs({
-						['return']=function(msg,opts)
-							printf("script return %s\n",tostring(msg.value))
-						end,
-						user=function(msg,opts)
-							printf("script msg %s\n",tostring(msg.value))
-						end,
-						error=function(msg,opts)
-							return false,msg.value
-						end,
-					})
-					if not status then
-						return false, err
-					end
-				end
-				if not status.run then 
-					warnf('script not running\n')
-					break
-				end
-				local s,e,cmd = string.find(line,'^[%c%s]*([%w_]+)[%c%s]*')
-				local rest = string.sub(line,e+1)
-				-- printf("cmd [%s] rest [%s]\n",cmd,rest);
-				if cmd == 'path' then
-					if rest == '' then
-						rest = nil
-					end
-					args[1] = rest
-					rcopts,err = init_handlers(args,opts)
-					-- TODO handle error, should send l to script
-				else
-					-- remaining commands assumed to be cam side
-					-- TODO could check if remotecap has timed out here
-					status, err = con:write_msg(cmd..' '..rest)
-					if not status then
-						done=true
-						warnf('write_msg failed %s\n',tostring(err))
-						-- TODO might have remotecap data, but probably won't be able to read it if msg failed
-						break
-					end
- 					if cmd == 's' or cmd == 'l' then
-						status,err = con:capture_get_data(rcopts)
-						if not status then
-							warnf('capture_get_data error %s\n',tostring(err))
-						end
-						if cmd == 'l' then
-							done=true
-						end
-					end
-				end
-			until done
-
-			local t0=ustime.new()
-			-- wait for shot script to end or timeout
-			local wstatus,werr=con:wait_status{
-				run=false,
-				timeout=30000,
-			}
-			if not wstatus then
-				warnf('error waiting for shot script %s\n',tostring(werr))
-			elseif wstatus.timeout then
-				warnf('timed out waiting for shot script\n')
-			end
-			cli.dbgmsg("script wait time %.4f\n",ustime.diff(t0)/1000000)
-			-- TODO check messages
-
-			local ustatus, uerr = con:execwait('init_usb_capture(0)') -- try to uninit
-			-- if uninit failed, combine with previous status
-			if not ustatus then
-				uerr = 'uninit '..tostring(uerr)
-				status = false
-				if err then
-					err = err .. ' ' .. uerr
-				else 
-					err = uerr
+				if cmd == 'l' then
+					done=true
 				end
 			end
-			return status, err
-		end,
-	},
-}
+		end
+	until done
 
-function m.init() 
+	local t0=ustime.new()
+	-- wait for shot script to end or timeout
+	local wstatus,werr=con:wait_status{
+		run=false,
+		timeout=30000,
+	}
+	if not wstatus then
+		warnf('error waiting for shot script %s\n',tostring(werr))
+	elseif wstatus.timeout then
+		warnf('timed out waiting for shot script\n')
+	end
+	cli.dbgmsg("script wait time %.4f\n",ustime.diff(t0)/1000000)
+	-- TODO check messages
+
+	local ustatus, uerr = con:execwait('init_usb_capture(0)') -- try to uninit
+	-- if uninit failed, combine with previous status
+	if not ustatus then
+		uerr = 'uninit '..tostring(uerr)
+		status = false
+		if err then
+			err = err .. ' ' .. uerr
+		else 
+			err = uerr
+		end
+	end
+	return status, err
+end
+
+function m.register_rlib() 
 	chdku.rlibs:register{
 		name='rsint',
 		depend={'extend_table','serialize_msgs','rs_shoot_init'},
@@ -405,11 +359,5 @@ function rsint_run(opts)
 	return true
 end
 ]]}
-	-- can't use xpcall with gui readline in 5.1
-	-- TODO this won't work if module is loaded before gui
-	if gui and util.lua_ver_minor < 2 then
-		m.cli_cmds[1].noxpcall = true 
-	end
-	cli:add_commands(m.cli_cmds)
 end
 return m

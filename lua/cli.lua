@@ -444,6 +444,10 @@ function cli:get_shoot_common_opts(args)
 	return opts
 end
 
+-- TODO should have a system to split up command code
+local rsint=require'extras/rsint'
+rsint.register_rlib()
+
 cli:add_commands{
 	{
 		names={'help','h'},
@@ -1904,6 +1908,49 @@ cli:add_commands{
 		end,
 	},
 	{
+		names={'rsint'},
+		help='shoot and download in continuous mode with interactive control',
+		arghelp="[local] [options]",
+		args=cli.argparser.create{
+			u='s',
+			tv=false,
+			sv=false,
+			av=false,
+			isomode=false,
+			nd=false,
+			jpg=false,
+			raw=false,
+			dng=false,
+			dnghdr=false,
+			s=false,
+			c=false,
+			badpix=false,
+			cmdwait=60
+		},
+		help_detail=[[
+ [local]       local destination directory or filename (w/o extension!)
+ options:
+   -u=<s|a|96>
+      s   standard units (default)
+      a   APEX
+      96  APEX*96
+   -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
+   -sv=<v>    ISO value. In standard units, Canon "real" ISO
+   -av=<v>    Aperture value. In standard units, f number
+   -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
+   -nd=<in|out> set ND filter state
+   -jpg         jpeg, default if no other options (not supported on all cams)
+   -raw         framebuffer dump raw
+   -dng         DNG format raw
+   -dnghdr      save DNG header to a seperate file, ignored with -dng
+   -s=<start>   first line of for subimage raw
+   -c=<count>   number of lines for subimage
+   -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
+   -cmdwait=n   wait n seconds for command, default 60
+]],
+		func=rsint.cli_cmd_func,
+	},
+	{
 		names={'rec'},
 		help='switch camera to shooting mode',
 		func=function(self,args) 
@@ -1956,6 +2003,7 @@ return false,'already in play'
 		end,
 	},
 }
+
 
 prefs._add('cli_time','boolean','show cli execution times')
 prefs._add('cli_xferstats','boolean','show cli data transfer stats')
