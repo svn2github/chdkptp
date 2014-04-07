@@ -1,6 +1,9 @@
 #ifndef __LIVE_VIEW_H
 #define __LIVE_VIEW_H
 
+// Note: used in modules and platform independent code. 
+// Do not add platform dependent stuff in here (#ifdef/#endif compile options or camera dependent values)
+
 /*
 Protocol notes:
 - Unless otherwise specified, all structure values are packed in camera native (little
@@ -92,9 +95,5 @@ typedef struct {
     int vp_desc_start;
     int bm_desc_start;
 } lv_data_header;
-
-#ifdef CAM_CHDK_PTP
-extern int live_view_get_data(ptp_data *data, int flags);
-#endif
 
 #endif // __LIVE_VIEW_H

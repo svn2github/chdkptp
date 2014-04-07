@@ -3,7 +3,7 @@
  * based on ptpcam.c
  * Copyright (C) 2001-2005 Mariusz Woloszyn <emsi@ipartners.pl>
  * additions
- * Copyright (C) 2010-2011 <reyalp (at) gmail dot com>
+ * Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -123,9 +123,6 @@ void *_GdipFontFamilyCachedGenericSerif;
 /* meta table for for connection list */
 #define CHDK_CONNECTION_LIST_META "chkdptp.connection_list_meta"
 
-#define MAXCONNRETRIES 10
-
-
 /* USB interface class */
 #ifndef USB_CLASS_PTP
 #define USB_CLASS_PTP		6
@@ -206,7 +203,9 @@ ptp_usb_read_func (unsigned char *bytes, unsigned max_size, void *data)
 		result=USB_BULK_READ(ptp_cs->usb.handle, ptp_cs->usb.inep,(char *)bytes, toread,ptp_cs->timeout);
 		/* sometimes retry might help */
 		if (result==0) {
-			printf("read retry\n");
+			if(verbose) {
+				printf("read retry\n");
+			}
 			result=USB_BULK_READ(ptp_cs->usb.handle, ptp_cs->usb.inep,(char *)bytes, toread,ptp_cs->timeout);
 		}
 		if (result < 0)

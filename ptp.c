@@ -2277,10 +2277,6 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
 }
 
 /*
- * Preliminary remote capture over USB code. Corresponding CHDK code is in the ptp-remote-capture-test
- * This is under development and should not be included in builds for general distribution
- */
-/*
  * isready: 0: not ready, lowest 2 bits: available image formats, 0x10000000: error
  */
 int ptp_chdk_rcisready(PTPParams* params, int *isready,int *imgnum)
