@@ -455,47 +455,6 @@ function m.set_frame_time(time)
 	m.update_run_state()
 end
 
---[[
-local function schedule_frames(time)
-	if not m.sched then
-		m.sched=gui.sched.run_repeat(time,function()
-			if not m.active then
-				return
-			end
-			local cstatus,msg = xpcall(timer_action,util.err_traceback)
-			if not cstatus then
-				printf('live timer update error\n%s',tostring(msg))
-				-- TODO could stop live updates here, for now just spam the console
-			end
-		end)
-	else
-		m.sched.time = time
-	end
-end
-]]
---[[
-local function init_timer(time)
-	if not time then
-		time = "100"
-	end 
-	if m.timer then
-		iup.Destroy(m.timer)
-	end
-	m.timer = iup.timer{ 
-		time = time,
-		action_cb = function()
-			-- use xpcall so we don't get a popup every frame
-			local cstatus,msg = xpcall(timer_action,util.err_traceback)
-			if not cstatus then
-				printf('live timer update error\n%s',tostring(msg))
-				-- TODO could stop live updates here, for now just spam the console
-			end
-		end,
-	}
-	m.update_run_state()
-end
-]]
-
 local function update_fps(val)
 	val = tonumber(val)
 	if val == 0 then
