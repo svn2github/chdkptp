@@ -32,7 +32,6 @@ bm_active -- bitmap streaming selected
 timer -- timer for fetching updates
 statslabel -- text for stats
 ]]
-	active=false, -- should frames update
 }
 
 local screen_aspects = {
@@ -146,13 +145,24 @@ local bm_fit_toggle = iup.toggle{
 }
 
 local function update_should_run()
+	-- is the tab current?
+	if m.tabs.value ~= m.container then
+		return false
+	end
+	-- is any view active
+	if not (m.vp_active or m.bm_active) then
+		return false
+	end
+
+	-- in dump replay
+	if m.dump_replay then
+		return true
+	end
+
 	if not m.live_con_valid then
 		return false
 	end
-	if not con:is_connected() or m.tabs.value ~= m.container then
-		return false
-	end
-	return (m.vp_active or m.bm_active)
+	return con:is_connected() -- TODO this is a hard update, takes time, should do soft and let error disconnect
 end
 
 local last_frame_fields = {}
@@ -382,31 +392,30 @@ end
 
 
 local function timer_action(self)
-	if not m.active then
-		return
-	end
 	if update_should_run() then
-		stats:start()
-		local what=get_fb_selection()
-		if what == 0 then
-			return
-		end
-		stats:start_xfer()
-		local status,err = con:live_get_frame(what)
-		if not status then
-			end_dump()
-			printf('error getting frame: %s\n',tostring(err))
-			gui.update_connection_status() -- update connection status on error, to prevent spamming
-			stats:stop()
+		if m.dump_replay then
+			read_dump_frame()
+			m.icnv:action()
 		else
-			stats:end_xfer(con.live._frame:len())
-			update_frame_data(con.live)
-			record_dump()
-			update_canvas_size()
+			stats:start()
+			local what=get_fb_selection()
+			if what == 0 then
+				return
+			end
+			stats:start_xfer()
+			local status,err = con:live_get_frame(what)
+			if not status then
+				end_dump()
+				printf('error getting frame: %s\n',tostring(err))
+				gui.update_connection_status() -- update connection status on error, to prevent spamming
+				stats:stop()
+			else
+				stats:end_xfer(con.live._frame:len())
+				update_frame_data(con.live)
+				record_dump()
+				update_canvas_size()
+			end
 		end
-		m.icnv:action()
-	elseif m.dump_replay then
-		read_dump_frame()
 		m.icnv:action()
 	else
 		stats:stop()
@@ -675,13 +684,11 @@ function m.update_run_state(state)
 		if m.timer then
 			m.timer.run = "YES"
 		end
-		m.active = true
 		stats:start()
 	else
 		if m.timer then
 			m.timer.run = "NO"
 		end
-		m.active = false
 		stats:stop()
 	end
 end
