@@ -162,7 +162,8 @@ local function update_should_run()
 	if not m.live_con_valid then
 		return false
 	end
-	return con:is_connected() -- TODO this is a hard update, takes time, should do soft and let error disconnect
+	-- return soft status, connection errors will reset quickly
+	return gui.last_connection_status
 end
 
 local last_frame_fields = {}
