@@ -99,6 +99,10 @@ function stats:get()
 		-- note this includes time between timer ticks
 		bps_avg = self.xfer_total/tsec
 		xfer_time = self.t_end_xfer:diffms(self.t_start_xfer)
+		-- if would divide by zero, pretend it was 1ms
+		if xfer_time == 0 then
+			xfer_time = 1
+		end
 		-- instananeous
 		bps_last = self.xfer_last/xfer_time*1000
 	end
