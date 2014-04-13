@@ -32,6 +32,8 @@ bm_active -- bitmap streaming selected
 timer -- timer for fetching updates
 statslabel -- text for stats
 ]]
+	skip_frames = 0, -- number of frames to drop based on how much longer than desired rate the last one took
+	skip_count = 0, -- total number skipped
 }
 
 local screen_aspects = {
@@ -394,6 +396,12 @@ end
 
 local function timer_action(self)
 	if update_should_run() then
+		-- not keeping up, skip
+		if m.skip_frames > 0 then
+			m.skip_count = m.skip_count + 1
+			m.skip_frames = m.skip_frames - 1
+			return
+		end
 		if m.dump_replay then
 			read_dump_frame()
 			m.icnv:action()
@@ -416,12 +424,17 @@ local function timer_action(self)
 				record_dump()
 				update_canvas_size()
 			end
+			local total_time = stats:get_last_total_ms()
+			if prefs.gui_live_dropframes and total_time > m.frame_time then
+				--m.skip_frames = (total_time-m.frame_time)/m.frame_time
+				m.skip_frames = 1
+			end
 		end
 		m.icnv:action()
 	else
 		stats:stop()
 	end
-	m.statslabel.title = stats:get()
+	m.statslabel.title = stats:get() .. string.format('\nDropped: %d',m.skip_count)
 end
 
 function m.set_frame_time(time)
@@ -527,7 +540,7 @@ function m.init()
 	end
 	local icnv = iup.canvas{rastersize="360x240",border="NO",expand="NO"}
 	m.icnv = icnv
-	m.statslabel = iup.label{size="90x60",alignment="ALEFT:ATOP"}
+	m.statslabel = iup.label{size="90x64",alignment="ALEFT:ATOP"}
 	m.container = iup.hbox{
 		iup.frame{
 			icnv,
@@ -719,6 +732,8 @@ prefs._add('gui_live_sched','boolean','use scheduler for live updates',false,
 		end
 	end
 )
+-- windows degrades gracefully if req rate is too high
+prefs._add('gui_live_dropframes','boolean','drop frames if target fps too high',(sys.ostype() ~= 'Windows'))
 prefs._add('gui_dump_palette','boolean','dump live palette data on state change')
 prefs._add('gui_context_plus','boolean','use IUP context plus if available')
 prefs._add('gui_force_replay_palette','number','override palette type dump replay, -1 disable',-1)

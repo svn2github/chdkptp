@@ -21,10 +21,12 @@ stats collector for live view
 local stats={
 	t_start_frame = ustime.new(),
 	t_end_frame = ustime.new(),
+	ms_last_frame = 0,
 	t_start_xfer = ustime.new(),
 	t_end_xfer = ustime.new(),
-	t_start_draw = ustime.new(),
-	t_end_draw = ustime.new(),
+	ms_last_xfer = 0,
+--	t_start_draw = ustime.new(),
+--	t_end_draw = ustime.new(),
 	t_start = ustime.new(),
 	t_stop = ustime.new(),
 }
@@ -60,6 +62,7 @@ end
 
 function stats:end_frame()
 	self.t_end_frame:get()
+	self.ms_last_frame = self.t_end_frame:diffms(self.t_start_frame)
 end
 function stats:start_xfer()
 	self.t_start_xfer:get()
@@ -69,7 +72,13 @@ function stats:end_xfer(bytes)
 	self.t_end_xfer:get()
 	self.xfer_last = bytes
 	self.xfer_total = self.xfer_total + bytes
+	self.ms_last_xfer = self.t_end_xfer:diffms(self.t_start_xfer)
 end
+
+function stats:get_last_total_ms()
+	return self.ms_last_frame + self.ms_last_xfer 
+end
+
 function stats:get()
 	local run
 	local t_end
@@ -93,12 +102,12 @@ function stats:get()
 	end
 	if self.count_frame > 0 then
 		fps_avg = self.count_frame/tsec
-		frame_time = self.t_end_frame:diffms(self.t_start_frame)
+		frame_time = self.ms_last_frame
 	end
 	if self.count_xfer > 0 then
 		-- note this includes time between timer ticks
 		bps_avg = self.xfer_total/tsec
-		xfer_time = self.t_end_xfer:diffms(self.t_start_xfer)
+		xfer_time = self.ms_last_xfer
 		-- if would divide by zero, pretend it was 1ms
 		if xfer_time == 0 then
 			xfer_time = 1
