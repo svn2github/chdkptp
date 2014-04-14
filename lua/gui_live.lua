@@ -424,13 +424,14 @@ local function timer_action(self)
 				record_dump()
 				update_canvas_size()
 			end
-			local total_time = stats:get_last_total_ms()
-			if prefs.gui_live_dropframes and total_time > m.frame_time then
-				--m.skip_frames = (total_time-m.frame_time)/m.frame_time
-				m.skip_frames = 1
-			end
 		end
 		m.icnv:action()
+		local total_time = stats:get_last_total_ms()
+		if prefs.gui_live_dropframes and total_time > m.frame_time then
+			-- skipping ones seems to be enough, just letting the normal
+			-- gui run for a short time would probably do it too
+			m.skip_frames = 1
+		end
 	else
 		stats:stop()
 	end
@@ -698,6 +699,8 @@ function m.update_run_state(state)
 		if m.timer then
 			m.timer.run = "YES"
 		end
+		m.skip_frames = 0
+		m.skip_count = 0
 		stats:start()
 	else
 		if m.timer then
