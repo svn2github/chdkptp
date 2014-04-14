@@ -134,6 +134,11 @@ t.ustime = function()
 	local t0=ustime.new(t,600000)
 	local t1=ustime.new(t+1,500000)
 	assert(ustime.diff(t1,t0)==900000)
+	local t0=ustime.new()
+	sys.sleep(100)
+	local d = t0:diff()
+	-- allow 40 msec (!) fudge, timing is bad on some windows systems
+	assert(d > 80000 and d < 120000)
 end
 
 t.lbuf = function()

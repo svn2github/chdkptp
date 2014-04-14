@@ -49,11 +49,15 @@ if only one time is given, subtract from current time
 no provision is made for overflow
 ]]
 function ustime.diff(t1,t0)
-	if not t0 then
+	local t1_sec, t1_usec
+	if t0 then
+		t1_sec,t1_usec = t1.sec,t1.usec
+	else
 		t0 = t1
-		t1 = ustime.new()
+		-- get times directly rather than creating a new ustime object
+		t1_sec,t1_usec = sys.gettimeofday()
 	end
-	return (t1.sec - t0.sec)*1000000 + t1.usec - t0.usec
+	return (t1_sec - t0.sec)*1000000 + t1_usec - t0.usec
 end
 
 --[[
