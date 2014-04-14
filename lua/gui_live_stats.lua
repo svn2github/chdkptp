@@ -18,23 +18,83 @@
 --[[
 stats collector for live view
 ]]
-local stats={
-	t_start_frame = ustime.new(),
-	t_end_frame = ustime.new(),
-	ms_last_frame = 0,
-	t_start_xfer = ustime.new(),
-	t_end_xfer = ustime.new(),
-	ms_last_xfer = 0,
---	t_start_draw = ustime.new(),
---	t_end_draw = ustime.new(),
-	t_start = ustime.new(),
-	t_stop = ustime.new(),
+local counter_proto = {
+	hist_size=10,
 }
+function counter_proto.new(init)
+	local t=util.extend_table({},counter_proto)
+	util.extend_table(t,init)
+	t.t_start=ustime.new()
+	t:reset()
+	return t
+end
+function counter_proto:reset()
+	self.times={}
+	self.r_times={} -- repeat times = time between starts 
+	self.count=0
+end
+function counter_proto:start()
+	if self.count > 0 then
+		self.r_times[self.cur_index] = self.t_start:diffms()
+	end
+	self.t_start:get()
+	self.count = self.count + 1
+	self.cur_index = math.floor(self.count%self.hist_size)
+end
+
+function counter_proto:finish()
+	self.times[self.cur_index] = self.t_start:diffms()
+end
+
+function counter_proto:last_time()
+	return self.times[self.cur_index]
+end
+
+function counter_proto:last_r_time()
+	return self.r_times[self.cur_index]
+end
+
+-- ensure a usable value is returned
+function counter_proto.avg(t)
+	local m=util.table_amean(t)
+	if not m or m == 0 then
+		return 0.1
+	end
+	return m
+end
+
+function counter_proto:avg_time()
+	return self.avg(self.times)
+end
+
+function counter_proto:avg_r_time()
+	return self.avg(self.r_times)
+end
+
+local stats={
+	frames=counter_proto.new(),
+	xfer=counter_proto.new({
+		reset=function(self)
+			counter_proto.reset(self)
+			self.bytes={}
+		end,
+		finish=function(self,bytes)
+			counter_proto.finish(self)
+			self.bytes[self.cur_index] = bytes
+		end,
+		avg_bytes=function(self)
+			return self.avg(self.bytes)
+		end,
+		last_bytes=function(self)
+			return self.bytes[self.cur_index]
+		end,
+	}),
+}
+
+
 function stats:init_counters()
-	self.count_xfer = 0
-	self.count_frame = 0
-	self.xfer_last = 0
-	self.xfer_total = 0
+	self.frames:reset()
+	self.xfer:reset()
 end
 
 stats:init_counters()
@@ -44,7 +104,6 @@ function stats:start()
 		return
 	end
 	self:init_counters()
-	self.t_start:get()
 	self.run = true
 end
 function stats:stop()
@@ -52,85 +111,73 @@ function stats:stop()
 		return
 	end
 	self.run = false
-	self.t_stop:get()
 end
 
 function stats:start_frame()
-	self.t_start_frame:get()
-	self.count_frame = self.count_frame + 1
+	self.frames:start()
 end
 
 function stats:end_frame()
-	self.t_end_frame:get()
-	self.ms_last_frame = self.t_end_frame:diffms(self.t_start_frame)
+	self.frames:finish()
 end
 function stats:start_xfer()
-	self.t_start_xfer:get()
-	self.count_xfer = self.count_xfer + 1
+	self.xfer:start()
 end
 function stats:end_xfer(bytes)
-	self.t_end_xfer:get()
-	self.xfer_last = bytes
-	self.xfer_total = self.xfer_total + bytes
-	self.ms_last_xfer = self.t_end_xfer:diffms(self.t_start_xfer)
+	self.xfer:finish(bytes)
 end
 
 function stats:get_last_total_ms()
-	return self.ms_last_frame + self.ms_last_xfer 
+	return self.frames:last_time() + self.xfer:last_time() 
 end
 
 function stats:get()
 	local run
-	local t_end
-	-- TODO a rolling average would be more useful
-	local fps_avg = 0
-	local frame_time =0
-	local bps_avg = 0
-	local xfer_time = 0
-	local bps_last = 0
 
 	if self.run then
 		run = "yes"
-		t_end = self.t_end_frame
 	else
 		run = "no"
-		t_end = self.t_stop
 	end
-	local tsec = (t_end:diffms(self.t_start)/1000)
-	if tsec == 0 then
-		tsec = 1 
+	
+	local fps_avg = 0
+	local frame_time = 0
+	local tp_bps_avg = 0
+	local bps_avg = 0
+	local xfer_avg = 0
+	local xfer_time = 0
+	local xfer_bytes = 0
+	if self.frames.count > 1 then
+		fps_avg = 1000/self.frames:avg_r_time()
+		frame_time = self.frames:last_time()
 	end
-	if self.count_frame > 0 then
-		fps_avg = self.count_frame/tsec
-		frame_time = self.ms_last_frame
+
+	if self.xfer.count > 1 then
+		local avg_bytes = self.xfer:avg_bytes()
+		-- total throughput (against wall time)
+		tp_bps_avg = 1000*avg_bytes/self.xfer:avg_r_time()
+		-- actual transfer bps
+		bps_avg = 1000*avg_bytes/self.xfer:avg_time()
+		xfer_time = self.xfer:last_time()
+		xfer_bytes = self.xfer:last_bytes()
 	end
-	if self.count_xfer > 0 then
-		-- note this includes time between timer ticks
-		bps_avg = self.xfer_total/tsec
-		xfer_time = self.ms_last_xfer
-		-- if would divide by zero, pretend it was 1ms
-		if xfer_time == 0 then
-			xfer_time = 1
-		end
-		-- instananeous
-		bps_last = self.xfer_last/xfer_time*1000
-	end
+
 	-- TODO this rapidly spams lua with lots of unique strings
 	return string.format(
 [[Running: %s
-FPS avg: %0.2f
+FPS: %0.2f
 Frame last ms: %d
-T/P avg kb/s: %d
+T/P kb/s: %d
 Xfer last ms: %d
 Xfer kb: %d
-Xfer last kb/s: %d]],
+Xfer kb/s: %d]],
 		run,
 		fps_avg,
 		frame_time,
-		bps_avg/1024,
+		tp_bps_avg/1024,
 		xfer_time,
-		self.xfer_last/1024,
-		bps_last/1024)
+		xfer_bytes/1024,
+		bps_avg/1024)
 end
 
 return stats
