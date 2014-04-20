@@ -1330,7 +1330,6 @@ static int chdk_list_usb_devices(lua_State *L) {
 	return 1;
 }
 
-// TODO arg errors shouldn't be fatal
 /*
 status[,errmsg]=con:upload(src,dst)
 */
@@ -1352,7 +1351,6 @@ static int chdk_upload(lua_State *L) {
 	return 1;
 }
 
-// TODO arg errors shouldn't be fatal
 /*
 status[,errmsg]=con:download(src,dst)
 */
