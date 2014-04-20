@@ -37,10 +37,18 @@ gui.cam_dropdown = iup.list{
 }
 
 function gui.cam_dropdown:valuechanged_cb()
-	gui.dbgmsg('cam_dropdown set %s\n',tostring(self.value))
+	v=tonumber(self.value)
+	-- 0 means none selected. Callback can be called with this (multiple times) when list is emptied
+	if v == 0 then
+		return
+	end
 
-	con=chdku.connection(gui.cached_devs[tonumber(self.value)])
+	gui.dbgmsg('cam_dropdown set %s\n',tostring(v))
+
+	con=chdku.connection(gui.cached_devs[v])
+	-- if not connected will only get dev/bus
 	con:update_connection_info()
+	gui.dbgmsg('cam_dropdown new con %s:%s\n',con.condev.dev,con.condev.bus)
 	-- TODO cams should be in the tree
 	gui.tree.get_container().state = 'COLLAPSED' -- force refresh when switching cams
 end
@@ -148,19 +156,25 @@ function gui.update_cam_list(devs)
 	for i,dev in ipairs(devs) do
 		-- TODO name would be nice, but will might hose other connections
 		local s=string.format("%s:%s",dev.bus,dev.dev)
-		gui.cam_dropdown[tostring(i)] =s
-		gui.dbgmsg('cam_dropdown %d:%s\n',i,s)
+		gui.cam_dropdown[tostring(i)] = s
+		gui.dbgmsg('cam_dropdown %d=%s\n',i,s)
 		if con.condev and con.condev.dev == dev.dev and con.condev.bus == dev.bus then
 			gui.dbgmsg('cur %d\n',i)
 			curid = i 
 		end
 	end
 	gui.cached_devs = devs
-	if #devs > 0 and not curid then
-		gui.cam_dropdown.value = 1
-		gui.cam_dropdown:valuechanged_cb()
+	if #devs > 0 then
+		if curid then
+			gui.dbgmsg('cam_dropdown: current %s\n',tostring(curid))
+			gui.cam_dropdown.value = curid
+		else
+			gui.dbgmsg('cam_dropdown: current not found, default to 1\n')
+			gui.cam_dropdown.value = 1
+			gui.cam_dropdown:valuechanged_cb()
+		end
 	else
-		gui.cam_dropdown.value = curid
+		gui.cam_dropdown.value = 0 -- none
 	end
 end
 
