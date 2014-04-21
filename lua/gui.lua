@@ -722,6 +722,15 @@ function gui.chdku_sleep(time)
 	coroutine.yield('sleep')
 end
 
+function gui.schedule_dev_check()
+	if gui.connection_check then
+		gui.connection_check:cancel()
+	end
+	if prefs.gui_dev_check_interval > 0 then
+		gui.connection_check = gui.sched.run_repeat(prefs.gui_dev_check_interval,timer_update_connection_status)
+	end
+end
+
 function gui:run()
 	-- shows dialog
 	dlg:showxy( iup.CENTER, iup.CENTER)
@@ -747,12 +756,24 @@ function gui:run()
 	gui.sched.init_timer(20)
 	chdku.sleep = gui.chdku_sleep
 	
-	-- TODO should be controlled by pref
-	gui.connection_check = gui.sched.run_repeat(500,timer_update_connection_status)
+	gui.schedule_dev_check()
 
 	if (iup.MainLoopLevel()==0) then
 		iup.MainLoop()
 	end
 end
 prefs._add('gui_verbose','number','control verbosity of gui',1)
+prefs._add('gui_dev_check_interval','number','connection/device list check time in ms, 0=never',500,
+	nil, -- default getter
+	function(self,val)
+		self.value = val
+		if val < 100 and val ~= 0 then
+			return false, 'invalid value'
+		end
+		-- if timer already running, reset
+		if gui.sched.timer then
+			gui.schedule_dev_check()
+		end
+	end
+)
 return gui

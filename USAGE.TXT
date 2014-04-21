@@ -418,6 +418,7 @@ gui_dump_palette=false - boolean: dump live palette data on state change
 gui_context_plus=false - boolean: use IUP context plus if available
 gui_force_replay_palette=-1 - number: override palette type dump replay, -1 disable
 gui_verbose=1        - number: control verbosity of gui
+gui_dev_check_interval=500 - number: connection/device list check time in ms, 0=never
 
 Notes:
 1) Outside of startup files, setting a gui option when the gui is not running
