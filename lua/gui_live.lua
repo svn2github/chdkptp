@@ -725,11 +725,9 @@ function m.on_dlg_run()
 	m.set_frame_time(100)
 end
 prefs._add('gui_live_sched','boolean','use scheduler for live updates',false,
-	function(self)
-		return self.val
-	end,
+	nil,
 	function(self,val) 
-		self.val = val
+		self.value = val
 		if m.frame_time then
 			m.set_frame_time(m.frame_time)
 		end
