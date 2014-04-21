@@ -206,8 +206,9 @@ delete (rm)  [options] <target, target,...>: - delete file/directories from the 
 mkdir        <directory> : - create directories on camera
  <directory> directory to create. Intermediate directories will be created as needed
 
-version (ver) [-p]        : - print API and program versions
+version (ver) [-p][-l]    : - print API and program versions
  -p print program version
+ -l print library versions
 
 connect (c)  [-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] | -h=host [-p=port]: - connect to device
  If no options are given, connects to the first available device.
@@ -411,14 +412,18 @@ cli_source_max=10    - number: max nested source calls
 core_verbose=0       - number: ptp core verbosity
 
 In the GUI, the following additional options are available:
+gui_live_sched=false - boolean: use scheduler for live updates
+gui_live_dropframes=false - boolean: drop frames if target fps too high
 gui_dump_palette=false - boolean: dump live palette data on state change
 gui_context_plus=false - boolean: use IUP context plus if available
 gui_force_replay_palette=-1 - number: override palette type dump replay, -1 disable
 gui_verbose=1        - number: control verbosity of gui
 
 Notes:
-1) Setting a gui option when the gui is not running is currently an error
+1) Outside of startup files, setting a gui option when the gui is not running
+   is currently an error
 2) gui_context_plus must be set in a startup file to take effect.
+3) gui_live_dropframes defaults to true under Linux
 
 =Examples=
 start chdkptp in interactive mode and connect to the first available camera
@@ -457,7 +462,7 @@ con> mup c:\CHDK\SCRIPTS CHDK/SCRIPTS
 ad hoc scripting on PC side - download some files
 con> !t=con:listdir('A/DCIM/100CANON',{match="%.JPG$"})
 con> !for i,n in ipairs(t) do con:download("A/DCIM/100CANON/"..n,"C:/TEMP/"..n) end
-note the mdownload cli command above is probably more convenient
+NOTE the mdownload cli command above is probably more convenient
 
 list devices and connect to a specific camera
 ___> list

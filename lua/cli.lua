@@ -1099,10 +1099,14 @@ cli:add_commands{
 	{
 		names={'version','ver'},
 		help='print API and program versions',
-		args=argparser.create{ p=false},
-		arghelp="[-p]",
+		args=argparser.create{ 
+			p=false,
+			l=false,
+		},
+		arghelp="[-p][-l]",
 		help_detail=[[
  -p print program version
+ -l print library versions
 ]],
 		func=function(self,args) 
 			local host_ver = string.format("host:%d.%d cam:",chdku.apiver.MAJOR,chdku.apiver.MINOR)
@@ -1124,6 +1128,16 @@ cli:add_commands{
 				r = string.format('chdkptp %d.%d.%d-%s built %s %s\n%s',
 									chdku.ver.MAJOR,chdku.ver.MINOR,chdku.ver.BUILD,chdku.ver.DESC,
 									chdku.ver.DATE,chdku.ver.TIME,r)
+			end
+			if args.l then
+				r = r .. '\n'.._VERSION -- Lua version
+				-- note these will only show up if actually running gui
+				if iup then
+					r = r .. '\nIUP '..iup._VERSION
+				end
+				if cd then
+					r = r .. '\nCD '..cd._VERSION
+				end
 			end
 			return status,r
 		end,

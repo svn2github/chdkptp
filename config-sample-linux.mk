@@ -25,13 +25,20 @@ READLINE_SUPPORT=1
 # library names for -llibfoo, only needed to override defaults
 #READLINE_LIB=readline history
 
+# for distro provided Lua, you probably want something like this
+# exact paths may vary depending on distro and Lua version
 LUA_INCLUDE_DIR=/usr/include/lua5.1
 LUA_LIB=lua5.1
+
+# for self built lua, use something like
+#LUA_INCLUDE_DIR=/path/to/installed/lua/include
+#LUA_LIB_DIR=/path/to/installed/lua/lib
 
 # compile with debug support 
 DEBUG=1
 
-# lib paths - only needed if you haven't installed in system directories
+# GUI lib paths - only needed if building GUI 
+# and you haven't installed libs in system directories
 #IUP_LIB_DIR=/path/to/iup
 #IUP_INCLUDE_DIR=/path/to/iup/include
 #CD_LIB_DIR=/path/to/cd
