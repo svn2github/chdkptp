@@ -670,7 +670,7 @@ m.init_cli = function()
   	region of image to search, either active area (default) or all
   -coords=<abs|rel>
     output coordinates relative to region, or absolute
-	use rel for raw therapee and dcraw
+    use rel for raw therapee and dcraw
 ]],
 		func=function(self,args) 
 			local d = m.get_sel_batch(args[1])
