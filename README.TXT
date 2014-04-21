@@ -133,9 +133,14 @@ See README-OSX.TXT
 make
 
 =Testing your build=
+To test some internal functions use
 chdkptp -e"exec require'tests':runall()"
 
-This is not a comprehensive test.
+To run some tests against a camera, use
+chdkptp -e"exec require'camtests'.runstd()"
+(if more than one camera is connected to the system, a random one will be used)
+
+Neither of these is a comprehensive test.
 
 =Running=
 See USAGE.TXT
