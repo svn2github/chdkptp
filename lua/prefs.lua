@@ -139,8 +139,13 @@ function m._set(name,value)
 	if p then
 		local status,value = read_val(p.vtype,value)
 		if status then
-			p:set(value)
-			return true
+			local status,msg=p:set(value)
+			-- nil is treated as OK, so setters don't have to return a value
+			-- only explicit false returns error
+			if status or status == nil then
+				return true
+			end
+			return false,msg
 		end
 		return false,value
 	end
