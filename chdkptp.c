@@ -1257,6 +1257,7 @@ static int chdk_program_version(lua_State *L) {
 
 /*
 status[,err]=con:execlua("code"[,flags])
+flats: PTP_CHDK_SCRIPT_FL* values.
 status is true if script started successfully, false otherwise
 con:get_script_id() will return the id of the started script
 */
@@ -1271,8 +1272,6 @@ static int chdk_execlua(lua_State *L) {
 	int status;
 	if(!ptp_chdk_exec_lua(params,(char *)luaL_optstring(L,2,""),luaL_optnumber(L,3,0),&ptp_cs->script_id,&status)) {
 		lua_pushboolean(L,0);
-		// TODO this is hacky
-		// if we got a script id, script request got as far as the the camera
 		if(status == PTP_CHDK_S_ERRTYPE_COMPILE) {
 			lua_pushstring(L,"compile"); // caller can check messages for details
 		} else if(status == PTP_CHDK_S_ERR_SCRIPTRUNNING) {
