@@ -689,6 +689,21 @@ function dng_methods.set_data(self,data,offset,order)
 		-- order should always be big for embedded data
 	end
 
+	local active_area = {
+		top=ifd.byname.ActiveArea:getel(0),
+		left=ifd.byname.ActiveArea:getel(1),
+		bottom=ifd.byname.ActiveArea:getel(2),
+		right=ifd.byname.ActiveArea:getel(3),
+	}
+	-- clamp invalid active area for easier DNG debugging
+	if active_area.bottom > ifd.byname.ImageLength:getel() then
+		util.warnf("invalid active area bottom %d > %d\n",active_area.bottom,ifd.byname.ImageLength:getel())
+		active_area.bottom = ifd.byname.ImageLength:getel()
+	end
+	if active_area.left > ifd.byname.ImageWidth:getel() then
+		util.warnf("warning invalid active area left %d > %d\n",active_area.left,ifd.byname.ImageWidth:getel())
+		active_area.left = ifd.byname.ImageWidth:getel()
+	end
 	local img = rawimg.bind_lbuf{
 		data=data,
 		data_offset=offset,
@@ -698,12 +713,7 @@ function dng_methods.set_data(self,data,offset,order)
 		endian=order,
 		black_level=ifd.byname.BlackLevel:getel(),
 		cfa_pattern=ifd.byname.CFAPattern:get_byte_str(),
-		active_area={
-			top=ifd.byname.ActiveArea:getel(0),
-			left=ifd.byname.ActiveArea:getel(1),
-			bottom=ifd.byname.ActiveArea:getel(2),
-			right=ifd.byname.ActiveArea:getel(3),
-		}
+		active_area=active_area,
 	}
 	self.img = img
 	return true
