@@ -395,22 +395,23 @@ cam_btn_frame = iup.vbox{
 			title='shoot half',
 			size='45x15',
 			action=function(self)
-				gui.execquick([[
+				gui.execquick(string.format([[
+local timeout=%d
 local rec,vid = get_mode()
 if rec and not vid then
 	press("shoot_half")
 	local n = 0
 	repeat
 		sleep(10)
-		n = n + 1
-	until get_shooting() == true or n > 100
+		n = n + 10
+	until get_shooting() == true or n > timeout
 	release("shoot_half")
 else
 	press("shoot_half") 
 	sleep(1000)
 	release("shoot_half")
 end
-]])
+]],prefs.gui_shoot_half_timeout))
 			end,
 		},
 		iup.fill{
@@ -776,4 +777,5 @@ prefs._add('gui_dev_check_interval','number','connection/device list check time 
 		end
 	end
 )
+prefs._add('gui_shoot_half_timeout','number','max time to wait for shoot_half, in ms',3000)
 return gui
