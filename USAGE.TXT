@@ -266,6 +266,7 @@ shoot        [options]   : - shoot a picture with specified exposure
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
+   -sd=<v>[units]  subject distance, units one of m, mm, in, ft default m
    -raw[=1|0] Force raw on or off, defaults to current camera setting
    -dng[=1|0] Force DNG on or off, implies raw if on, default current camera setting
    -pretend   print actions instead of running them
@@ -286,6 +287,7 @@ remoteshoot (rs) [local] [options]: - shoot and download without saving to SD (r
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
+   -sd=<v>[units]  subject distance, units one of m, mm, in, ft default m
    -jpg         jpeg, default if no other options (not supported on all cams)
    -raw         framebuffer dump raw
    -dng         DNG format raw
@@ -307,6 +309,7 @@ rsint        [local] [options]: - shoot and download in continuous mode with int
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
+   -sd=<v>[units]  subject distance, units one of m, mm, in, ft default m
    -jpg         jpeg, default if no other options (not supported on all cams)
    -raw         framebuffer dump raw
    -dng         DNG format raw
@@ -365,7 +368,7 @@ dnglistpixels [options] [image num]: - generate a list of pixel coordinates
         region of image to search, either active area (default) or all
   -coords=<abs|rel>
     output coordinates relative to region, or absolute
-        use rel for raw therapee and dcraw
+    use rel for raw therapee and dcraw
 
 dnglist                  : - list loaded dng files
 dngsel       <number>    : - select dng

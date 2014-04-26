@@ -969,6 +969,9 @@ function rlib_shoot_init_exp(opts)
 	if opts.nd then
 		set_nd_filter(opts.nd)
 	end
+	if opts.sd then
+		set_focus(opts.sd)
+	end
 end
 ]],
 },

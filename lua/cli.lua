@@ -435,6 +435,24 @@ function cli:get_shoot_common_opts(args)
 		end
 		opts.nd = val
 	end
+	if args.sd then
+		local sd,units=string.match(args.sd,'(%d+)(%a*)')
+
+		local convert={
+			mm=1,
+			cm=100,
+			m=1000,
+			ft=304.8,
+			['in']=25.4,
+		}
+		if units == '' then
+			units = 'm'
+		end
+		if not convert[units] then
+			return false,string.format('invalid sd units %s',tostring(units))
+		end
+		opts.sd = util.round(sd*convert[units])
+	end
 
 	-- hack for CHDK override bug that ignores APEX 0
 	-- only used for CHDK 1.1 (API 2.4 and earlier)
@@ -1590,6 +1608,7 @@ cli:add_commands{
 			av=false,
 			isomode=false,
 			nd=false,
+			sd=false,
 			raw=false,
 			dng=false,
 			pretend=false,
@@ -1609,6 +1628,7 @@ cli:add_commands{
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
+   -sd=<v>[units]  subject distance, units one of m, mm, in, ft default m
    -raw[=1|0] Force raw on or off, defaults to current camera setting
    -dng[=1|0] Force DNG on or off, implies raw if on, default current camera setting
    -pretend   print actions instead of running them
@@ -1728,6 +1748,7 @@ cli:add_commands{
 			av=false,
 			isomode=false,
 			nd=false,
+			sd=false,
 			jpg=false,
 			raw=false,
 			dng=false,
@@ -1749,6 +1770,7 @@ cli:add_commands{
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
+   -sd=<v>[units]  subject distance, units one of m, mm, in, ft default m
    -jpg         jpeg, default if no other options (not supported on all cams)
    -raw         framebuffer dump raw
    -dng         DNG format raw
@@ -1932,6 +1954,7 @@ cli:add_commands{
 			av=false,
 			isomode=false,
 			nd=false,
+			sd=false,
 			jpg=false,
 			raw=false,
 			dng=false,
@@ -1953,6 +1976,7 @@ cli:add_commands{
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
+   -sd=<v>[units]  subject distance, units one of m, mm, in, ft default m
    -jpg         jpeg, default if no other options (not supported on all cams)
    -raw         framebuffer dump raw
    -dng         DNG format raw
