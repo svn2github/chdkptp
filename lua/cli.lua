@@ -1638,7 +1638,7 @@ cli:add_commands{
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value, Canon "real" ISO
-   -svm=<v>   ISO value, Canon "Market" ISO
+   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3)
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
@@ -1782,7 +1782,7 @@ cli:add_commands{
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value, Canon "real" ISO
-   -svm=<v>   ISO value, Canon "Market" ISO
+   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3)
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
@@ -1990,7 +1990,7 @@ cli:add_commands{
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value, Canon "real" ISO
-   -svm=<v>   ISO value, Canon "Market" ISO
+   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3)
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state

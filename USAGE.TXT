@@ -262,7 +262,8 @@ shoot        [options]   : - shoot a picture with specified exposure
       a   APEX
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
-   -sv=<v>    ISO value. In standard units, Canon "real" ISO
+   -sv=<v>    ISO value, Canon "real" ISO
+   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3)
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
@@ -283,7 +284,8 @@ remoteshoot (rs) [local] [options]: - shoot and download without saving to SD (r
       a   APEX
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
-   -sv=<v>    ISO value. In standard units, Canon "real" ISO
+   -sv=<v>    ISO value, Canon "real" ISO
+   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3)
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
@@ -305,7 +307,8 @@ rsint        [local] [options]: - shoot and download in continuous mode with int
       a   APEX
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
-   -sv=<v>    ISO value. In standard units, Canon "real" ISO
+   -sv=<v>    ISO value, Canon "real" ISO
+   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3)
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
