@@ -240,7 +240,7 @@ end
 function m.register_rlib() 
 	chdku.rlibs:register{
 		name='rsint',
-		depend={'extend_table','serialize_msgs','rs_shoot_init'},
+		depend={'extend_table','serialize_msgs','rlib_shoot_common','rs_shoot_init'},
 		code=[[
 function wait_shooting(state, timeout)
 	if not timeout then
@@ -301,6 +301,8 @@ cmds={
 }
 
 function rsint_run(opts)
+	rlib_shoot_init_exp(opts)
+
 	press('shoot_half')
 
 	status, err = wait_shooting(true)
