@@ -960,6 +960,12 @@ function rlib_shoot_init_exp(opts)
 	if opts.sv then
 		set_sv96(opts.sv)
 	end
+	if opts.svm then
+		if type(sv96_market_to_real) ~= 'function' then
+			error('svm not supported')
+		end
+		set_sv96(sv96_market_to_real(opts.svm))
+	end
 	if opts.isomode then
 		set_iso_mode(opts.isomode)
 	end

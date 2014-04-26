@@ -376,6 +376,9 @@ function cli:get_shoot_common_opts(args)
 	if not util.in_table({'s','a','96'},args.u) then
 		return false,"invalid units"
 	end
+	if args.sv and args.svm then
+		return false, "both sv and svm given"
+	end
 	local opts={}
 	if args.u == 's' then
 		if args.av then
@@ -383,6 +386,9 @@ function cli:get_shoot_common_opts(args)
 		end
 		if args.sv then
 			opts.sv=exp.iso_to_sv96(args.sv)
+		end
+		if args.svm then
+			opts.svm=exp.iso_to_sv96(args.svm)
 		end
 		if args.tv then
 			local n,d = string.match(args.tv,'^([%d]+)/([%d.]+)$')
@@ -408,6 +414,9 @@ function cli:get_shoot_common_opts(args)
 		if args.sv then
 			opts.sv = util.round(args.sv*96)
 		end
+		if args.svm then
+			opts.svm = util.round(args.svm*96)
+		end
 		if args.tv then
 			opts.tv = util.round(args.tv*96)
 		end
@@ -418,13 +427,16 @@ function cli:get_shoot_common_opts(args)
 		if args.sv then
 			opts.sv=tonumber(args.sv)
 		end
+		if args.svm then
+			opts.svm=tonumber(args.svm)
+		end
 		if args.tv then
 			opts.tv=tonumber(args.tv)
 		end
 	end
 	if args.isomode then
-		if opts.sv then
-			return false,'set sv or isomode, not both!'
+		if opts.sv or opts.svm then
+			return false,'set only one of sv, svm or isomode!'
 		end
 		opts.isomode = tonumber(args.isomode)
 	end
@@ -1605,6 +1617,7 @@ cli:add_commands{
 			u='s',
 			tv=false,
 			sv=false,
+			svm=false,
 			av=false,
 			isomode=false,
 			nd=false,
@@ -1624,7 +1637,8 @@ cli:add_commands{
       a   APEX
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
-   -sv=<v>    ISO value. In standard units, Canon "real" ISO
+   -sv=<v>    ISO value, Canon "real" ISO
+   -svm=<v>   ISO value, Canon "Market" ISO
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
@@ -1745,6 +1759,7 @@ cli:add_commands{
 			u='s',
 			tv=false,
 			sv=false,
+			svm=false,
 			av=false,
 			isomode=false,
 			nd=false,
@@ -1766,7 +1781,8 @@ cli:add_commands{
       a   APEX
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
-   -sv=<v>    ISO value. In standard units, Canon "real" ISO
+   -sv=<v>    ISO value, Canon "real" ISO
+   -svm=<v>   ISO value, Canon "Market" ISO
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
@@ -1951,6 +1967,7 @@ cli:add_commands{
 			u='s',
 			tv=false,
 			sv=false,
+			svm=false,
 			av=false,
 			isomode=false,
 			nd=false,
@@ -1972,7 +1989,8 @@ cli:add_commands{
       a   APEX
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
-   -sv=<v>    ISO value. In standard units, Canon "real" ISO
+   -sv=<v>    ISO value, Canon "real" ISO
+   -svm=<v>   ISO value, Canon "Market" ISO
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
