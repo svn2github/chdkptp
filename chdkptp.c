@@ -165,7 +165,7 @@ short verbose=0;
 // so is this
 #define CHDK_ENSURE_CONNECTED    if (!ptp_cs->connected) { \
 		lua_pushboolean(L,0); \
-		chdk_push_error(L, PTP_ERROR_NOT_CONNECTED); \
+		chdk_push_ptp_error(L, PTP_ERROR_NOT_CONNECTED); \
 		return 2; \
 	}
 
@@ -279,17 +279,6 @@ void
 ptpcam_debug (void *data, const char *format, va_list args)
 {
 	if (verbose<2) return;
-	vfprintf (stderr, format, args);
-	fprintf (stderr,"\n");
-	fflush(stderr);
-}
-
-void
-ptpcam_error (void *data, const char *format, va_list args);
-void
-ptpcam_error (void *data, const char *format, va_list args)
-{
-/*	if (!verbose) return; */
 	vfprintf (stderr, format, args);
 	fprintf (stderr,"\n");
 	fflush(stderr);
@@ -1041,7 +1030,7 @@ static int chdk_error_tostring(lua_State *L) {
 /*
 push a new error object
 */
-static int chdk_push_error(lua_State *L,uint16_t code) {
+static int chdk_push_ptp_error(lua_State *L,uint16_t code) {
 	lua_createtable(L,0,1);
 	lua_pushnumber(L,code);
 	lua_setfield(L, -2,"ptp_rc");
@@ -1061,7 +1050,7 @@ static int chdk_check_ptp(lua_State *L,uint16_t code) {
 		return 1;
 	}
 	lua_pushboolean(L,0);
-	chdk_push_error(L,code);
+	chdk_push_ptp_error(L,code);
 	return 0;
 }
 
