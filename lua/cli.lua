@@ -314,10 +314,13 @@ end
 function cli:print_status(status,msg) 
 	if not status then
 		errf("%s\n",tostring(msg))
-	elseif msg and string.len(msg) ~= 0 then
-		printf("%s",msg)
-		if string.sub(msg,-1,-1) ~= '\n' then
-			printf("\n")
+	elseif msg then
+		msg = tostring(msg) -- ensure error object is converted
+		if string.len(msg) ~= 0 then
+			printf("%s",msg)
+			if string.sub(msg,-1,-1) ~= '\n' then
+				printf("\n")
+			end
 		end
 	end
 	return status,msg
