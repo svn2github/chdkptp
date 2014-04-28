@@ -97,17 +97,27 @@ local con_methods = {}
 --[[
 check whether this cameras model and serial number match those given
 assumes self.ptpdev is up to date
-TODO - ugly
+bool = con:match_ptp_info(match)
+{
+	model='model pattern'
+	serial='serial number pattern'
+	plain=bool -- plain text match
+}
+empty / false model or serial matches any
 ]]
 function con_methods:match_ptp_info(match) 
-	match = util.extend_table({model='.*',serial_number='.*'},match)
+	if match.model and not string.find(self.ptpdev.model,match.model,1,match.plain) then
+		return false
+	end
 	-- older cams don't have serial
 	local serial = ''
 	if self.ptpdev.serial_number then
 		serial = self.ptpdev.serial_number
 	end
---	printf('model %s (%s) serial_number %s (%s)\n',ptp_info.model,match.model,ptp_info.serial_number, match.serial_number)
-	return (string.find(self.ptpdev.model,match.model) and string.find(serial,match.serial_number))
+	if match.serial and not string.find(serial,match.serial,1,match.plain) then
+		return false
+	end
+	return true
 end
 
 --[[
@@ -1602,19 +1612,24 @@ attempt to find a device specified by the match table
 	bus='bus pattern'
 	dev='device pattern'
 	product_id = number
+	plain = bool -- plain text match
 }
+empty / false dev or bus matches any
 ]]
 function chdku.match_device(devinfo,match) 
-	--[[
+--[[
 	printf('try bus:%s (%s) dev:%s (%s) pid:%s (%s)\n',
-		devinfo.bus, match.bus,
-		devinfo.dev, match.dev,
+		devinfo.bus, tostring(match.bus),
+		devinfo.dev, tostring(match.dev),
 		devinfo.product_id, tostring(match.product_id))
-	--]]
-	if string.find(devinfo.bus,match.bus) and string.find(devinfo.dev,match.dev) then
-		return (match.product_id == nil or tonumber(match.product_id)==devinfo.product_id)
+--]]
+	if match.bus and not string.find(devinfo.bus,match.bus,1,match.plain) then
+		return false
 	end
-	return false
+	if match.dev and not string.find(devinfo.dev,match.dev,1,match.plain) then
+		return false
+	end
+	return (match.product_id == nil or tonumber(match.product_id)==devinfo.product_id)
 end
 --[[
 return a connection object wrapped with chdku methods

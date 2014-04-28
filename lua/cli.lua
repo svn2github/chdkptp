@@ -1178,22 +1178,33 @@ cli:add_commands{
 	{
 		names={'connect','c'},
 		help='connect to device',
-		arghelp="[-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] | -h=host [-p=port]",
+		arghelp="[-nodis] [USB dev spec] | -h=host [-p=port]",
 		args=argparser.create{
-			b='.*',
-			d='.*',
+			b=false,
+			d=false,
 			p=false,
 			s=false,
 			h=false,
+			nodis=false,
+			nopat=false,
 		},
 		
 		help_detail=[[
- If no options are given, connects to the first available device.
+ If no options are given, connects to the first available USB device.
+ USB dev spec:
+  -b=<bus>
+  -d=<dev> 
+  -p=<pid>
+  -s=<serial> 
+  model 
  <pid> is the USB product ID, as a decimal or hexadecimal number.
- All other options are treated as a Lua pattern. For alphanumerics, this is a case sensitive substring match.
+ All other values are treated as a Lua pattern, unless -nopat is given.
  If the serial or model are specified, a temporary connection will be made to each device
  If <model> includes spaces, it must be quoted.
  If multiple devices match, the first matching device will be connected.
+ other options:
+  -nodis do not close current connection
+  -nopat use plain substring matches instead of patterns
 ]],
 		func=function(self,args) 
 			local match = {}
@@ -1211,8 +1222,9 @@ cli:add_commands{
 				end
 --				printf('%s=%s\n',v,tostring(args[k]))
 			end
+			match.plain = args.nopat
 
-			if con:is_connected() then
+			if not args.nodis and con:is_connected() then
 				con:disconnect()
 			end
 
@@ -1264,6 +1276,7 @@ cli:add_commands{
 				end
 				if con:is_connected() then
 					cli.infomsg('connected: %s, max packet size %d\n',con.ptpdev.model,con.ptpdev.max_packet_size)
+					-- TODO should have a min API version check
 					if con.apiver.MAJOR < 0 then
 						util.warnf('CHDK extension not detected\n')
 					end

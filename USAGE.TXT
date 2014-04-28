@@ -210,13 +210,22 @@ version (ver) [-p][-l]    : - print API and program versions
  -p print program version
  -l print library versions
 
-connect (c)  [-b=<bus>] [-d=<dev>] [-p=<pid>] [-s=<serial>] [model] | -h=host [-p=port]: - connect to device
- If no options are given, connects to the first available device.
+connect (c)  [-nodis] [USB dev spec] | -h=host [-p=port]: - connect to device
+ If no options are given, connects to the first available USB device.
+ USB dev spec:
+  -b=<bus>
+  -d=<dev>
+  -p=<pid>
+  -s=<serial>
+  model
  <pid> is the USB product ID, as a decimal or hexadecimal number.
- All other options are treated as a Lua pattern. For alphanumerics, this is a case sensitive substring match.
+ All other values are treated as a Lua pattern, unless -nopat is given.
  If the serial or model are specified, a temporary connection will be made to each device
  If <model> includes spaces, it must be quoted.
  If multiple devices match, the first matching device will be connected.
+ other options:
+  -nodis do not close current connection
+  -nopat use plain substring matches instead of patterns
 
 reconnect (r)             : - reconnect to current device
 disconnect (dis)             : - disconnect from device
@@ -456,7 +465,7 @@ download A/CHDK/CCHDK.CFG to BACKUP.CFG in the current directory
 
 connect to the device with name containing D10 on bus "bus-0", 
  chdkptp -c"D10 -b=bus%-0" -i
-note connect -b takes a lua pattern, so % is needed to escapes the -
+note connect -b takes a lua pattern by default, so % is used to escape the -
 
 download some jpeg images (in 100CANON etc folders)
 con> mdl -fmatch=%.JPG$ DCIM C:\temp
