@@ -812,8 +812,7 @@ struct _PTPParams {
 	PTPIOGetResp	event_check;
 	PTPIOGetResp	event_wait;
 
-	/* Custom error and debug function */
-	PTPErrorFunc error_func;
+	/* Custom debug message function */
 	PTPDebugFunc debug_func;
 
 	/* Data passed to above functions */

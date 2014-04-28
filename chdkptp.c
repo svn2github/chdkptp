@@ -412,7 +412,6 @@ int init_ptp_tcp(PTPParams* params, PTP_CON_STATE* ptp_cs) {
 	params->check_int_fast_func=ptp_tcp_check_int;
 	params->read_control_func=ptp_tcp_read_control;
 	params->read_data_func=ptp_tcp_read_data;
-	params->error_func=ptpcam_error;
 	params->debug_func=ptpcam_debug;
 	params->sendreq_func=ptp_tcp_sendreq;
 	params->senddata_func=ptp_tcp_senddata;
@@ -539,7 +538,6 @@ init_ptp_usb (PTPParams* params, PTP_CON_STATE* ptp_cs, struct usb_device* dev)
 	params->check_int_fast_func=ptp_usb_check_int;
 	params->read_control_func=ptp_usb_read_control;
 	params->read_data_func=ptp_usb_read_data;
-	params->error_func=ptpcam_error;
 	params->debug_func=ptpcam_debug;
 	params->sendreq_func=ptp_usb_sendreq;
 	params->senddata_func=ptp_usb_senddata;

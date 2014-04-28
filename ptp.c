@@ -75,23 +75,6 @@ ptp_debug (PTPParams *params, const char *format, ...)
 	va_end (args);
 }  
 
-static void
-ptp_error (PTPParams *params, const char *format, ...)
-{  
-	va_list args;
-
-	va_start (args, format);
-	if (params->error_func!=NULL)
-		params->error_func (params->data, format, args);
-	else
-	{
-		vfprintf (stderr, format, args);
-		fprintf (stderr,"\n");
-		fflush (stderr);
-	}
-	va_end (args);
-}
-
 /* Pack / unpack functions */
 
 #include "ptp-pack.c"
@@ -562,9 +545,6 @@ ptp_usb_sendreq (PTPParams* params, PTPContainer* req)
 		params->data);
 	if (ret!=PTP_RC_OK) {
 		ret = PTP_ERROR_IO;
-/*		ptp_error (params,
-			"PTP: request code 0x%04x sending req error 0x%04x",
-			req->Code,ret); */
 	}
 	return ret;
 }
@@ -590,10 +570,6 @@ ptp_usb_senddata (PTPParams* params, PTPContainer* ptp,
 	if (ret!=PTP_RC_OK)
 	{
 		ret = PTP_ERROR_IO;
-		/*
-		ptp_error (params,
-			"PTP: request code 0x%04x sending data error 0x%04x", ptp->Code,ret);
-		*/
 		return ret;
 	}
 	if (size > PTP_USB_BULK_PAYLOAD_LEN)
@@ -604,10 +580,6 @@ ptp_usb_senddata (PTPParams* params, PTPContainer* ptp,
 		if (ret!=PTP_RC_OK)
 		{
 			ret = PTP_ERROR_IO;
-			/*
-			ptp_error (params,
-				"PTP: request code 0x%04x sending data error 0x%04x", ptp->Code,ret);
-			*/
 			return ret;
 		}
 	}
@@ -708,9 +680,6 @@ ptp_usb_getresp (PTPParams* params, PTPContainer* resp)
 		ret = dtoh16(usbresp.code);
 	}
 	if (ret!=PTP_RC_OK) {
-/*		ptp_error (params,
-		"PTP: request code 0x%04x getting resp error 0x%04x",
-			resp->Code, ret);*/
 		return ret;
 	}
 	/* build an appropriate PTPContainer */
@@ -1936,105 +1905,6 @@ const char *ptp_strerror(uint16_t error) {
 	}
 	return "unknown";
 }
-
-#if 0
-void 
-ptp_perror(PTPParams* params, uint16_t error) {
-
-	int i;
-	/* PTP error descriptions */
-	static struct {
-		uint16_t error;
-		const char *txt;
-	} ptp_errors[] = {
-	{PTP_RC_Undefined, 		N_("PTP: Undefined Error")},
-	{PTP_RC_OK, 			N_("PTP: OK!")},
-	{PTP_RC_GeneralError, 		N_("PTP: General Error")},
-	{PTP_RC_SessionNotOpen, 	N_("PTP: Session Not Open")},
-	{PTP_RC_InvalidTransactionID, 	N_("PTP: Invalid Transaction ID")},
-	{PTP_RC_OperationNotSupported, 	N_("PTP: Operation Not Supported")},
-	{PTP_RC_ParameterNotSupported, 	N_("PTP: Parameter Not Supported")},
-	{PTP_RC_IncompleteTransfer, 	N_("PTP: Incomplete Transfer")},
-	{PTP_RC_InvalidStorageId, 	N_("PTP: Invalid Storage ID")},
-	{PTP_RC_InvalidObjectHandle, 	N_("PTP: Invalid Object Handle")},
-	{PTP_RC_DevicePropNotSupported, N_("PTP: Device Prop Not Supported")},
-	{PTP_RC_InvalidObjectFormatCode, N_("PTP: Invalid Object Format Code")},
-	{PTP_RC_StoreFull, 		N_("PTP: Store Full")},
-	{PTP_RC_ObjectWriteProtected, 	N_("PTP: Object Write Protected")},
-	{PTP_RC_StoreReadOnly, 		N_("PTP: Store Read Only")},
-	{PTP_RC_AccessDenied,		N_("PTP: Access Denied")},
-	{PTP_RC_NoThumbnailPresent, 	N_("PTP: No Thumbnail Present")},
-	{PTP_RC_SelfTestFailed, 	N_("PTP: Self Test Failed")},
-	{PTP_RC_PartialDeletion, 	N_("PTP: Partial Deletion")},
-	{PTP_RC_StoreNotAvailable, 	N_("PTP: Store Not Available")},
-	{PTP_RC_SpecificationByFormatUnsupported,
-				N_("PTP: Specification By Format Unsupported")},
-	{PTP_RC_NoValidObjectInfo, 	N_("PTP: No Valid Object Info")},
-	{PTP_RC_InvalidCodeFormat, 	N_("PTP: Invalid Code Format")},
-	{PTP_RC_UnknownVendorCode, 	N_("PTP: Unknown Vendor Code")},
-	{PTP_RC_CaptureAlreadyTerminated,
-					N_("PTP: Capture Already Terminated")},
-	{PTP_RC_DeviceBusy, 		N_("PTP: Device Busy")},
-	{PTP_RC_InvalidParentObject, 	N_("PTP: Invalid Parent Object")},
-	{PTP_RC_InvalidDevicePropFormat, N_("PTP: Invalid Device Prop Format")},
-	{PTP_RC_InvalidDevicePropValue, N_("PTP: Invalid Device Prop Value")},
-	{PTP_RC_InvalidParameter, 	N_("PTP: Invalid Parameter")},
-	{PTP_RC_SessionAlreadyOpened, 	N_("PTP: Session Already Opened")},
-	{PTP_RC_TransactionCanceled, 	N_("PTP: Transaction Canceled")},
-	{PTP_RC_SpecificationOfDestinationUnsupported,
-			N_("PTP: Specification Of Destination Unsupported")},
-
-	{PTP_ERROR_IO,		  N_("PTP: I/O error")},
-	{PTP_ERROR_BADPARAM,	  N_("PTP: Error: bad parameter")},
-	{PTP_ERROR_DATA_EXPECTED, N_("PTP: Protocol error: data expected")},
-	{PTP_ERROR_RESP_EXPECTED, N_("PTP: Protocol error: response expected")},
-	{0, NULL}
-	};
-	static struct {
-		uint16_t error;
-		const char *txt;
-	} ptp_errors_EK[] = {
-	{PTP_RC_EK_FilenameRequired,	N_("PTP EK: Filename Required")},
-	{PTP_RC_EK_FilenameConflicts,	N_("PTP EK: Filename Conflicts")},
-	{PTP_RC_EK_FilenameInvalid,	N_("PTP EK: Filename Invalid")},
-	{0, NULL}
-	};
-	static struct {
-		uint16_t error;
-		const char *txt;
-	} ptp_errors_NIKON[] = {
-	{PTP_RC_NIKON_PropertyReadOnly,	N_("PTP NIKON: Property Read Only")},
-	{0, NULL}
-	};
-
-	for (i=0; ptp_errors[i].txt!=NULL; i++)
-		if (ptp_errors[i].error == error){
-			ptp_error(params, ptp_errors[i].txt);
-			return;
-		}
-
-	/*if (error|PTP_RC_EXTENSION_MASK==PTP_RC_EXTENSION)*/
-	switch (params->deviceinfo.VendorExtensionID) {
-		case PTP_VENDOR_EASTMAN_KODAK:
-			for (i=0; ptp_errors_EK[i].txt!=NULL; i++)
-				if (ptp_errors_EK[i].error==error) {
-					ptp_error(params, ptp_errors_EK[i].txt);
-					return;
-				}
-			break;
-		case PTP_VENDOR_NIKON:
-			for (i=0; ptp_errors_NIKON[i].txt!=NULL; i++)
-				if (ptp_errors_NIKON[i].error==error) {
-					ptp_error(params, ptp_errors_NIKON[i].txt);
-					return;
-				}
-			break;
-	}
-
-	ptp_error(params, "PTP: Error 0x%04x", error);
-	
-}
-#endif
 
 /* return DataType description */
 
