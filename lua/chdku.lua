@@ -1322,6 +1322,11 @@ function con_methods:update_connection_info()
 	end
 	local major,minor=self:camera_api_version()
 	if not major then
+		-- device connected doesn't support PTP_OC_CHDK
+		if minor.ptp_rc == ptp.RC_OperationNotSupported then
+			self.apiver={MAJOR=-1,MINOR=-1}
+			return true
+		end
 		return false,minor
 	end
 	self.apiver={MAJOR=major,MINOR=minor}

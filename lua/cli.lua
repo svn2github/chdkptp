@@ -1264,6 +1264,9 @@ cli:add_commands{
 				end
 				if con:is_connected() then
 					cli.infomsg('connected: %s, max packet size %d\n',con.ptpdev.model,con.ptpdev.max_packet_size)
+					if con.apiver.MAJOR < 0 then
+						util.warnf('CHDK extension not detected\n')
+					end
 					status = true
 				end
 			else 
