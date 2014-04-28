@@ -61,35 +61,35 @@
 static void
 ptp_debug (PTPParams *params, const char *format, ...)
 {  
-        va_list args;
+	va_list args;
 
-        va_start (args, format);
-        if (params->debug_func!=NULL)
-                params->debug_func (params->data, format, args);
-        else
+	va_start (args, format);
+	if (params->debug_func!=NULL)
+    	params->debug_func (params->data, format, args);
+    else
 	{
-                vfprintf (stderr, format, args);
+		vfprintf (stderr, format, args);
 		fprintf (stderr,"\n");
 		fflush (stderr);
 	}
-        va_end (args);
+	va_end (args);
 }  
 
 static void
 ptp_error (PTPParams *params, const char *format, ...)
 {  
-        va_list args;
+	va_list args;
 
-        va_start (args, format);
-        if (params->error_func!=NULL)
-                params->error_func (params->data, format, args);
-        else
+	va_start (args, format);
+	if (params->error_func!=NULL)
+		params->error_func (params->data, format, args);
+	else
 	{
-                vfprintf (stderr, format, args);
+		vfprintf (stderr, format, args);
 		fprintf (stderr,"\n");
 		fflush (stderr);
 	}
-        va_end (args);
+	va_end (args);
 }
 
 /* Pack / unpack functions */
@@ -1878,7 +1878,65 @@ ptp_free_devicepropdesc(PTPDevicePropDesc* dpd)
 }
 
 /* report PTP errors */
+const char *ptp_strerror(uint16_t error) {
+	/* PTP error descriptions */
+	static struct {
+		uint16_t error;
+		const char *txt;
+	} ptp_errors[] = {
+	{PTP_RC_Undefined, 		N_("PTP: Undefined Error")},
+	{PTP_RC_OK, 			N_("PTP: OK!")},
+	{PTP_RC_GeneralError, 		N_("PTP: General Error")},
+	{PTP_RC_SessionNotOpen, 	N_("PTP: Session Not Open")},
+	{PTP_RC_InvalidTransactionID, 	N_("PTP: Invalid Transaction ID")},
+	{PTP_RC_OperationNotSupported, 	N_("PTP: Operation Not Supported")},
+	{PTP_RC_ParameterNotSupported, 	N_("PTP: Parameter Not Supported")},
+	{PTP_RC_IncompleteTransfer, 	N_("PTP: Incomplete Transfer")},
+	{PTP_RC_InvalidStorageId, 	N_("PTP: Invalid Storage ID")},
+	{PTP_RC_InvalidObjectHandle, 	N_("PTP: Invalid Object Handle")},
+	{PTP_RC_DevicePropNotSupported, N_("PTP: Device Prop Not Supported")},
+	{PTP_RC_InvalidObjectFormatCode, N_("PTP: Invalid Object Format Code")},
+	{PTP_RC_StoreFull, 		N_("PTP: Store Full")},
+	{PTP_RC_ObjectWriteProtected, 	N_("PTP: Object Write Protected")},
+	{PTP_RC_StoreReadOnly, 		N_("PTP: Store Read Only")},
+	{PTP_RC_AccessDenied,		N_("PTP: Access Denied")},
+	{PTP_RC_NoThumbnailPresent, 	N_("PTP: No Thumbnail Present")},
+	{PTP_RC_SelfTestFailed, 	N_("PTP: Self Test Failed")},
+	{PTP_RC_PartialDeletion, 	N_("PTP: Partial Deletion")},
+	{PTP_RC_StoreNotAvailable, 	N_("PTP: Store Not Available")},
+	{PTP_RC_SpecificationByFormatUnsupported,
+				N_("PTP: Specification By Format Unsupported")},
+	{PTP_RC_NoValidObjectInfo, 	N_("PTP: No Valid Object Info")},
+	{PTP_RC_InvalidCodeFormat, 	N_("PTP: Invalid Code Format")},
+	{PTP_RC_UnknownVendorCode, 	N_("PTP: Unknown Vendor Code")},
+	{PTP_RC_CaptureAlreadyTerminated,
+					N_("PTP: Capture Already Terminated")},
+	{PTP_RC_DeviceBusy, 		N_("PTP: Device Busy")},
+	{PTP_RC_InvalidParentObject, 	N_("PTP: Invalid Parent Object")},
+	{PTP_RC_InvalidDevicePropFormat, N_("PTP: Invalid Device Prop Format")},
+	{PTP_RC_InvalidDevicePropValue, N_("PTP: Invalid Device Prop Value")},
+	{PTP_RC_InvalidParameter, 	N_("PTP: Invalid Parameter")},
+	{PTP_RC_SessionAlreadyOpened, 	N_("PTP: Session Already Opened")},
+	{PTP_RC_TransactionCanceled, 	N_("PTP: Transaction Canceled")},
+	{PTP_RC_SpecificationOfDestinationUnsupported,
+			N_("PTP: Specification Of Destination Unsupported")},
 
+	{PTP_ERROR_IO,		  N_("PTP: I/O error")},
+	{PTP_ERROR_BADPARAM,	  N_("PTP: Error: bad parameter")},
+	{PTP_ERROR_DATA_EXPECTED, N_("PTP: Protocol error: data expected")},
+	{PTP_ERROR_RESP_EXPECTED, N_("PTP: Protocol error: response expected")},
+	{0, NULL}
+	};
+	int i;
+	for (i=0; ptp_errors[i].txt!=NULL; i++) {
+		if (ptp_errors[i].error == error){
+			return ptp_errors[i].txt;
+		}
+	}
+	return "unknown";
+}
+
+#if 0
 void 
 ptp_perror(PTPParams* params, uint16_t error) {
 
@@ -1975,6 +2033,7 @@ ptp_perror(PTPParams* params, uint16_t error) {
 	ptp_error(params, "PTP: Error 0x%04x", error);
 	
 }
+#endif
 
 /* return DataType description */
 
@@ -2131,11 +2190,11 @@ ptp_get_operation_name(PTPParams* params, uint16_t oc)
 
 
 /****** CHDK interface ******/
-char* ptp_chdk_get_memory(PTPParams* params, int start, int num)
+uint16_t ptp_chdk_get_memory(PTPParams* params, int start, int num, char **buf)
 {
   uint16_t ret;
   PTPContainer ptp;
-  char *buf = NULL;
+  *buf = NULL;
 
   PTP_CNT_INIT(ptp);
   ptp.Code=PTP_OC_CHDK;
@@ -2143,19 +2202,16 @@ char* ptp_chdk_get_memory(PTPParams* params, int start, int num)
   ptp.Param1=PTP_CHDK_GetMemory;
   ptp.Param2=start;
   ptp.Param3=num;
-  ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
+  ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, buf);
   if ( ret != PTP_RC_OK )
   {
-    ptp_error(params,"unexpected return code 0x%x",ret);
-    free(buf);
-    return NULL;
+    free(*buf);
   }
-  return buf;
+  return ret;
 }
 
-int ptp_chdk_set_memory_long(PTPParams* params, int addr, int val)
+uint16_t ptp_chdk_set_memory_long(PTPParams* params, int addr, int val)
 {
-  uint16_t ret;
   PTPContainer ptp;
   char *buf = (char *) &val;
 
@@ -2165,16 +2221,10 @@ int ptp_chdk_set_memory_long(PTPParams* params, int addr, int val)
   ptp.Param1=PTP_CHDK_SetMemory;
   ptp.Param2=addr;
   ptp.Param3=4;
-  ret=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, 4, &buf);
-  if ( ret != PTP_RC_OK )
-  {
-    ptp_error(params,"unexpected return code 0x%x",ret);
-    return 0;
-  }
-  return 1;
+  return ptp_transaction(params, &ptp, PTP_DP_SENDDATA, 4, &buf);
 }
 
-int ptp_chdk_upload(PTPParams* params, char *local_fn, char *remote_fn)
+uint16_t ptp_chdk_upload(PTPParams* params, char *local_fn, char *remote_fn)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -2190,8 +2240,7 @@ int ptp_chdk_upload(PTPParams* params, char *local_fn, char *remote_fn)
   f = fopen(local_fn,"rb");
   if ( f == NULL )
   {
-    ptp_error(params,"could not open file \'%s\'",local_fn);
-    return 0;
+	return PTP_ERROR_IO;
   }
 
   fseek(f,0,SEEK_END);
@@ -2211,12 +2260,7 @@ int ptp_chdk_upload(PTPParams* params, char *local_fn, char *remote_fn)
 
   free(buf);
 
-  if ( ret != PTP_RC_OK )
-  {
-    ptp_error(params,"unexpected return code 0x%x",ret);
-    return 0;
-  }
-  return 1;
+  return ret;
 }
 
 static uint16_t gd_to_file(PTPParams* params, PTPGetdataParams *gdparams, unsigned len, unsigned char *bytes) {
@@ -2228,7 +2272,7 @@ static uint16_t gd_to_file(PTPParams* params, PTPGetdataParams *gdparams, unsign
 	return PTP_RC_OK;
 }
 
-int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
+uint16_t ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -2238,8 +2282,7 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
   f = fopen(local_fn,"wb");
   if ( f == NULL )
   {
-    ptp_error(params,"could not open file \'%s\'",local_fn);
-    return 0;
+    return PTP_ERROR_IO;
   }
 
   PTP_CNT_INIT(ptp);
@@ -2250,9 +2293,8 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
   ret=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, strlen(remote_fn), &remote_fn);
   if ( ret != PTP_RC_OK )
   {
-    ptp_error(params,"unexpected return code 0x%x",ret);
 	fclose(f);
-    return 0;
+    return ret;
   }
 
   PTP_CNT_INIT(ptp);
@@ -2267,19 +2309,13 @@ int ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn)
   gdparams.handler_data = f;
   ret=ptp_getdata_transaction(params, &ptp, &gdparams);
   fclose(f);
-  if ( ret != PTP_RC_OK )
-  {
-    ptp_error(params,"unexpected return code 0x%x",ret);
-    return 0;
-  }
-  
-  return 1;
+  return ret;
 }
 
 /*
  * isready: 0: not ready, lowest 2 bits: available image formats, 0x10000000: error
  */
-int ptp_chdk_rcisready(PTPParams* params, int *isready,int *imgnum)
+uint16_t ptp_chdk_rcisready(PTPParams* params, int *isready,int *imgnum)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -2290,17 +2326,12 @@ int ptp_chdk_rcisready(PTPParams* params, int *isready,int *imgnum)
   ptp.Param1=PTP_CHDK_RemoteCaptureIsReady;
 
   ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-  if ( ret != PTP_RC_OK )
-  {
-      ptp_error(params,"RemoteCaptureIsReady: unexpected return code 0x%x",ret);
-      return 0;
-  }
   *isready=ptp.Param1;
   *imgnum=ptp.Param2;
-  return 1;
+  return ret;
 }
 
-int ptp_chdk_rcgetchunk(PTPParams* params, int fmt, ptp_chdk_rc_chunk *chunk)
+uint16_t ptp_chdk_rcgetchunk(PTPParams* params, int fmt, ptp_chdk_rc_chunk *chunk)
 {
 	uint16_t ret;
 	PTPContainer ptp;
@@ -2318,18 +2349,13 @@ int ptp_chdk_rcgetchunk(PTPParams* params, int fmt, ptp_chdk_rc_chunk *chunk)
 
 	// TODO should allow ptp_getdata_transaction to send chunks directly to file, or to mem
 	ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &chunk->data);
-	if ( ret != PTP_RC_OK )
-	{
-	  ptp_error(params,"RemoteCaptureGetData: unexpected return code 0x%x",ret);
-	  return 0;
-	}
 	chunk->size = ptp.Param1;
 	chunk->last = (ptp.Param2 == 0);
   	chunk->offset = ptp.Param3; //-1 for none
-	return 1;
+	return ret;
 }
 
-int ptp_chdk_exec_lua(PTPParams* params, char *script, int flags, int *script_id, int *status)
+uint16_t ptp_chdk_exec_lua(PTPParams* params, char *script, int flags, int *script_id, int *status)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2344,17 +2370,16 @@ int ptp_chdk_exec_lua(PTPParams* params, char *script, int flags, int *script_id
 
   if ( r != PTP_RC_OK )
   {
-    ptp_error(params,"unexpected return code 0x%x",r);
     *script_id = 0;
 	*status = 0;
-    return 0;
+    return r;
   }
   *script_id = ptp.Param1;
   *status = ptp.Param2;
-  return (*status == PTP_CHDK_S_ERRTYPE_NONE);
+  return r;
 }
 
-int ptp_chdk_get_version(PTPParams* params, int *major, int *minor)
+uint16_t ptp_chdk_get_version(PTPParams* params, int *major, int *minor)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2364,16 +2389,11 @@ int ptp_chdk_get_version(PTPParams* params, int *major, int *minor)
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_Version;
   r=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-  if ( r != PTP_RC_OK )
-  {
-    ptp_error(params,"unexpected return code 0x%x",r);
-    return 0;
-  }
   *major = ptp.Param1;
   *minor = ptp.Param2;
-  return 1;
+  return r;
 }
-int ptp_chdk_get_script_status(PTPParams* params, unsigned *status)
+uint16_t ptp_chdk_get_script_status(PTPParams* params, unsigned *status)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2383,15 +2403,10 @@ int ptp_chdk_get_script_status(PTPParams* params, unsigned *status)
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_ScriptStatus;
   r=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-  if ( r != PTP_RC_OK )
-  {
-    ptp_error(params,"unexpected return code 0x%x",r);
-    return 0;
-  }
   *status = ptp.Param1;
-  return 1;
+  return r;
 }
-int ptp_chdk_get_script_support(PTPParams* params, unsigned *status)
+uint16_t ptp_chdk_get_script_support(PTPParams* params, unsigned *status)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2401,24 +2416,18 @@ int ptp_chdk_get_script_support(PTPParams* params, unsigned *status)
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_ScriptSupport;
   r=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
-  if ( r != PTP_RC_OK )
-  {
-    ptp_error(params,"unexpected return code 0x%x",r);
-    return 0;
-  }
   *status = ptp.Param1;
-  return 1;
+  return r;
 }
-int ptp_chdk_write_script_msg(PTPParams* params, char *data, unsigned size, int target_script_id, int *status)
+uint16_t ptp_chdk_write_script_msg(PTPParams* params, char *data, unsigned size, int target_script_id, int *status)
 {
   uint16_t r;
   PTPContainer ptp;
 
   // a zero length data phase appears to do bad things, camera stops responding to PTP
   if(!size) {
-    ptp_error(params,"zero length message not allowed");
     *status = 0;
-	return 0;
+	return PTP_ERROR_BADPARAM;
   }
   PTP_CNT_INIT(ptp);
   ptp.Code=PTP_OC_CHDK;
@@ -2429,14 +2438,13 @@ int ptp_chdk_write_script_msg(PTPParams* params, char *data, unsigned size, int 
   r=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, size, &data);
   if ( r != PTP_RC_OK )
   {
-    ptp_error(params,"unexpected return code 0x%x",r);
     *status = 0;
-    return 0;
+    return r;
   }
   *status = ptp.Param1;
-  return 1;
+  return r;
 }
-int ptp_chdk_read_script_msg(PTPParams* params, ptp_chdk_script_msg **msg)
+uint16_t ptp_chdk_read_script_msg(PTPParams* params, ptp_chdk_script_msg **msg)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2454,7 +2462,7 @@ int ptp_chdk_read_script_msg(PTPParams* params, ptp_chdk_script_msg **msg)
     ptp_error(params,"unexpected return code 0x%x",r);
     free(data);
     *msg = NULL;
-    return 0;
+    return r;
   }
   // for convenience, always allocate an extra byte and null it
   *msg = malloc(sizeof(ptp_chdk_script_msg) + ptp.Param4 + 1);
@@ -2464,10 +2472,10 @@ int ptp_chdk_read_script_msg(PTPParams* params, ptp_chdk_script_msg **msg)
   (*msg)->size = ptp.Param4;
   memcpy((*msg)->data,data,(*msg)->size);
   (*msg)->data[(*msg)->size] = 0;
-  return 1;
+  return r;
 }
 
-int ptp_chdk_get_live_data(PTPParams* params, unsigned flags,char **data,unsigned *data_size) {
+uint16_t ptp_chdk_get_live_data(PTPParams* params, unsigned flags,char **data,unsigned *data_size) {
   uint16_t r;
   PTPContainer ptp;
 
@@ -2485,14 +2493,14 @@ int ptp_chdk_get_live_data(PTPParams* params, unsigned flags,char **data,unsigne
     ptp_error(params,"unexpected return code 0x%x",r);
     free(*data);
     *data = NULL;
-    return 0;
+    return r;
   }
   *data_size = ptp.Param1;
-  return 1;
+  return r;
 
 }
 
-int ptp_chdk_call_function(PTPParams* params, int *args, int size, int *ret)
+uint16_t ptp_chdk_call_function(PTPParams* params, int *args, int size, int *ret)
 {
   uint16_t r;
   PTPContainer ptp;
@@ -2504,13 +2512,11 @@ int ptp_chdk_call_function(PTPParams* params, int *args, int size, int *ret)
   r=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, size*sizeof(int), (char **) &args);
   if ( r != PTP_RC_OK )
   {
-    ptp_error(params,"unexpected return code 0x%x",r);
-    return 0;
+	return r;
   }
   if ( ret )
   {
     *ret = ptp.Param1;
   }
-  return 1;
+  return r;
 }
-
