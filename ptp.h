@@ -834,6 +834,12 @@ struct _PTPParams {
 	PTPPacketBuffer pkt_buf;
 };
 
+typedef struct {
+	uint16_t error;
+	const char *id; // identifier as string, for Lua etc
+	const char *txt;
+} PTPErrorDef;
+
 /* last, but not least - ptp functions */
 uint16_t ptp_tcp_read_data(PTPParams* params, unsigned size, unsigned char *dst);
 uint16_t ptp_usb_read_data(PTPParams* params, unsigned size, unsigned char *dst);
@@ -939,7 +945,7 @@ int ptp_operation_issupported	(PTPParams* params, uint16_t operation);
 int ptp_property_issupported	(PTPParams* params, uint16_t property);
 
 void ptp_free_devicepropdesc	(PTPDevicePropDesc* dpd);
-//void ptp_perror			(PTPParams* params, uint16_t error);
+const PTPErrorDef *ptp_get_error_by_index(unsigned i);
 const char *ptp_strerror	(uint16_t error);
 const char*
 ptp_get_datatype_name		(PTPParams* params, uint16_t dt);

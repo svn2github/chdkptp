@@ -2123,6 +2123,17 @@ static int guisys_caps(lua_State *L) {
 	return 1;
 }
 
+static void init_ptp_codes(lua_State *L) {
+	lua_newtable(L);
+	const PTPErrorDef *p;
+	int i;
+	for(i=0;(p=ptp_get_error_by_index(i)) != NULL;i++) {
+		lua_pushnumber(L,p->error);
+		lua_setfield(L,-2,p->id);
+	}
+	lua_setglobal(L,"ptp");
+}
+
 static const luaL_Reg lua_guisyslib[] = {
   {"init", guisys_init},
   {"caps", guisys_caps},
@@ -2134,6 +2145,9 @@ static int chdkptp_registerlibs(lua_State *L) {
 	luaL_newmetatable(L,CHDK_PTP_ERROR_META);
 	lua_pushcfunction(L,chdk_error_tostring);
 	lua_setfield(L,-2,"__tostring");
+
+	// register error codes
+	init_ptp_codes(L);
 
 	/* set up meta table for connection object */
 	luaL_newmetatable(L,CHDK_CONNECTION_META);
