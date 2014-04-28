@@ -1925,6 +1925,7 @@ const char *ptp_strerror(uint16_t error) {
 	{PTP_ERROR_BADPARAM,	  N_("PTP: Error: bad parameter")},
 	{PTP_ERROR_DATA_EXPECTED, N_("PTP: Protocol error: data expected")},
 	{PTP_ERROR_RESP_EXPECTED, N_("PTP: Protocol error: response expected")},
+	{PTP_ERROR_NOT_CONNECTED, N_("PTP: Error: not connected")},
 	{0, NULL}
 	};
 	int i;
@@ -2459,7 +2460,6 @@ uint16_t ptp_chdk_read_script_msg(PTPParams* params, ptp_chdk_script_msg **msg)
   r=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &data);
   if ( r != PTP_RC_OK )
   {
-    ptp_error(params,"unexpected return code 0x%x",r);
     free(data);
     *msg = NULL;
     return r;
@@ -2491,7 +2491,6 @@ uint16_t ptp_chdk_get_live_data(PTPParams* params, unsigned flags,char **data,un
   r=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, data);
   if ( r != PTP_RC_OK )
   {
-    ptp_error(params,"unexpected return code 0x%x",r);
     free(*data);
     *data = NULL;
     return r;

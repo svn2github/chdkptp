@@ -270,10 +270,11 @@ typedef struct __attribute__ ((__packed__)) {
 
 /* extended local ERROR codes */
 #define PTP_ERROR_IO			0x02FF
-#define PTP_ERROR_DATA_EXPECTED		0x02FE
-#define PTP_ERROR_RESP_EXPECTED		0x02FD
+#define PTP_ERROR_DATA_EXPECTED	0x02FE
+#define PTP_ERROR_RESP_EXPECTED	0x02FD
 #define PTP_ERROR_BADPARAM		0x02FC
 #define PTP_ERROR_NOMEM			0x02FB
+#define PTP_ERROR_NOT_CONNECTED	0x02FA
 
 /* PTP Event Codes */
 

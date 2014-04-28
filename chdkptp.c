@@ -122,6 +122,8 @@ void *_GdipFontFamilyCachedGenericSerif;
 #define CHDK_CONNECTION_LIST "chkdptp.connection_list"
 /* meta table for for connection list */
 #define CHDK_CONNECTION_LIST_META "chkdptp.connection_list_meta"
+/* meta for error object */
+#define CHDK_PTP_ERROR_META "chkdptp.ptp_error_meta"
 
 /* USB interface class */
 #ifndef USB_CLASS_PTP
@@ -159,6 +161,13 @@ short verbose=0;
 
 // TODO this is lame
 #define CHDK_CONNECTION_METHOD PTPParams *params; PTP_CON_STATE *ptp_cs; get_connection_data(L,1,&params,&ptp_cs);
+
+// so is this
+#define CHDK_ENSURE_CONNECTED    if (!ptp_cs->connected) { \
+		lua_pushboolean(L,0); \
+		chdk_push_error(L, PTP_ERROR_NOT_CONNECTED); \
+		return 2; \
+	}
 
 /* we need it for a proper signal handling :/ */
 // reyalp -not using signal handler for now, revisit later
@@ -1017,6 +1026,48 @@ int open_camera_dev_usb(struct usb_device *dev, PTP_CON_STATE *ptp_cs, PTPParams
 }
 
 /*
+tostring metamethod for errors
+*/
+static int chdk_error_tostring(lua_State *L) {
+	if(!lua_istable(L,1)) {
+		return luaL_error(L,"expected table");
+	}
+	lua_getfield(L,1,"msg");
+	if(lua_isnil(L,-1)) {
+		lua_pop(L,1);
+		lua_pushstring(L,"unknown error");
+	}
+	return 1;
+}
+
+/*
+push a new error object
+*/
+static int chdk_push_error(lua_State *L,uint16_t code) {
+	lua_createtable(L,0,1);
+	lua_pushnumber(L,code);
+	lua_setfield(L, -2,"ptp_rc");
+	lua_pushstring(L,ptp_strerror(code));
+	lua_setfield(L, -2,"msg");
+	luaL_getmetatable(L, CHDK_PTP_ERROR_META);
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+/*
+if code isn't PTP_RC_OK, push false, (error) return 0
+otherwise return 1
+*/
+static int chdk_check_ptp(lua_State *L,uint16_t code) {
+	if(code == PTP_RC_OK) {
+		return 1;
+	}
+	lua_pushboolean(L,0);
+	chdk_push_error(L,code);
+	return 0;
+}
+
+/*
 chdk_connection=chdk.connection([devspec])
 devspec={
 	bus="bus",
@@ -1204,18 +1255,12 @@ static int chdk_is_connected(lua_State *L) {
 // TODO we could just get this when we connect
 static int chdk_camera_api_version(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
+	CHDK_ENSURE_CONNECTED;
 	int major,minor;
-	if ( !ptp_cs->connected ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
-	if(ptp_chdk_get_version(params,&major,&minor) == PTP_RC_OK) {
+
+	if(chdk_check_ptp(L,ptp_chdk_get_version(params,&major,&minor))) {
 		lua_pushnumber(L,major);
 		lua_pushnumber(L,minor);
-	} else {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"error");
 	}
 	return 2;
 }
@@ -1263,25 +1308,20 @@ con:get_script_id() will return the id of the started script
 */
 static int chdk_execlua(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
-    if (!ptp_cs->connected) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
+	CHDK_ENSURE_CONNECTED;
 
 	int status;
-	if(ptp_chdk_exec_lua(params,
+	if(!chdk_check_ptp(L,ptp_chdk_exec_lua(params,
 						(char *)luaL_optstring(L,2,""),
 						luaL_optnumber(L,3,0),
-						&ptp_cs->script_id,&status) != PTP_RC_OK) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"failed");
+						&ptp_cs->script_id,&status))) {
 		return 2;
 	}
 	if(status == PTP_CHDK_S_ERRTYPE_NONE) {
 		lua_pushboolean(L,1);
 		return 1;
 	} else {
+		// TODO should return compatible with error object
 		lua_pushboolean(L,0);
 		if(status == PTP_CHDK_S_ERRTYPE_COMPILE) {
 			lua_pushstring(L,"compile"); // caller can check messages for details
@@ -1343,16 +1383,10 @@ status[,errmsg]=con:upload(src,dst)
 */
 static int chdk_upload(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
-    if (!ptp_cs->connected) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
+	CHDK_ENSURE_CONNECTED;
 	char *src = (char *)luaL_checkstring(L,2);
 	char *dst = (char *)luaL_checkstring(L,3);
-	if ( ptp_chdk_upload(params,src,dst) != PTP_RC_OK ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"upload failed");
+	if (!chdk_check_ptp(L,ptp_chdk_upload(params,src,dst))) {
 		return 2;
 	}
 	lua_pushboolean(L,1);
@@ -1364,16 +1398,10 @@ status[,errmsg]=con:download(src,dst)
 */
 static int chdk_download(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
-    if (!ptp_cs->connected) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
+	CHDK_ENSURE_CONNECTED;
 	char *src = (char *)luaL_checkstring(L,2);
 	char *dst = (char *)luaL_checkstring(L,3);
-	if ( ptp_chdk_download(params,src,dst) != PTP_RC_OK ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"download failed");
+	if (!chdk_check_ptp(L,ptp_chdk_download(params,src,dst))) {
 		return 2;
 	}
 	lua_pushboolean(L,1);
@@ -1392,16 +1420,10 @@ imgnum:
 */
 static int chdk_capture_ready(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
-	if (!ptp_cs->connected) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
+	CHDK_ENSURE_CONNECTED;
 	int isready = 0;
 	int imgnum = 0;
-	if ( ptp_chdk_rcisready(params,&isready,&imgnum) != PTP_RC_OK ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"rcisready failed");
+	if (!chdk_check_ptp(L,ptp_chdk_rcisready(params,&isready,&imgnum))) {
 		return 2;
 	}
 	lua_pushinteger(L,isready);
@@ -1424,16 +1446,10 @@ false or
 */
 static int chdk_capture_get_chunk(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
-	if (!ptp_cs->connected) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
+	CHDK_ENSURE_CONNECTED;
 	int fmt = (unsigned)luaL_checknumber(L,2);
 	ptp_chdk_rc_chunk chunk;
-	if ( ptp_chdk_rcgetchunk(params,fmt,&chunk) != PTP_RC_OK ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"rcgetchunk failed");
+	if (!chdk_check_ptp(L,ptp_chdk_rcgetchunk(params,fmt,&chunk))) {
 		return 2;
 	}
 	lua_createtable(L,0,4);
@@ -1465,22 +1481,17 @@ default is string
 */
 static int chdk_getmem(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
+	CHDK_ENSURE_CONNECTED;
+
 	unsigned addr, count;
 	const char *dest;
 	char *buf;
-	if ( !ptp_cs->connected ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
 	addr = (unsigned)luaL_checknumber(L,2);
 	count = (unsigned)luaL_checknumber(L,3);
 	dest = luaL_optstring(L,4,"string");
 
 	// TODO check dest values
-	if ( ptp_chdk_get_memory(params,addr,count,&buf) != PTP_RC_OK ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"error getting memory");
+	if (!chdk_check_ptp(L,ptp_chdk_get_memory(params,addr,count,&buf))) {
 		return 2;
 	}
 	if(strcmp(dest,"string") == 0) {
@@ -1511,13 +1522,9 @@ args must be numbers, or pointers set up on the cam by other means
 */
 static int chdk_call_function(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
+	CHDK_ENSURE_CONNECTED;
 	int args[11];
 	int ret;
-	if ( !ptp_cs->connected ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
 	memset(args,0,sizeof(args));
 	int size = lua_gettop(L)-1; // args excluding self
 	if(size > 10 || size < 1) {
@@ -1529,9 +1536,7 @@ static int chdk_call_function(lua_State *L) {
 	for(i=2;i<=size+1;i++) {
 		args[i-2] = (unsigned)luaL_checknumber(L,i);
 	}
-	if ( ptp_chdk_call_function(params,args,size,&ret) != PTP_RC_OK ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"ptp error");
+	if (!chdk_check_ptp(L,ptp_chdk_call_function(params,args,size,&ret))) {
 		return 2;
 	}
 	lua_pushnumber(L,ret);
@@ -1540,15 +1545,9 @@ static int chdk_call_function(lua_State *L) {
 
 static int chdk_script_support(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
+	CHDK_ENSURE_CONNECTED;
 	unsigned status = 0;
-	if ( !ptp_cs->connected ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
-    if (ptp_chdk_get_script_support(params,&status) != PTP_RC_OK) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"ptp error");
+    if (!chdk_check_ptp(L,ptp_chdk_get_script_support(params,&status))) {
 		return 2;
 	}
 	lua_pushnumber(L,status);
@@ -1561,15 +1560,9 @@ status={run:bool,msg:bool} or false
 */
 static int chdk_script_status(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
+	CHDK_ENSURE_CONNECTED;
 	unsigned status;
-	if ( !ptp_cs->connected ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
-	if (ptp_chdk_get_script_status(params,&status) != PTP_RC_OK) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"ptp error");
+	if (!chdk_check_ptp(L,ptp_chdk_get_script_status(params,&status))) {
 		return 2;
 	}
 	lua_createtable(L,0,2);
@@ -1585,18 +1578,12 @@ lbuf - lbuf to re-use, will be created if nil
 */
 static int chdk_get_live_data(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
+	CHDK_ENSURE_CONNECTED;
 	lBuf_t *buf = lbuf_getlbuf(L,2);
 	unsigned flags=lua_tonumber(L,3);
 	char *data=NULL;
 	unsigned data_size = 0;
-	if ( !ptp_cs->connected ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
-	if (ptp_chdk_get_live_data(params,flags,&data,&data_size) != PTP_RC_OK) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"ptp error");
+	if (!chdk_check_ptp(L,ptp_chdk_get_live_data(params,flags,&data,&data_size))) {
 		return 2;
 	}
 	if(!data) {
@@ -1664,17 +1651,11 @@ use chdku.wait_status to wait for messages
 
 static int chdk_read_msg(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
+	CHDK_ENSURE_CONNECTED;
+
 	ptp_chdk_script_msg *msg = NULL;
 
-	if ( !ptp_cs->connected ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
-
-	if(ptp_chdk_read_script_msg(params,&msg) != PTP_RC_OK) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"ptp error");
+	if(!chdk_check_ptp(L,ptp_chdk_read_script_msg(params,&msg))) {
 		return 2;
 	}
 
@@ -1727,16 +1708,11 @@ errormessage can be used to identify full queue etc
 */
 static int chdk_write_msg(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
+	CHDK_ENSURE_CONNECTED;
 	const char *str;
 	size_t len;
 	int status;
 	int target_script_id = luaL_optinteger(L,3,ptp_cs->script_id);
-
-	if ( !ptp_cs->connected ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
 
 	str = lua_tolstring(L,2,&len);
 	if(!str || !len) {
@@ -1745,9 +1721,7 @@ static int chdk_write_msg(lua_State *L) {
 		return 2;
 	}
 
-	if (ptp_chdk_write_script_msg(params,(char *)str,len,target_script_id,&status) != PTP_RC_OK) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"ptp error");
+	if (!chdk_check_ptp(L,ptp_chdk_write_script_msg(params,(char *)str,len,target_script_id,&status))) {
 		return 2;
 	} 
 
@@ -1823,11 +1797,8 @@ version does not match canon firmware version (e.g. d10 100a = "1-6.0.1.0")
 static int chdk_get_ptp_devinfo(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 	// don't actually need to be connected to get this, but ensures we have valid data
-	if ( !ptp_cs->connected ) {
-		lua_pushboolean(L,0);
-		lua_pushstring(L,"not connected");
-		return 2;
-	}
+	CHDK_ENSURE_CONNECTED;
+
 	lua_newtable(L);
 	lua_pushstring(L, params->deviceinfo.Model);
 	lua_setfield(L, -2, "model");
@@ -2172,6 +2143,11 @@ static const luaL_Reg lua_guisyslib[] = {
 };
 
 static int chdkptp_registerlibs(lua_State *L) {
+	/* set up meta table for error object */
+	luaL_newmetatable(L,CHDK_PTP_ERROR_META);
+	lua_pushcfunction(L,chdk_error_tostring);
+	lua_setfield(L,-2,"__tostring");
+
 	/* set up meta table for connection object */
 	luaL_newmetatable(L,CHDK_CONNECTION_META);
 	lua_pushcfunction(L,chdk_connection_gc);
