@@ -1193,7 +1193,7 @@ static int connect_cam_tcp(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_c
 		close_camera_tcp(ptp_cs,params); // TODO should clean up any partially open stuff
 		lua_pushboolean(L,0);
 		lua_pushstring(L,"connect failed"); // TODO return detailed error messages instead of printing
-		return 0;
+		return 2;
 	}
 	lua_pushboolean(L,1);
 	return 1;
