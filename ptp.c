@@ -2471,6 +2471,7 @@ uint16_t ptp_chdk_read_script_msg(PTPParams* params, ptp_chdk_script_msg **msg)
   (*msg)->script_id = ptp.Param3;
   (*msg)->size = ptp.Param4;
   memcpy((*msg)->data,data,(*msg)->size);
+  free(data);
   (*msg)->data[(*msg)->size] = 0;
   return r;
 }
