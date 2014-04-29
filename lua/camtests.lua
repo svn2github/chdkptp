@@ -170,6 +170,30 @@ function tests.exectimes()
 	m.exectime({count=50})
 end
 
+function tests.exec_errors()
+	local status,err=con:exec('sleep(500)')
+	assert(status,tostring(err))
+	status,err=con:exec('print"test"')
+	assert((not status) and err.etype == 'execlua_scriptrun')
+	-- test killscript if compatible
+	if con:is_ver_compatible(2,6) then
+		status,err=con:execwait('print"kill"',{clobber=true})
+		assert(status,tostring(err))
+	else
+		-- otherwise just wait
+		sys.sleep(600)
+	end
+	status,err=con:exec('bogus(')
+	assert((not status) and err.etype == 'execlua_compile')
+end
+function tests.not_connected()
+	if con:is_connected() then
+		error('already connected')
+	end
+	local status,err=con:script_status()
+	assert((not status) and err.ptp_rc == ptp.ERROR_NOT_CONNECTED)
+end
+
 -- prepare for connected tests by connecting
 -- devspec is a string for connect
 function tests.connect(devspec)
@@ -255,12 +279,14 @@ function m.runstd(devspec)
 		printf('aborted\n')
 		return false
 	end
+	m.run('exec_errors')
 	printf('benchmark/stress\n')
 	m.run('exectimes')
 	m.run('xfer')
 	m.run('msgs')
 	m.run('filetransfer')
 	m.run('disconnect')
+	m.run('not_connected')
 end
 
 return m

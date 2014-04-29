@@ -724,13 +724,14 @@ function con_methods:exec(code,opts_in)
 	local status,err=self:execlua(code,execflags)
 	if not status then
 		-- syntax error, try to fetch the error message
-		if err == 'compile' then
+		if err.etype == 'execlua_compile' then
 			local msg = self:get_error_msg()
 			if msg then
-				return false,format_exec_error(libs,code,msg)
+				err.msg = format_exec_error(libs,code,msg)
+				return false,err
 			end
-		elseif err == 'scriptrun' then
-			return false, "a script is already running"
+		elseif err.etype == 'execlua_scriptrun' then
+			return false,err
 		end
 		--  other unspecified error, or fetching syntax/compile error message failed
 		return false,err
