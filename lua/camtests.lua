@@ -190,7 +190,7 @@ function tests.not_connected()
 	if con:is_connected() then
 		error('already connected')
 	end
-	local status,err=con:script_status()
+	local status,err=con:script_status_pcall()
 	assert((not status) and err.ptp_rc == ptp.ERROR_NOT_CONNECTED)
 end
 
@@ -265,9 +265,11 @@ function m.run(name,...)
 	status,msg = xpcall(tests[name],util.err_traceback,...)
 	printf('%s:',name)
 	if status then
+		m.passed = m.passed + 1
 		printf('ok\n')
 		return true
 	else
+		m.failed = m.failed + 1
 		printf('failed %s\n',msg)
 		return false
 	end
@@ -275,6 +277,8 @@ end
 
 function m.runstd(devspec)
 	-- if connect fails, don't try to run anything else
+	m.passed = 0
+	m.failed = 0
 	if not m.run('connect',devspec) then
 		printf('aborted\n')
 		return false
@@ -287,6 +291,7 @@ function m.runstd(devspec)
 	m.run('filetransfer')
 	m.run('disconnect')
 	m.run('not_connected')
+	printf("passed %d\nfailed %d\n",m.passed,m.failed)
 end
 
 return m

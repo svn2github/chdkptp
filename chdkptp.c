@@ -163,11 +163,7 @@ short verbose=0;
 #define CHDK_CONNECTION_METHOD PTPParams *params; PTP_CON_STATE *ptp_cs; get_connection_data(L,1,&params,&ptp_cs);
 
 // so is this
-#define CHDK_ENSURE_CONNECTED    if (!ptp_cs->connected) { \
-		lua_pushboolean(L,0); \
-		push_api_error_ptp(L, PTP_ERROR_NOT_CONNECTED); \
-		return 2; \
-	}
+#define CHDK_ENSURE_CONNECTED if(!ptp_cs->connected) {push_api_error_ptp(L, PTP_ERROR_NOT_CONNECTED); return lua_error(L);}
 
 /* we need it for a proper signal handling :/ */
 // reyalp -not using signal handler for now, revisit later
@@ -1082,18 +1078,39 @@ static int chdk_newerror(lua_State *L) {
 if code isn't PTP_RC_OK, push false, (error) return 0
 otherwise return 1
 */
+/*
 static int api_check_ptp(lua_State *L,uint16_t code) {
 	if(code == PTP_RC_OK) {
 		return 1;
 	}
-	lua_pushboolean(L,0);
 	push_api_error_ptp(L,code);
 	return 0;
 }
+*/
 
+/*
+check code and throw if not OK
+*/
+static int api_check_ptp_throw(lua_State *L,uint16_t code) {
+	if(code != PTP_RC_OK) {
+		push_api_error_ptp(L,code);
+		return lua_error(L);
+	}
+	return 1;
+}
+
+/*
 static void api_set_error(lua_State *L,const char *etype, const char *msg) {
-	lua_pushboolean(L,0);
 	push_api_error_misc(L,etype,msg);
+}
+*/
+
+/*
+doesn't actually return, type int to match lua_error() pattern
+*/
+static int api_throw_error(lua_State *L,const char *etype, const char *msg) {
+	push_api_error_misc(L,etype,msg);
+	return lua_error(L);
 }
 
 /*
@@ -1204,8 +1221,7 @@ static int chdk_connection(lua_State *L) {
 static int connect_cam_usb(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_cs) {
 	struct usb_device *dev=find_device_by_path(ptp_cs->usb.bus,ptp_cs->usb.dev);
 	if(!dev) {
-		api_set_error(L,"connect_no_dev","no matching device");
-		return 2;
+		return api_throw_error(L,"connect_no_dev","no matching device");
 	}
 	if(open_camera_dev_usb(dev,ptp_cs,params)) {
 		lua_pushboolean(L,1);
@@ -1213,8 +1229,7 @@ static int connect_cam_usb(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_c
 	} else {
 		ptp_cs->connected = 0;
 		// TODO should get return code from open_camera_dev_usb
-		api_set_error(L,"connect_fail","connection failed");
-		return 2;
+		return api_throw_error(L,"connect_fail","connection failed");
 	}
 }
 static int connect_cam_tcp(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_cs) {
@@ -1222,8 +1237,7 @@ static int connect_cam_tcp(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_c
 	if(!init_ptp_tcp(params,ptp_cs)) {
 		close_camera_tcp(ptp_cs,params); // TODO should clean up any partially open stuff
 		// TODO return detailed error messages instead of printing
-		api_set_error(L,"connect_fail","connection failed");
-		return 2;
+		return api_throw_error(L,"connect_fail","connection failed");
 	}
 	lua_pushboolean(L,1);
 	return 1;
@@ -1232,16 +1246,14 @@ static int connect_cam_tcp(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_c
 #endif
 }
 /*
-status[,errmsg]=con:connect()
+status=con:connect()
 */
 static int chdk_connect(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 	
 	// TODO might want to disconnect/reconnect, or check real connection status ? or options
 	if(ptp_cs->connected) {
-		lua_pushboolean(L,0);
-		api_set_error(L,"connect_connected","connection already connected");
-		return 2;
+		return api_throw_error(L,"connect_connected","connection already connected");
 	}
 
 	if(ptp_cs->con_type == PTP_CON_USB) {
@@ -1286,10 +1298,10 @@ static int chdk_camera_api_version(lua_State *L) {
 	CHDK_ENSURE_CONNECTED;
 	int major,minor;
 
-	if(api_check_ptp(L,ptp_chdk_get_version(params,&major,&minor))) {
-		lua_pushnumber(L,major);
-		lua_pushnumber(L,minor);
-	}
+	api_check_ptp_throw(L,ptp_chdk_get_version(params,&major,&minor));
+
+	lua_pushnumber(L,major);
+	lua_pushnumber(L,minor);
 	return 2;
 }
 
@@ -1329,9 +1341,10 @@ static int chdk_program_version(lua_State *L) {
 }
 
 /*
-status[,err]=con:execlua("code"[,flags])
+status=con:execlua("code"[,flags])
 flags: PTP_CHDK_SCRIPT_FL* values.
-status is true if script started successfully, false otherwise
+TODO status is true if script started successfully,
+throws error on failure, use etype to detect compile, script running
 con:get_script_id() will return the id of the started script
 */
 static int chdk_execlua(lua_State *L) {
@@ -1339,24 +1352,23 @@ static int chdk_execlua(lua_State *L) {
 	CHDK_ENSURE_CONNECTED;
 
 	int status;
-	if(!api_check_ptp(L,ptp_chdk_exec_lua(params,
+	api_check_ptp_throw(L, ptp_chdk_exec_lua(params,
 						(char *)luaL_optstring(L,2,""),
 						luaL_optnumber(L,3,0),
-						&ptp_cs->script_id,&status))) {
-		return 2;
-	}
+						&ptp_cs->script_id,&status));
+
 	if(status == PTP_CHDK_S_ERRTYPE_NONE) {
+		// TODO status no longer needed
 		lua_pushboolean(L,1);
 		return 1;
 	} else {
 		if(status == PTP_CHDK_S_ERRTYPE_COMPILE) {
-			api_set_error(L,"execlua_compile","compile error"); // caller can check messages for details
+			return api_throw_error(L,"execlua_compile","compile error"); // caller can check messages for details
 		} else if(status == PTP_CHDK_S_ERR_SCRIPTRUNNING) {
-			api_set_error(L,"execlua_scriptrun","a script is already running");
+			return api_throw_error(L,"execlua_scriptrun","a script is already running");
 		} else {
-			api_set_error(L,"unknown","unknown error");
+			return api_throw_error(L,"unknown","unknown error");
 		}
-		return 2;
 	}
 }
 
@@ -1405,37 +1417,39 @@ static int chdk_list_usb_devices(lua_State *L) {
 }
 
 /*
-status[,errmsg]=con:upload(src,dst)
+status=con:upload(src,dst)
 */
 static int chdk_upload(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	CHDK_ENSURE_CONNECTED;
 	char *src = (char *)luaL_checkstring(L,2);
 	char *dst = (char *)luaL_checkstring(L,3);
-	if (!api_check_ptp(L,ptp_chdk_upload(params,src,dst))) {
-		return 2;
-	}
+
+	api_check_ptp_throw(L,ptp_chdk_upload(params,src,dst));
+
+	// TODO not needed any more
 	lua_pushboolean(L,1);
 	return 1;
 }
 
 /*
-status[,errmsg]=con:download(src,dst)
+status=con:download(src,dst)
 */
 static int chdk_download(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	CHDK_ENSURE_CONNECTED;
 	char *src = (char *)luaL_checkstring(L,2);
 	char *dst = (char *)luaL_checkstring(L,3);
-	if (!api_check_ptp(L,ptp_chdk_download(params,src,dst))) {
-		return 2;
-	}
+
+	api_check_ptp_throw(L,ptp_chdk_download(params,src,dst));
+
+	// TODO not needed any more
 	lua_pushboolean(L,1);
 	return 1;
 }
 
 /*
-isready,imgnum|errmsg=con:capture_ready()
+isready,imgnum=con:capture_ready()
 isready: 
 	false: local error in errmsg
 	0: not ready
@@ -1449,35 +1463,35 @@ static int chdk_capture_ready(lua_State *L) {
 	CHDK_ENSURE_CONNECTED;
 	int isready = 0;
 	int imgnum = 0;
-	if (!api_check_ptp(L,ptp_chdk_rcisready(params,&isready,&imgnum))) {
-		return 2;
-	}
+
+	api_check_ptp_throw(L,ptp_chdk_rcisready(params,&isready,&imgnum));
+
 	lua_pushinteger(L,isready);
 	lua_pushinteger(L,imgnum);
 	return 2;
 }
 
 /*
-chunk[,errmsg]=con:capture_get_chunk(fmt)
+chunk=con:capture_get_chunk(fmt)
 fmt: data type (1: jpeg, 2: raw, 4:dng header)
 must be a single type reported as available by con:capture_ready()
 chunk:
-false or
 {
 	size=number,
 	offset=number|nil,
 	last=bool
 	data=lbuf
 }
+throws error on falure
 */
 static int chdk_capture_get_chunk(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
 	CHDK_ENSURE_CONNECTED;
 	int fmt = (unsigned)luaL_checknumber(L,2);
 	ptp_chdk_rc_chunk chunk;
-	if (!api_check_ptp(L,ptp_chdk_rcgetchunk(params,fmt,&chunk))) {
-		return 2;
-	}
+
+	api_check_ptp_throw(L,ptp_chdk_rcgetchunk(params,fmt,&chunk));
+
 	lua_createtable(L,0,4);
 	lua_pushinteger(L, chunk.size);
 	lua_setfield(L, -2, "size");
@@ -1495,7 +1509,7 @@ static int chdk_capture_get_chunk(lua_State *L) {
 }
 
 /*
-r,msg=con:getmem(address,count[,dest])
+r=con:getmem(address,count[,dest])
 dest is
 "string"
 "number" TODO int or unsigned ?
@@ -1517,9 +1531,8 @@ static int chdk_getmem(lua_State *L) {
 	dest = luaL_optstring(L,4,"string");
 
 	// TODO check dest values
-	if (!api_check_ptp(L,ptp_chdk_get_memory(params,addr,count,&buf))) {
-		return 2;
-	}
+	api_check_ptp_throw(L,ptp_chdk_get_memory(params,addr,count,&buf));
+
 	if(strcmp(dest,"string") == 0) {
 		lua_pushlstring(L,buf,count);
 	} else if(strcmp(dest,"number") == 0) {
@@ -1535,8 +1548,7 @@ status[,msg]=con:setmem(address,data)
 data is a number (to bet set as a 32 bit int) or string
 */
 static int chdk_setmem(lua_State *L) {
-	api_set_error(L,"not_implemented","not implemented yet, use lua poke()");
-	return 2;
+	return api_throw_error(L,"not_implemented","not implemented yet, use lua poke()");
 }
 
 /*
@@ -1553,16 +1565,14 @@ static int chdk_call_function(lua_State *L) {
 	memset(args,0,sizeof(args));
 	int size = lua_gettop(L)-1; // args excluding self
 	if(size > 10 || size < 1) {
-		api_set_error(L,"bad_arg","invalid number of arguments");
-		return 2;
+		return api_throw_error(L,"bad_arg","invalid number of arguments");
 	}
 	int i;
 	for(i=2;i<=size+1;i++) {
 		args[i-2] = (unsigned)luaL_checknumber(L,i);
 	}
-	if (!api_check_ptp(L,ptp_chdk_call_function(params,args,size,&ret))) {
-		return 2;
-	}
+	api_check_ptp_throw(L,ptp_chdk_call_function(params,args,size,&ret));
+
 	lua_pushnumber(L,ret);
 	return 1;
 }
@@ -1571,24 +1581,23 @@ static int chdk_script_support(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	CHDK_ENSURE_CONNECTED;
 	unsigned status = 0;
-    if (!api_check_ptp(L,ptp_chdk_get_script_support(params,&status))) {
-		return 2;
-	}
+    api_check_ptp_throw(L,ptp_chdk_get_script_support(params,&status));
+
 	lua_pushnumber(L,status);
 	return 1;
 }
 
 /*
-status[,errmsg]=con:script_status()
-status={run:bool,msg:bool} or false
+status=con:script_status()
+status={run:bool,msg:bool} or throws error
 */
 static int chdk_script_status(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 	CHDK_ENSURE_CONNECTED;
 	unsigned status;
-	if (!api_check_ptp(L,ptp_chdk_get_script_status(params,&status))) {
-		return 2;
-	}
+
+	api_check_ptp_throw(L,ptp_chdk_get_script_status(params,&status));
+
 	lua_createtable(L,0,2);
 	lua_pushboolean(L, status & PTP_CHDK_SCRIPT_STATUS_RUN);
 	lua_setfield(L, -2, "run");
@@ -1597,8 +1606,9 @@ static int chdk_script_status(lua_State *L) {
 	return 1;
 }
 /*
-lbuf[,errmsg]=con:get_live_data(lbuf,flags)
+lbuf=con:get_live_data(lbuf,flags)
 lbuf - lbuf to re-use, will be created if nil
+throws error on failure
 */
 static int chdk_get_live_data(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
@@ -1607,16 +1617,13 @@ static int chdk_get_live_data(lua_State *L) {
 	unsigned flags=lua_tonumber(L,3);
 	char *data=NULL;
 	unsigned data_size = 0;
-	if (!api_check_ptp(L,ptp_chdk_get_live_data(params,flags,&data,&data_size))) {
-		return 2;
-	}
+	api_check_ptp_throw(L,ptp_chdk_get_live_data(params,flags,&data,&data_size));
+
 	if(!data) {
-		api_set_error(L,"internal_error","no data");
-		return 2;
+		return api_throw_error(L,"internal_error","no data");
 	}
 	if(!data_size) {
-		api_set_error(L,"internal_error","zero data size");
-		return 2;
+		return api_throw_error(L,"internal_error","zero data size");
 	}
 	if(buf) {
 		if(buf->flags & LBUF_FL_FREE) {
@@ -1658,8 +1665,8 @@ static const char* script_msg_error_type_to_name(unsigned type_id) {
 }
 
 /*
-msg[,errormessage]=con:read_msg()
-msg is table on success, or false
+msg=con:read_msg()
+on success rturns message as table:
 {
 value=<val>
 script_id=<id>
@@ -1667,7 +1674,7 @@ mtype=<type_name>
 msubtype=<subtype_name>
 }
 no message: type is set to 'none'
-
+throws error on error
 use chdku.wait_status to wait for messages
 */
 
@@ -1677,9 +1684,7 @@ static int chdk_read_msg(lua_State *L) {
 
 	ptp_chdk_script_msg *msg = NULL;
 
-	if(!api_check_ptp(L,ptp_chdk_read_script_msg(params,&msg))) {
-		return 2;
-	}
+	api_check_ptp_throw(L,ptp_chdk_read_script_msg(params,&msg));
 
 	lua_createtable(L,0,4);
 	lua_pushinteger(L, msg->script_id);
@@ -1724,9 +1729,9 @@ static int chdk_read_msg(lua_State *L) {
 }
 
 /*
-status[,errormessage]=con:write_msg(msgstring,[script_id])
+status=con:write_msg(msgstring,[script_id])
 script_id defaults to the most recently started script
-errormessage can be used to identify full queue etc
+throws error on falure, error.etype can be used to identify full queue etc
 */
 static int chdk_write_msg(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
@@ -1738,13 +1743,10 @@ static int chdk_write_msg(lua_State *L) {
 
 	str = lua_tolstring(L,2,&len);
 	if(!str || !len) {
-		api_set_error(L,"bad_arg","invalid data");
-		return 2;
+		return api_throw_error(L,"bad_arg","invalid data");
 	}
 
-	if (!api_check_ptp(L,ptp_chdk_write_script_msg(params,(char *)str,len,target_script_id,&status))) {
-		return 2;
-	} 
+	api_check_ptp_throw(L,ptp_chdk_write_script_msg(params,(char *)str,len,target_script_id,&status));
 
 	switch(status) {
 		case PTP_CHDK_S_MSGSTATUS_OK:
@@ -1752,18 +1754,17 @@ static int chdk_write_msg(lua_State *L) {
 			return 1;
 		break;
 		case PTP_CHDK_S_MSGSTATUS_NOTRUN:
-			api_set_error(L,"msg_notrun","no script running");
+			return api_throw_error(L,"msg_notrun","no script running");
 		break;
 		case PTP_CHDK_S_MSGSTATUS_QFULL:
-			api_set_error(L,"msg_full","message queue full");
+			return api_throw_error(L,"msg_full","message queue full");
 		break;
 		case PTP_CHDK_S_MSGSTATUS_BADID:
-			api_set_error(L,"msg_badid","bad script id");
+			return api_throw_error(L,"msg_badid","bad script id");
 		break;
-		default:
-			api_set_error(L,"internal_error","unexpected status code");
+//		default:
 	}
-	return 2;
+	return api_throw_error(L,"internal_error","unexpected status code");
 }
 
 /*

@@ -700,12 +700,9 @@ function con_methods:exec(code,opts_in)
 		-- check for already running script and flush messages
 		if not opts.clobber then
 			-- this requires an extra PTP round trip per exec call
-			local status,err = self:script_status()
-			if not status then
-				return false,err
-			end
+			local status = self:script_status()
 			if status.run then
-				return false,"a script is already running"
+				error(chdk.newerror({etype='execlua_scriptrun',msg='a script is already running'}))
 			end
 			if opts.flush_cam_msgs and status.msg then
 				status,err=self:flushmsgs()
@@ -721,7 +718,8 @@ function con_methods:exec(code,opts_in)
 	code = libs:code() .. code
 
 	-- try to start the script
-	local status,err=self:execlua(code,execflags)
+	-- catch errors so we can handle compile errors
+	local status,err=self:execlua_pcall(code,execflags)
 	if not status then
 		-- syntax error, try to fetch the error message
 		if err.etype == 'execlua_compile' then
@@ -1594,6 +1592,10 @@ local function init_connection_methods()
 		if con_methods[name] == nil and type(func) == 'function' then
 			con_methods[name] = function(self,...)
 				return chdk_connection[name](self._con,...)
+			end
+			-- pcall variants for things that want to catch errors
+			con_methods[name..'_pcall'] = function(self,...)
+				return pcall(chdk_connection[name],self._con,...)
 			end
 		end
 	end
