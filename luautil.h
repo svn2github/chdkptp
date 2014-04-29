@@ -26,3 +26,4 @@ lua_Number lu_table_checknumber(lua_State *L, int narg, const char *fname);
 lua_Number lu_table_optnumber(lua_State *L, int narg, const char *fname, lua_Number d);
 int lu_table_checkoption(lua_State *L, int narg, const char *fname, const char *def, const char *lst[]);
 const char *lu_table_optlstring(lua_State *L, int narg, const char *fname, const char *d, size_t *l);
+//void lu_rawsetfield(lua_State *L, int index, const char *key);

@@ -85,3 +85,18 @@ const char *lu_table_optlstring(lua_State *L, int narg, const char *fname, const
 	return r;
 }
 
+/*
+like lua_setfield but raw
+*/
+/*
+void lu_rawsetfield(lua_State *L, int index, const char *k) {
+	// going to push another value
+	// psuedoindexes start below -LUAI_MAXSTACK
+	if(index < 0 && index > -LUAI_MAXSTACK)
+		index--;
+	lua_pushstring(L,k);
+	// move key above value for rawset
+	lua_insert(L,-2);
+	lua_rawset(L,index);
+}
+*/
