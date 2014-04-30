@@ -500,10 +500,7 @@ read pending messages and return error from current script, if available
 ]]
 function con_methods:get_error_msg()
 	while true do
-		local msg,err = self:read_msg()
-		if not msg then
-			return false
-		end
+		local msg = self:read_msg()
 		if msg.type == 'none' then
 			return false
 		end
@@ -543,16 +540,13 @@ local function format_exec_error(libs,code,msg)
 end
 
 --[[
-read and discard all pending messages. Returns false,error if message functions fails, otherwise true
+read and discard all pending messages.
+throws on error
 ]]
 function con_methods:flushmsgs()
 	repeat
-		local msg,err=self:read_msg()
-		if not msg then
-			return false, err
-		end
+		local msg=self:read_msg()
 	until msg.type == 'none' 
-	return true
 end
 
 --[[
@@ -564,7 +558,9 @@ opts {
 	error=handler
 }
 handler = table or function(msg,opts)
-function may return false (not nil) optionally an error message to end processing
+throws on error
+returns true unless aborted by handler
+handler function may abort by returning false or throwing
 ]]
 function con_methods:read_all_msgs(opts)
 	opts = util.extend_table({},opts)
@@ -577,10 +573,7 @@ function con_methods:read_all_msgs(opts)
 		end
 	end
 	while true do
-		local msg,err=self:read_msg()
-		if not msg then
-			return false, err
-		end
+		msg=self:read_msg()
 		if msg.type == 'none' then
 			break
 		end
@@ -705,10 +698,7 @@ function con_methods:exec(code,opts_in)
 				error(chdk.newerror({etype='execlua_scriptrun',msg='a script is already running'}))
 			end
 			if opts.flush_cam_msgs and status.msg then
-				status,err=self:flushmsgs()
-				if not status then
-					return false,err
-				end
+				self:flushmsgs()
 			end
 		end
 	end
@@ -747,21 +737,15 @@ function con_methods:exec(code,opts_in)
 
 	-- process messages and wait for script to end
 	while true do
-		status,err=self:wait_status{
+		status=self:wait_status{
 			msg=true,
 			run=false,
 			initwait=opts.initwait,
 			poll=opts.poll,
 			pollstart=opts.pollstart
 		}
-		if not status then
-			return false,tostring(err)
-		end
 		if status.msg then
-			local msg,err=self:read_msg()
-			if not msg then
-				return false, err
-			end
+			local msg=self:read_msg()
 			if msg.script_id ~= self:get_script_id() then
 				warnf("chdku.exec: message from unexpected script %d %s\n",msg.script_id,chdku.format_script_msg(msg))
 			elseif msg.type == 'user' then
@@ -818,12 +802,13 @@ munserialize=<bool> - unserialize and return the message value, only valid for u
 returns
 status,message|msg value
 status first since message value could decode to false/nil
+-- TODO throw, remove need for status
 ]]
 function con_methods:read_msg_strict(opts)
 	opts=extend_table({},opts)
-	local msg,err=self:read_msg()
-	if not msg or msg.type == 'none' then
-		return false, err
+	local msg=self:read_msg()
+	if msg.type == 'none' then
+		return false, 'no msg'
 	end
 	if msg.script_id ~= self:get_script_id() then
 		return false,'msg from unexpected script id'
@@ -855,10 +840,8 @@ function con_methods:wait_msg(opts)
 	opts=extend_table({},opts)
 	opts.msg=true
 	opts.run=nil
-	local status,err=self:wait_status(opts)
-	if not status then
-		return false,err
-	end
+	local status=self:wait_status(opts)
+	-- TODO throw
 	if status.timeout then
 		return false,'timeout'
 	end
@@ -1131,8 +1114,8 @@ handler_data:
 	imgnum -- image number
 	store_return() -- a function that can be used to store values for the return value of capture_get_data
 rets
-	false on error
 	true or array of store_return[bitnum][value] values on success
+	throw on error
 ]]
 function con_methods:capture_get_data(opts)
 	opts=util.extend_table({
@@ -1144,7 +1127,7 @@ function con_methods:capture_get_data(opts)
 	local handlers = {}
 	
 	if not self:capture_is_api_compatible() then
-		return false, "camera does not support remote capture"
+		error("camera does not support remote capture")
 	end
 
 
@@ -1167,15 +1150,12 @@ function con_methods:capture_get_data(opts)
 
 	local done
 	while not done do
-		local status,err = con:wait_status(wait_opts)
-		if not status then
-			return false,'wait_status '..tostring(err)
-		end
+		local status = con:wait_status(wait_opts)
 		if status.timeout then
-			return false,'timed out'
+			error('timed out')
 		end
 		if status.rsdata == 0x10000000 then
-			return false,'remote shoot error'
+			error('remote shoot error')
 		end
 		local avail = util.bit_unpack(status.rsdata)
 		local n_toget = 0
@@ -1183,7 +1163,7 @@ function con_methods:capture_get_data(opts)
 			if avail[i] == 1 then
 				if not toget[i] then
 					-- TODO could have a nop handler
-					return false, string.format('unexpected type %d',i)
+					error(string.format('unexpected type %d',i))
 				end
 				local hdata = util.extend_table({
 					opts=opts,
@@ -1199,7 +1179,7 @@ function con_methods:capture_get_data(opts)
 
 				local status, err = handlers[i](self,hdata)
 				if not status then
-					return false,tostring(err)
+					error(tostring(err))
 				end
 				toget[i] = nil
 			end
@@ -1231,9 +1211,8 @@ opts:
 	pollstart=<number> -- if not false, start polling at pollstart, double interval each iteration until poll is reached
 	initwait=<number> -- wait N ms before first poll. If this is long enough for call to finish, saves round trip
 }
-
+-- TODO should allow passing in a custom sleep in opts
 status:
-false,errormessage on error, otherwise table:
 {
 	msg:bool -- message status
 	run:bool -- script status
@@ -1242,7 +1221,7 @@ false,errormessage on error, otherwise table:
 	timeout:bool -- true if timed out
 }
 rs values are only set if rsdata is requested in opts
-TODO for gui, this should yield in lua, resume from timer or something
+throws on error
 ]]
 function con_methods:wait_status(opts)
 	opts = util.extend_table({
@@ -1267,10 +1246,10 @@ function con_methods:wait_status(opts)
 	-- if waiting on remotecap state, make sure it's supported
 	if opts.rsdata then
 		if not self:capture_is_api_compatible() then
-			return false, 'camera does not support remote capture'
+			error('camera does not support remote capture')
 		end
 		if type(self.capture_ready) ~= 'function' then
-			return false, 'client does not support remote capture'
+			error('client does not support remote capture')
 		end
 	end
 
@@ -1278,20 +1257,13 @@ function con_methods:wait_status(opts)
 	-- local t0=ustime.new()
 	while true do
 		-- TODO shouldn't poll script status if only waiting on rsdata
-		local status,msg = self:script_status()
-		if not status then
-			return false,msg
-		end
+		local status = self:script_status()
 		if opts.rsdata then
-			status.rsdata,msg = self:capture_ready()
-			-- TODO debug
-			-- cli.dbgmsg('%4d rs poll %s %s\n',ustime.diff(t0)/1000,tostring(status.rsdata),tostring(msg))
-			if not status.rsdata then
-				return false,msg
-			end
+			local imgnum
+			status.rsdata,imgnum = self:capture_ready()
 			-- TODO may want to handle PTP_CHDK_CAPTURE_NOTSET differently
 			if status.rsdata ~= 0 then
-				status.rsimgnum = msg
+				status.rsimgnum = imgnum
 				return status
 			end
 		end

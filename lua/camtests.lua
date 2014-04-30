@@ -213,7 +213,19 @@ function tests.connect(devspec)
 	m.cliexec(cmd)
 	assert(con:is_connected())
 end
-
+function tests.msgfuncs()
+	-- test script not running
+	local status,err=con:write_msg_pcall("test")
+	assert((not status) and err.etype == 'msg_notrun')
+	-- test flushmsgs
+	con:exec('write_usb_msg("msg1") return 2,3')
+	con:wait_status{run=false}
+	status = con:script_status()
+	assert(status.msg == true)
+	con:flushmsgs()
+	status = con:script_status()
+	assert(status.msg == false)
+end
 function tests.filetransfer()
 	local ldir='camtest'
 	if lfs.attributes(ldir,'mode') ~= 'directory' then
@@ -284,6 +296,7 @@ function m.runstd(devspec)
 		return false
 	end
 	m.run('exec_errors')
+	m.run('msgfuncs')
 	printf('benchmark/stress\n')
 	m.run('exectimes')
 	m.run('xfer')

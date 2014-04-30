@@ -143,6 +143,7 @@ m.cli_cmd_func = function(self,args)
 		return false,err
 	end
 
+	-- TODO should catch thown errors and try to clean up
 	done = false
 	local status,err
 	repeat
@@ -169,6 +170,7 @@ m.cli_cmd_func = function(self,args)
 					return false,msg.value
 				end,
 			})
+			-- TODO could try to clean up
 			if not status then
 				return false, err
 			end
