@@ -226,7 +226,7 @@ function tests.msgfuncs()
 	status = con:script_status()
 	assert(status.msg == false)
 end
-function tests.filetransfer()
+function tests.filexfer()
 	local ldir='camtest'
 	if lfs.attributes(ldir,'mode') ~= 'directory' then
 		assert(fsutil.mkdir_m(ldir))
@@ -287,24 +287,36 @@ function m.run(name,...)
 	end
 end
 
-function m.runstd(devspec)
+--[[
+opts:{
+	devspec=<usb device spec> -- specify which device to use, default to first available
+	bench=bool -- run "benchmark" tests
+	filexfer=bool -- run file transfer tests
+}
+]]
+function m.runbatch(opts)
+	opts = util.extend_table({},opts)
 	-- if connect fails, don't try to run anything else
 	m.passed = 0
 	m.failed = 0
-	if not m.run('connect',devspec) then
+	if not m.run('connect',opts.devspec) then
 		printf('aborted\n')
 		return false
 	end
 	m.run('exec_errors')
 	m.run('msgfuncs')
-	printf('benchmark/stress\n')
-	m.run('exectimes')
-	m.run('xfer')
-	m.run('msgs')
-	m.run('filetransfer')
+	if opts.bench then
+		m.run('exectimes')
+		m.run('xfer')
+		m.run('msgs')
+	end
+	if opts.filexfer then
+		m.run('filexfer')
+	end
 	m.run('disconnect')
 	m.run('not_connected')
 	printf("passed %d\nfailed %d\n",m.passed,m.failed)
+	return m.failed == 0
 end
 
 return m
