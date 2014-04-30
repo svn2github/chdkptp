@@ -46,8 +46,11 @@ function gui.cam_dropdown:valuechanged_cb()
 	gui.dbgmsg('cam_dropdown set %s\n',tostring(v))
 
 	con=chdku.connection(gui.cached_devs[v])
-	-- if not connected will only get dev/bus
-	con:update_connection_info()
+	if con:is_connected() then
+		con:update_connection_info()
+	else
+		con.condev=con:get_con_devinfo()
+	end
 	gui.dbgmsg('cam_dropdown new con %s:%s\n',con.condev.dev,con.condev.bus)
 	-- TODO cams should be in the tree
 	gui.tree.get_container().state = 'COLLAPSED' -- force refresh when switching cams
