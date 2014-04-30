@@ -84,7 +84,7 @@ local function do_download_dialog(data)
 	if status == "1" or status == "0" then 
 		gui.dbgmsg("d %s->%s\n",remotepath,filedlg.value)
 		-- can't use mdownload here because local name might be different than remote basename
-		add_status(con:download(remotepath,filedlg.value))
+		add_status(con:download_pcall(remotepath,filedlg.value))
 		add_status(lfs.touch(filedlg.value,chdku.ts_cam2pc(data.stat.mtime)))
 -- canceled
 --	elseif status == "-1" then 

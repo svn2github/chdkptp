@@ -193,11 +193,7 @@ local function mdownload_single(lcon,finfo,lopts,src,dst)
 	end
 	-- ptp download fails on zero byte files (zero size data phase, possibly other problems)
 	if finfo.st.size > 0 then
-		-- TODO should download to a temp file and move to final when complete
-		local status,err = lcon:download(src,dst)
-		if not status then
-			return status,err
-		end
+		lcon:download(src,dst)
 	else
 		local f,err=io.open(dst,"wb")
 		f:close()
@@ -305,10 +301,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 			end
 			-- TODO this should be optional
 			printf("%s->%s\n",src,dst);
-			local status, err=download(self,finfo,lopts,src,dst)
-			if not status then
-				return status,err
-			end
+			download(self,finfo,lopts,src,dst)
 		end
 	end
 	return true
@@ -380,10 +373,7 @@ local function mupload_fn(self,opts)
 		-- TODO timestamp comparison
 		printf('%s->%s\n',src,dst)
 		if not opts.pretend then
-			local status,err = con:upload(src,dst)
-			if not status then
-				return false,err
-			end
+			con:upload(src,dst)
 			if opts.mtime then
 				-- TODO updating times in batches would be faster
 				local status,err = con:utime(dst,chdku.ts_pc2cam(self.cur.st.modification))

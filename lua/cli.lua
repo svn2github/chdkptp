@@ -858,11 +858,8 @@ cli:add_commands{
 			end
 
 			local msg=string.format("%s->%s\n",src,dst)
-			local r, msg2 = con:upload(src,dst)
-			if msg2 then
-				msg = msg .. msg2
-			end
-			return r, msg
+			con:upload(src,dst)
+			return true, msg
 		end,
 	},
 	{
@@ -914,11 +911,8 @@ cli:add_commands{
 				end
 			end
 			local msg=string.format("%s->%s\n",src,dst)
-			local r, msg2 = con:download(src,dst)
-			if msg2 then
-				msg = msg .. msg2
-			end
-			return r, msg
+			con:download(src,dst)
+			return true, msg
 		end,
 	},
 	{

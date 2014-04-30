@@ -1341,10 +1341,11 @@ static int chdk_program_version(lua_State *L) {
 }
 
 /*
-status=con:execlua("code"[,flags])
+con:execlua("code"[,flags])
 flags: PTP_CHDK_SCRIPT_FL* values.
-TODO status is true if script started successfully,
-throws error on failure, use etype to detect compile, script running
+no return value, throws error on failure
+on compile error, thrown etype='execlua_compile'
+on script running, thrown etype='execlua_scriptrun'
 con:get_script_id() will return the id of the started script
 */
 static int chdk_execlua(lua_State *L) {
@@ -1358,9 +1359,7 @@ static int chdk_execlua(lua_State *L) {
 						&ptp_cs->script_id,&status));
 
 	if(status == PTP_CHDK_S_ERRTYPE_NONE) {
-		// TODO status no longer needed
-		lua_pushboolean(L,1);
-		return 1;
+		return 0;
 	} else {
 		if(status == PTP_CHDK_S_ERRTYPE_COMPILE) {
 			return api_throw_error(L,"execlua_compile","compile error"); // caller can check messages for details
@@ -1417,7 +1416,8 @@ static int chdk_list_usb_devices(lua_State *L) {
 }
 
 /*
-status=con:upload(src,dst)
+con:upload(src,dst)
+throws on error
 */
 static int chdk_upload(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
@@ -1427,13 +1427,12 @@ static int chdk_upload(lua_State *L) {
 
 	api_check_ptp_throw(L,ptp_chdk_upload(params,src,dst));
 
-	// TODO not needed any more
-	lua_pushboolean(L,1);
-	return 1;
+	return 0;
 }
 
 /*
-status=con:download(src,dst)
+con:download(src,dst)
+throws on error
 */
 static int chdk_download(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
@@ -1443,9 +1442,7 @@ static int chdk_download(lua_State *L) {
 
 	api_check_ptp_throw(L,ptp_chdk_download(params,src,dst));
 
-	// TODO not needed any more
-	lua_pushboolean(L,1);
-	return 1;
+	return 0;
 }
 
 /*
