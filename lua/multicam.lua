@@ -101,8 +101,8 @@ end
 
 function mc:check_errors()
 	for i,lcon in ipairs(self.cams) do
-		local msg,err=lcon:read_msg()
-		if msg then
+		local status,msg=lcon:read_msg_pcall()
+		if status then
 			if msg.type ~= 'none' then
 				if msg.script_id ~= lcon:get_script_id() then
 					warnf("%d: message from unexpected script %d %s\n",i,msg.script_id,chdku.format_script_msg(msg))

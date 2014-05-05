@@ -657,10 +657,7 @@ cli:add_commands{
 			local msgs=''
 			local msg,err
 			while true do
-				msg,err=con:read_msg()
-				if type(msg) ~= 'table' then 
-					return false,msgs..err
-				end
+				msg=con:read_msg()
 				if msg.type == 'none' then
 					return true,msgs
 				end

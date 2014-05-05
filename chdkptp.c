@@ -1670,7 +1670,7 @@ msubtype=<subtype_name>
 }
 no message: type is set to 'none'
 throws error on error
-use chdku.wait_status to wait for messages
+use chdku con:wait_status or chdku con:wait_msg to wait for messages
 */
 
 static int chdk_read_msg(lua_State *L) {
