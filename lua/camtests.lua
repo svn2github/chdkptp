@@ -266,6 +266,11 @@ function tests.msgs()
 	assert(mt.test({size=10,sizeinc=10,count=100,verbose=0}))
 end
 
+function tests.reconnect()
+	assert(con:is_connected())
+	m.cliexec('reconnect')
+	assert(con:is_connected())
+end
 
 function tests.disconnect()
 	m.cliexec('dis')
@@ -313,6 +318,7 @@ function m.runbatch(opts)
 	if opts.filexfer then
 		m.run('filexfer')
 	end
+	m.run('reconnect')
 	m.run('disconnect')
 	m.run('not_connected')
 	printf("passed %d\nfailed %d\n",m.passed,m.failed)

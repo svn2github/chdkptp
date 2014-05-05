@@ -248,7 +248,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	end
 
 	if #files == 0 then
-		warnf("no matching files\n");
+		util.warnf("no matching files\n");
 		return true
 	end
 
@@ -497,7 +497,7 @@ function con_methods:get_error_msg()
 		if msg.type == 'error' and msg.script_id == self:get_script_id() then
 			return msg
 		end
-		warnf("chdku.get_error_msg: ignoring message %s\n",chdku.format_script_msg(msg))
+		util.warnf("chdku.get_error_msg: ignoring message %s\n",chdku.format_script_msg(msg))
 	end
 end
 
@@ -737,7 +737,7 @@ function con_methods:exec(code,opts_in)
 		if status.msg then
 			local msg=self:read_msg()
 			if msg.script_id ~= self:get_script_id() then
-				warnf("chdku.exec: message from unexpected script %d %s\n",msg.script_id,chdku.format_script_msg(msg))
+				util.warnf("chdku.exec: message from unexpected script %d %s\n",msg.script_id,chdku.format_script_msg(msg))
 			elseif msg.type == 'user' then
 				if type(opts.msgs) == 'function' then
 					local status,err = opts.msgs(msg,opts.fdata)
@@ -747,7 +747,7 @@ function con_methods:exec(code,opts_in)
 				elseif type(opts.msgs) == 'table' then
 					table.insert(opts.msgs,msg)
 				else
-					warnf("chdku.exec: unexpected user message %s\n",chdku.format_script_msg(msg))
+					util.warnf("chdku.exec: unexpected user message %s\n",chdku.format_script_msg(msg))
 				end
 			elseif msg.type == 'return' then
 				if type(opts.rets) == 'function' then
@@ -1342,21 +1342,17 @@ function con_methods:reconnect(opts)
 	local condev = self.condev
 	-- appears to be needed to avoid device numbers changing (reset too soon ?)
 	chdku.sleep(opts.wait)
-	local status,err = self:connect()
-	if not status then
-		return status,err
-	end
+	self:connect()
 	if ptpdev.model ~= self.ptpdev.model
 			or ptpdev.serial_number ~= self.ptpdev.serial_number
 			or condev.product_id ~= self.condev.product_id then
 		if opts.strict then
 			self:disconnect()
-			return false,'reconnected to a different device'
+			error('reconnected to a different device')
 		else
-			return true,'reconnected to a different device'
+			util.warnf('reconnected to a different device')
 		end
 	end
-	return true
 end
 
 --[[

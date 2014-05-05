@@ -1290,9 +1290,9 @@ cli:add_commands{
 		-- NOTE camera may connect to a different device,
 		-- will detect and fail if serial, model or pid don't match
 		func=function(self,args) 
-			local status, err = con:reconnect()
+			con:reconnect()
 			cli:connection_status_change()
-			return status,err
+			return true
 		end,
 	},
 	{
