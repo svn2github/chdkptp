@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2012 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -790,40 +790,38 @@ msubtype=<string|nil> - expected subtype, or nil for any
 munserialize=<bool> - unserialize and return the message value, only valid for user/return
 
 returns
-status,message|msg value
-status first since message value could decode to false/nil
--- TODO throw, remove need for status
+message|msg value
 ]]
 function con_methods:read_msg_strict(opts)
 	opts=extend_table({},opts)
 	local msg=self:read_msg()
 	if msg.type == 'none' then
-		return false, 'no msg'
+		error(chdk.newerror({etype='nomsg',msg='read_msg_strict no message'}))
 	end
 	if msg.script_id ~= self:get_script_id() then
-		return false,'msg from unexpected script id'
+		error(chdk.newerror({etype='bad_script_id',msg='msg from unexpected script id'}))
 	end
 	if msg.type ~= opts.mtype then
 		if msg.type == 'error' then
-			return false,'unexpected error: '..msg.value
+			error(chdk.newerror({etype='wrongmsg_error',msg='unexpected error: '..msg.value}))
 		end
-		return false,'unexpected msg type: '..msg.type
-
+		error(chdk.newerror({etype='wrongmsg',msg='unexpected msg type: '..msg.value}))
 	end
 	if opts.msubtype and msg.subtype ~= opts.msubtype then
-		return false,'wrong message subtype: ' ..msg.subtype
+		error(chdk.newerror({etype='wrongmsg_sub','wrong message subtype: ' ..msg.subtype}))
 	end
 	if opts.munserialize then
 		local v = util.unserialize(msg.value)
 		if opts.msubtype and type(v) ~= opts.msubtype then
-			return false,'unserialize failed'
+			error(chdk.newerror({etype='unserialize','unserialize error'}))
 		end
-		return true,v
+		return v
 	end
-	return true,msg
+	return msg
 end
 --[[
 convenience method, wait for a single message and return it
+throws if matching message is not available within timeout
 opts passed wait_status, and read_msg_strict
 ]]
 function con_methods:wait_msg(opts)
@@ -831,12 +829,11 @@ function con_methods:wait_msg(opts)
 	opts.msg=true
 	opts.run=nil
 	local status=self:wait_status(opts)
-	-- TODO throw
 	if status.timeout then
-		return false,'timeout'
+		error(chdk.newerror({etype='timeout',msg='wait_msg timed out'}))
 	end
 	if not status.msg then
-		return false,'no msg'
+		error(chdk.newerror({etype='nomsg',msg='wait_msg no message'}))
 	end
 	return self:read_msg_strict(opts)
 end

@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2013 <reyalp (at) gmail dot com>
+ Copyright (C) 2013-2014 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -247,6 +247,16 @@ function tests.msgfuncs()
 	con:flushmsgs()
 	status = con:script_status()
 	assert(status.msg == false)
+	con:exec('write_usb_msg("msg2") return 1')
+	local m=con:wait_msg({mtype='user'})
+	assert(m.type=='user' and m.value == 'msg2')
+	m=con:wait_msg({mtype='return'})
+	assert(m.type=='return' and m.value == 1)
+	status,err=pcall(con.wait_msg,con,{mtype='return',timeout=100})
+	assert(err.etype=='timeout',tostring(err))
+	con:exec('return 1')
+	status,err=pcall(con.wait_msg,con,{mtype='user'})
+	assert(err.etype=='wrongmsg',tostring(err))
 end
 function tests.filexfer()
 	local ldir='camtest'

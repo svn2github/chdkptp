@@ -1745,19 +1745,13 @@ static int chdk_write_msg(lua_State *L) {
 
 	switch(status) {
 		case PTP_CHDK_S_MSGSTATUS_OK:
-			lua_pushboolean(L,1);
-			return 1;
-		break;
+			return 0;
 		case PTP_CHDK_S_MSGSTATUS_NOTRUN:
 			return api_throw_error(L,"msg_notrun","no script running");
-		break;
 		case PTP_CHDK_S_MSGSTATUS_QFULL:
 			return api_throw_error(L,"msg_full","message queue full");
-		break;
 		case PTP_CHDK_S_MSGSTATUS_BADID:
 			return api_throw_error(L,"msg_badid","bad script id");
-		break;
-//		default:
 	}
 	return api_throw_error(L,"internal_error","unexpected status code");
 }

@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2012 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -122,36 +122,52 @@ function mc:check_errors()
 	end
 end
 
+function mc:init_sync_single_send(i,lcon,lt0,rt0,ticks,sends)
+	local tsend = ustime.new()
+	local diff = ustime.diffms(lt0)
+	lcon:write_msg('tick')
+	sends[i] = ustime.diffms(tsend)
+
+	local expect = rt0 + diff
+	local msg=lcon:wait_msg({
+			mtype='user',
+			msubtype='table',
+			munserialize=true,
+	})
+	printf('%s: send %d diff %d pred=%d r=%d delta=%d\n',
+		lcon.mc_id,
+		sends[i],
+		diff,
+		expect,
+		msg.status,
+		expect-msg.status)
+	table.insert(ticks,expect-msg.status)
+end
+
+function mc:init_sync_single_check(lcon)
+	local expect = self:get_sync_tick(lcon,ustime.new(),100)
+	lcon:write_msg(string.format('synctick %d',expect))
+	local msg=lcon:wait_msg({
+			mtype='user',
+			msubtype='table',
+			munserialize=true,
+	})
+	printf('%s: expect=%d r=%d d=%d %s\n',
+		lcon.mc_id,
+		expect,
+		msg.status,
+		expect-msg.status,
+		msg.msg)
+end
+
 function mc:init_sync_single(lcon,lt0,rt0)
 	local ticks={}
 	local sends={}
 	--printf('lt0 %d rt0 %d\n',lt0,rt0)
 	for i=1,10 do
-		local tsend = ustime.new()
-		local diff = ustime.diffms(lt0)
-		local status,err=lcon:write_msg('tick')
-		sends[i] = ustime.diffms(tsend)
-		if status then
-			local expect = rt0 + diff
-			local status,msg=lcon:wait_msg({
-					mtype='user',
-					msubtype='table',
-					munserialize=true,
-			})
-			if status then
-				printf('%s: send %d diff %d pred=%d r=%d delta=%d\n',
-					lcon.mc_id,
-					sends[i],
-					diff,
-					expect,
-					msg.status,
-					expect-msg.status)
-				table.insert(ticks,expect-msg.status)
-			else
-				warnf('sync_single wait_msg failed: %s\n',err)
-			end
-		else
-			warnf('sync_single write_msg failed: %s\n',err)
+		local status,err=pcall(self.init_sync_single_send,self,i,lcon,lt0,rt0,ticks,sends)
+		if not status then
+			warnf('init_sync_single_send %s\n',tostring(err))
 		end
 		sys.sleep(50) -- don't want messages to get queued
 	end
@@ -173,29 +189,22 @@ function mc:init_sync_single(lcon,lt0,rt0)
 	}
 	--local t0=ustime.new()
 	for i=1,10 do
-		local expect = self:get_sync_tick(lcon,ustime.new(),100)
-		local status,err=lcon:write_msg(string.format('synctick %d',expect))
-		if status then
-			local status,msg=lcon:wait_msg({
-					mtype='user',
-					msubtype='table',
-					munserialize=true,
-			})
-			if status then
-				printf('%s: expect=%d r=%d d=%d %s\n',
-					lcon.mc_id,
-					expect,
-					msg.status,
-					expect-msg.status,
-					msg.msg)
-			else
-				warnf('%s: sync_single wait_msg failed: %s\n',lcon.mc_id,msg)
-			end
-		else
-			warnf('%s: sync_single write_msg failed: %s\n',lcon.mc_id,err)
+		local status,err=pcall(self.init_sync_single_check,self,lcon)
+		if not status then
+			warnf('init_sync_single_check',tostring(err))
 		end
 		sys.sleep(50) -- don't want messages to get queued
 	end
+end
+function mc:init_sync_cam(lcon)
+	local t0=ustime.new()
+	lcon:write_msg('tick')
+	local msg=lcon:wait_msg({
+		mtype='user',
+		msubtype='table',
+		munserialize=true,
+	})
+	self:init_sync_single(lcon,t0,msg.status)
 end
 --[[
 initialize values to allow all cameras to execute a given command as close as possible to the same real time
@@ -203,44 +212,35 @@ initialize values to allow all cameras to execute a given command as close as po
 function mc:init_sync()
 	self.min_sync_delay = 0 -- minimum time required to send to all cams
 	for i,lcon in ipairs(self.cams) do
-		local t0=ustime.new()
-		local status,err=lcon:write_msg('tick')
+		local status,err=pcall(self.init_sync_cam,self,lcon)
 		if status then
-			local status,msg=lcon:wait_msg({
-				mtype='user',
-				msubtype='table',
-				munserialize=true,
-			})
-			if status then
-				self:init_sync_single(lcon,t0,msg.status)
-				-- TODO mean send time might not be enough
-				self.min_sync_delay = self.min_sync_delay + lcon.mc_sync.msend 
-			else
-				warnf('%d:wait_msg failed: %s\n',i,tostring(msg))
-			end
+			-- TODO mean send time might not be enough
+			self.min_sync_delay = self.min_sync_delay + lcon.mc_sync.msend 
 		else
-			warnf('%d:write_msg failed: %s\n',i,tostring(err))
+			warnf('%d:init_sync_cam: %s\n',i,tostring(err))
 		end
 	end
 	printf('minimum sync delay %d\n',self.min_sync_delay)
 end
 
 function mc:get_single_status(lcon,cmd,r)
-	local status,err = lcon:script_status()
+	local status,err = lcon:script_status_pcall()
 	if not status then
 		r.failed = true
-		r.err = err
+		r.err = tostring(err)
 		return
+	else
+		status=err
 	end
 	if status.msg then
-		local status,msg=lcon:read_msg_strict({
+		local status,msg=pcall(lcon.read_msg_strict,lcon,{
 			mtype='user',
 			msubtype='table',
 			munserialize=true
 		})
 		if not status then
 			r.failed = true
-			r.err = msg
+			r.err = tostring(msg)
 			return 
 		end
 		-- TODO it would be good to skip over any stale status messages
@@ -339,7 +339,7 @@ function mc:cmd(cmd,opts)
 		if opts.syncat then
 			sendcmd = string.format('%s %d',cmd,self:get_sync_tick(lcon,tstart,opts.syncat))
 		end
-		local status,err = lcon:write_msg(sendcmd)
+		local status,err = lcon:write_msg_pcall(sendcmd)
 		printf('%s:%s\n',lcon.mc_id,sendcmd)
 		if not status then
 			warnf('%s: send %s cmd failed: %s\n',lcon.mc_id,tostring(sendcmd),tostring(err))

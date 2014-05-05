@@ -68,6 +68,63 @@ function init_handlers(args,opts)
 	end
 	return rcopts
 end
+
+--[[
+do a single iteration of rsint
+returns true if done
+errors are thrown
+]]
+m.rsint_once = function(args,opts,rcopts)
+	local line = cli.readline('rsint> ')
+	if not line then
+		-- TODO maybe this should just be done
+		error('cli.readline failed / eof')
+	end
+	status = con:script_status()
+	if status.msg then
+		con:read_all_msgs({
+			['return']=function(msg,opts)
+				printf("script return %s\n",tostring(msg.value))
+			end,
+			user=function(msg,opts)
+				printf("script msg %s\n",tostring(msg.value))
+			end,
+			error=function(msg,opts)
+				return false,msg.value
+			end,
+		})
+	end
+	if not status.run then 
+		error('script not running\n')
+	end
+	local s,e,cmd = string.find(line,'^[%c%s]*([%w_]+)[%c%s]*')
+	local rest = string.sub(line,e+1)
+	-- printf("cmd [%s] rest [%s]\n",cmd,rest);
+	if cmd == 'path' then
+		if rest == '' then
+			rest = nil
+		end
+		args[1] = rest
+		rcopts,err = init_handlers(args,opts)
+		-- TODO handle error, should send l to script
+	else
+		-- remaining commands assumed to be cam side
+		-- TODO could check if remotecap has timed out here
+		con:write_msg(cmd..' '..rest)
+		if cmd == 's' or cmd == 'l' then
+			-- TODO not all converted to throw
+			status,err = con:capture_get_data(rcopts)
+			if not status then
+				warnf('capture_get_data error %s\n',tostring(err))
+			end
+			if cmd == 'l' then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 m.cli_cmd_func = function(self,args)
 	local opts,err = cli:get_shoot_common_opts(args)
 	if not opts then
@@ -143,88 +200,30 @@ m.cli_cmd_func = function(self,args)
 		return false,err
 	end
 
-	-- TODO should catch thown errors and try to clean up
-	done = false
-	local status,err
+	local status
 	repeat
---				local line = io.read()
-		local line = cli.readline('rsint> ')
-		if not line then
-			warnf('cli.readline failed / eof\n')
-			break
+		local r
+		status,r = pcall(m.rsint_once,args,opts,rcopts)
+		if not status then
+			warnf("%s",tostring(r))
 		end
-		status, err = con:script_status()
-		if not status then 
-			warnf('script_status failed %s\n',tostring(err))
-			break
-		end
-		if status.msg then
-			local status, err = con:read_all_msgs({
-				['return']=function(msg,opts)
-					printf("script return %s\n",tostring(msg.value))
-				end,
-				user=function(msg,opts)
-					printf("script msg %s\n",tostring(msg.value))
-				end,
-				error=function(msg,opts)
-					return false,msg.value
-				end,
-			})
-			-- TODO could try to clean up
-			if not status then
-				return false, err
-			end
-		end
-		if not status.run then 
-			warnf('script not running\n')
-			break
-		end
-		local s,e,cmd = string.find(line,'^[%c%s]*([%w_]+)[%c%s]*')
-		local rest = string.sub(line,e+1)
-		-- printf("cmd [%s] rest [%s]\n",cmd,rest);
-		if cmd == 'path' then
-			if rest == '' then
-				rest = nil
-			end
-			args[1] = rest
-			rcopts,err = init_handlers(args,opts)
-			-- TODO handle error, should send l to script
-		else
-			-- remaining commands assumed to be cam side
-			-- TODO could check if remotecap has timed out here
-			status, err = con:write_msg(cmd..' '..rest)
-			if not status then
-				done=true
-				warnf('write_msg failed %s\n',tostring(err))
-				-- TODO might have remotecap data, but probably won't be able to read it if msg failed
-				break
-			end
-			if cmd == 's' or cmd == 'l' then
-				status,err = con:capture_get_data(rcopts)
-				if not status then
-					warnf('capture_get_data error %s\n',tostring(err))
-				end
-				if cmd == 'l' then
-					done=true
-				end
-			end
-		end
-	until done
+	until r
 
 	local t0=ustime.new()
 	-- wait for shot script to end or timeout
-	local wstatus,werr=con:wait_status{
+	local pstatus,wstatus=pcall(con.wait_status,con,{
 		run=false,
 		timeout=30000,
-	}
-	if not wstatus then
-		warnf('error waiting for shot script %s\n',tostring(werr))
+	})
+	if not pstatus then
+		warnf('error waiting for shot script %s\n',tostring(wstatus))
 	elseif wstatus.timeout then
 		warnf('timed out waiting for shot script\n')
 	end
 	cli.dbgmsg("script wait time %.4f\n",ustime.diff(t0)/1000000)
 	-- TODO check messages
 
+	-- TODO remote script should try to uninit when done
 	local ustatus, uerr = con:execwait('init_usb_capture(0)') -- try to uninit
 	-- if uninit failed, combine with previous status
 	if not ustatus then

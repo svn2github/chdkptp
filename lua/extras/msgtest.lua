@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2012 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -18,7 +18,7 @@
 a script for stressing the usb layer and message system
 
 usage:
-!m=require'msgtest'
+!m=require'extras/msgtest'
 !m.test(options)
 opions:{
 	size=number     -- initial message size
@@ -55,10 +55,7 @@ function m.init_test()
 			count={}
 		}
 	end
-	local status, err = m.load()
-	if not status then
-		error('load failed '..tostring(err))
-	end
+	m.load()
 	m.set_gc(m.opts.gc)
 	m.t0=ustime.new()
 	return true
@@ -96,10 +93,7 @@ end
 
 function m.load()
 	local status,err=con:exec('msg_shell:run()',{libs={'msg_shell','serialize'}})
-	if not status then
-		return false,err
-	end
-	return con:write_msg([[exec
+	con:write_msg([[exec
 msg_shell.read_msg_timeout = nil
 msg_shell.default_cmd=function(msg)
 	if msgtest_gc then
@@ -114,47 +108,29 @@ end
 end
 
 function m.quit()
-	return con:write_msg('quit')
+	con:write_msg('quit')
 end
 
 function m.test_msg(len)
 	m.run_count = m.run_count + 1
 	local s=string.rep('x',len)
-	local status,err=con:write_msg(s)
-	if not status then
-		printf('send failed %s\n',tostring(err))
-		return false
-	end
-	local r
-	status,r = con:wait_msg({mtype='user'})
-	if not status then
-		printf('read failed %s\n',r) 
-		return false
-	elseif s == r.value then 
+	con:write_msg(s)
+	local r = con:wait_msg({mtype='user'})
+	if s == r.value then 
 		m.detailmsg('ok\n')
 	else
 		m.fail_count = m.fail_count + 1
 		printf('failed\nmsg %d len %d not equal\n',m.run_count,len)
 	end
 	if m.opts.checkmem then
-		local status,err=con:write_msg('memstats')
-		if not status then
-			printf('memstats send failed %s\n',tostring(err))
-			return false
-		end
-		status,r = con:wait_msg({mtype='user',munserialize=true})
-		if not status then
-			printf('memstats read failed %s\n',tostring(r)) 
-			return false
-		else
-			table.insert(m.memstats.free,r.mem)
-			table.insert(m.memstats.count,r.lmem)
-			if m.opts.memverbose then
-				printf('free:%d lua alloc:%d kb\n',r.mem,r.lmem)
-			end
+		con:write_msg('memstats')
+		r = con:wait_msg({mtype='user',munserialize=true})
+		table.insert(m.memstats.free,r.mem)
+		table.insert(m.memstats.count,r.lmem)
+		if m.opts.memverbose then
+			printf('free:%d lua alloc:%d kb\n',r.mem,r.lmem)
 		end
 	end
-	return true
 end
 
 function m.test(opts)
@@ -191,7 +167,9 @@ function m.test(opts)
 	m.init_test()
 	for i=1,opts.count do
 		m.detailmsg("send %d...",i)
-		if not m.test_msg(size) then
+		local status,err=pcall(m.test_msg,size)
+		if not status then
+			printf("%s\n",tostring(err))
 			printf("aborted, communication error\n")
 			m.finish_test()
 			return false
@@ -209,10 +187,6 @@ function m.set_gc(mode)
 	else
 		mode = '"'..mode..'"'
 	end
-	local status,err=con:write_msg('exec msgtest_gc='..mode)
-	if not status then
-		printf('send failed\n')
-		return
-	end
+	con:write_msg('exec msgtest_gc='..mode)
 end
 return m
