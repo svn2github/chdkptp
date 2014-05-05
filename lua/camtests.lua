@@ -161,6 +161,15 @@ function m.cliexec(cmd)
 	cli:print_status(true,err)
 end
 
+-- return output on success instead of printing
+function m.cliexec_ret_ok(cmd)
+	local status,err=cli:execute(cmd)
+	if not status then
+		error(err,2)
+	end
+	return err
+end
+
 function tests.xfer()
 	m.xfermem({count=50})
 end
@@ -212,6 +221,19 @@ function tests.connect(devspec)
 	end
 	m.cliexec(cmd)
 	assert(con:is_connected())
+end
+function tests.list_connected()
+	local list=m.cliexec_ret_ok('list')
+	local lines=util.string_split(list,'\n',{plain=true,empty=false})
+	for i,l in ipairs(lines) do
+		-- match the current (marked *) device, grab bus and dev name
+		local bus,dev=string.match(lines[1],'^%*%d+:.*b=([%S]+) d=([%S]+)')
+		if bus then
+			assert(bus==con.condev.bus and dev==con.condev.dev)
+			return true
+		end
+	end
+	error('current dev not found')
 end
 function tests.msgfuncs()
 	-- test script not running
@@ -308,6 +330,7 @@ function m.runbatch(opts)
 		printf('aborted\n')
 		return false
 	end
+	m.run('list_connected')
 	m.run('exec_errors')
 	m.run('msgfuncs')
 	if opts.bench then

@@ -42,7 +42,7 @@ function mc:connect()
 		if lcon:is_connected() then
 			lcon:update_connection_info()
 		else
-			local status,err = lcon:connect()
+			local status,err = pcall(lcon.connect,lcon)
 			if not status then
 				warnf('%d: connect failed bus:%s dev:%s err:%s\n',i,devinfo.dev,devinfo.bus,tostring(err))
 			end

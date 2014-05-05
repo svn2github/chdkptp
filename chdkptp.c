@@ -1224,8 +1224,7 @@ static int connect_cam_usb(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_c
 		return api_throw_error(L,"connect_no_dev","no matching device");
 	}
 	if(open_camera_dev_usb(dev,ptp_cs,params)) {
-		lua_pushboolean(L,1);
-		return 1;
+		return 0;
 	} else {
 		ptp_cs->connected = 0;
 		// TODO should get return code from open_camera_dev_usb
@@ -1239,14 +1238,14 @@ static int connect_cam_tcp(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_c
 		// TODO return detailed error messages instead of printing
 		return api_throw_error(L,"connect_fail","connection failed");
 	}
-	lua_pushboolean(L,1);
-	return 1;
+	return 0;
 #else
 	return luaL_error(L,"PTP/IP not supported");
 #endif
 }
 /*
-status=con:connect()
+con:connect()
+throws on error or if already connected
 */
 static int chdk_connect(lua_State *L) {
 	CHDK_CONNECTION_METHOD;
@@ -1271,8 +1270,7 @@ static int chdk_disconnect(lua_State *L) {
   	CHDK_CONNECTION_METHOD;
 
 	close_connection(params,ptp_cs);
-	lua_pushboolean(L,1);
-	return 1;
+	return 0;
 }
 
 static int chdk_is_connected(lua_State *L) {

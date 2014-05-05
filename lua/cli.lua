@@ -477,6 +477,39 @@ function cli:get_shoot_common_opts(args)
 	return opts
 end
 
+--[[
+return a single character status,formatted text listing for a single device specified by desc, or throw an error
+
+]]
+function cli.list_dev_single(desc)
+	local lcon = chdku.connection(desc)
+	local tempcon = false
+	local con_status = "+"
+	if not lcon:is_connected() then
+		tempcon = true
+		con_status = "-"
+		lcon:connect()
+	else
+		-- existing con wrapped in new object won't have info set
+		lcon.update_connection_info(lcon)
+	end
+
+	if con_status == '+' and lcon._con == con._con then
+		con_status = "*"
+	end
+
+	local msg=string.format("%s b=%s d=%s v=0x%x p=0x%x s=%s",
+									tostring(lcon.ptpdev.model),
+									lcon.condev.bus, lcon.condev.dev,
+									tostring(lcon.condev.vendor_id),
+									tostring(lcon.condev.product_id),
+									tostring(lcon.ptpdev.serial_number))
+	if tempcon then
+		lcon:disconnect()
+	end
+	return con_status,msg
+end
+
 -- TODO should have a system to split up command code
 local rsint=require'rsint'
 rsint.register_rlib()
@@ -748,7 +781,7 @@ cli:add_commands{
 	},
 	{
 		names={'list'},
-		help='list devices',
+		help='list USB devices',
 		help_detail=[[
  Lists all recognized PTP devices in the following format on success
   <status><num>:<modelname> b=<bus> d=<device> v=<usb vendor> p=<usb pid> s=<serial number>
@@ -759,44 +792,19 @@ cli:add_commands{
   + connected, not CLI target
   - not connected
   ! error querying status
- serial numbers are not available from all models
+ serial numbers are not available from all models, nil will be shown if not available
 ]],
 		func=function() 
 			local msg = ''
 			-- TODO usb only, will not show connected PTP/IP
 			local devs = chdk.list_usb_devices()
 			for i,desc in ipairs(devs) do
-				local lcon = chdku.connection(desc)
-				local tempcon = false
-				local con_status = "+"
-				local status,err
-				if not lcon:is_connected() then
-					tempcon = true
-					con_status = "-"
-					status,err = lcon:connect()
-				else
-					-- existing con wrapped in new object won't have info set
-					status,err = lcon:update_connection_info()
-				end
-
+				local status,con_status,str = pcall(cli.list_dev_single,desc)
 				if status then
-					if con_status == '+' and lcon._con == con._con then
-						con_status = "*"
-					end
-
-					msg = msg .. string.format("%s%d:%s b=%s d=%s v=0x%x p=0x%x s=%s\n",
-												con_status, i,
-												tostring(lcon.ptpdev.model),
-												lcon.condev.bus, lcon.condev.dev,
-												tostring(lcon.condev.vendor_id),
-												tostring(lcon.condev.product_id),
-												tostring(lcon.ptpdev.serial_number))
+					msg = msg .. string.format("%s%d:%s\n",con_status,i,str)
 				else
 					-- use the requested dev/bus here, since the lcon data may not be set
-					msg = msg .. string.format('!%d: b=%s d=%s ERROR: %s\n',i,desc.bus, desc.dev,tostring(err))
-				end
-				if tempcon then
-					lcon:disconnect()
+					msg = msg .. string.format('!%d: b=%s d=%s ERROR: %s\n',i,desc.bus, desc.dev,tostring(con_status))
 				end
 			end
 			return true,msg
@@ -1266,7 +1274,7 @@ cli:add_commands{
 			if lcon then
 				con = lcon
 				if not con:is_connected() then
-					status, err = con:connect()
+					con:connect()
 				end
 				if con:is_connected() then
 					cli.infomsg('connected: %s, max packet size %d\n',con.ptpdev.model,con.ptpdev.max_packet_size)
@@ -1299,9 +1307,9 @@ cli:add_commands{
 		names={'disconnect','dis'},
 		help='disconnect from device',
 		func=function(self,args) 
-			local status, err = con:disconnect()
+			con:disconnect()
 			cli:connection_status_change()
-			return status,err
+			return true
 		end,
 	},
 	{

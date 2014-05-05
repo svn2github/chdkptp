@@ -197,7 +197,8 @@ function btn_connect:action()
 		con:disconnect()
 	else
 		-- just connect to the 'con' selected by the dropdown
-		add_status(con:connect())
+		-- TODO error handling should be generic
+		add_status(pcall(con.connect,con))
 		--[[
 		local devs = chdk.list_usb_devices()
 		if #devs > 0 then

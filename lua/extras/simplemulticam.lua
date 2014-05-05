@@ -68,15 +68,12 @@ function m.connect(devspec)
 			error('no devices match dev:'..tostring(devspec.dev))
 		end
 	end
-	local lcon,msg = chdku.connection(devspec)
+	local lcon = chdku.connection(devspec)
 	-- if not already connected, try to connect
 	if lcon:is_connected() then
 		lcon:update_connection_info()
 	else
-		local status,err = lcon:connect()
-		if not status then
-			error(string.format('connect failed bus:%s dev:%s err:%s\n',devspec.dev,devspec.bus,tostring(err)))
-		end
+		lcon:connect()
 	end
 	-- if connection didn't fail
 	if lcon:is_connected() then

@@ -1281,27 +1281,23 @@ end
 
 --[[
 set condev, ptpdev apiver for current connection
+throws on error
+if CHDK extension not present, apiver is set to -1,-1
 ]]
 function con_methods:update_connection_info()
 	-- this currently can't fail, devinfo is always stored in connection object
 	self.condev=self:get_con_devinfo()
-	local status,err=self:get_ptp_devinfo()	
-	if status then
-		self.ptpdev = status
-	else
-		return false,err
-	end
-	local major,minor=self:camera_api_version()
-	if not major then
+	self.ptpdev=self:get_ptp_devinfo()
+	local status,major,minor=self:camera_api_version_pcall()
+	if not status then
+		local err = major
 		-- device connected doesn't support PTP_OC_CHDK
-		if minor.ptp_rc == ptp.RC_OperationNotSupported then
+		if err.ptp_rc == ptp.RC_OperationNotSupported then
 			self.apiver={MAJOR=-1,MINOR=-1}
-			return true
 		end
-		return false,minor
+		error(err) -- re-throw TODO stack trace will point here
 	end
 	self.apiver={MAJOR=major,MINOR=minor}
-	return true
 end
 --[[
 override low level connect to gather some useful information that shouldn't change over life of connection
@@ -1312,14 +1308,11 @@ opts{
 function con_methods:connect(opts)
 	opts = util.extend_table({},opts)
 	self.live = nil
-	local status,err=chdk_connection.connect(self._con)
-	if not status then
-		return false,err
-	end
+	chdk_connection.connect(self._con)
 	if opts.raw then
-		return true
+		return
 	end
-	return self:update_connection_info()
+	self:update_connection_info()
 end
 
 --[[
@@ -1560,6 +1553,27 @@ local function init_connection_methods()
 end
 
 init_connection_methods()
+
+-- methods with pcall wrappers
+-- generally stuff you would expect to want to examine the error rather than just throwing
+-- TODO not sure if I want this yet
+--[[
+local con_pcall_methods={
+	'connect',
+	'exec',
+	'execwait',
+	'wait_status',
+}
+local function init_pcall_wrappers()
+	for i,name in ipairs(con_pcall_methods) do
+		-- pcall variants for things that want to catch errors
+		con_methods[name..'_pcall'] = function(self,...)
+			return pcall(con_methods[name],self,...)
+		end
+	end
+end
+init_pcall_wrappers()
+]]
 
 -- host api version
 chdku.apiver = chdk.host_api_version()
