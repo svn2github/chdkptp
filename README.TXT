@@ -139,7 +139,7 @@ chdkptp -e"exec require'tests':runall()"
 To run some tests against a camera, use
 chdkptp -e"exec require'camtests'.runstd()"
 or for vesions after r562
-chdkptp -e"exec require'camtests'.runbatch{bench=true,xfer=true}"
+chdkptp -e"exec require'camtests'.runbatch{bench=true,filexfer=true}"
 (if more than one camera is connected to the system, a random one will be used)
 
 Neither of these is a comprehensive test.
