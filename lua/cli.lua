@@ -760,10 +760,7 @@ cli:add_commands{
 				count = count * 4
 			end
 
-			local r,msg = con:getmem(addr,count)
-			if not r then
-				return false,msg
-			end
+			local r = con:getmem(addr,count)
 
 			if args.i32 then
 				local fmt
@@ -1387,7 +1384,8 @@ cli:add_commands{
 			if args.norecon then
 				return true
 			end
-			return con:reconnect({wait=args.wait})
+			con:reconnect({wait=args.wait})
+			return true
 		end,
 	},
 	{

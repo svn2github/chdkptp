@@ -134,10 +134,7 @@ function m.xfermem(opts)
 	local tstart = ustime.new()
 	for i=1,opts.count do
 		local t0 = ustime.new()
-		local v,msg=con:getmem(opts.addr,opts.size)
-		if not v then
-			error('getmem failed '..tostring(err))
-		end
+		local v=con:getmem(opts.addr,opts.size)
 		table.insert(times,ustime.diff(t0)/1000000)
 	end
 	local wall_time = ustime.diff(tstart)/1000000
