@@ -1075,7 +1075,7 @@ static int chdk_newerror(lua_State *L) {
 	return 1;
 }
 /*
-if code isn't PTP_RC_OK, push false, (error) return 0
+if code isn't PTP_RC_OK, push error return 0
 otherwise return 1
 */
 /*
@@ -1477,7 +1477,7 @@ chunk:
 	last=bool
 	data=lbuf
 }
-throws error on falure
+throws error on error
 */
 static int chdk_capture_get_chunk(lua_State *L) {
 	CHDK_CONNECTION_METHOD;

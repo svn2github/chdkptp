@@ -196,12 +196,15 @@ local function mdownload_single(lcon,finfo,lopts,src,dst)
 		lcon:download(src,dst)
 	else
 		local f,err=io.open(dst,"wb")
+		if not f then
+			error(err)
+		end
 		f:close()
 	end
 	if lopts.mtime then
 		status,err = lfs.touch(dst,chdku.ts_cam2pc(finfo.st.mtime));
 		if not status then
-			return status,err
+			error(err)
 		end
 	end
 	return true
@@ -879,11 +882,11 @@ function chdku.rc_handler_store(store)
 		local chunk
 		local n_chunks = 0
 		repeat
-			local err
+			local status,err
 			cli.dbgmsg('rc chunk get %d %d\n',hdata.id,n_chunks)
-			chunk,err=lcon:capture_get_chunk(hdata.id)	
-			if not chunk then
-				return false,err
+			status,chunk=lcon:capture_get_chunk_pcall(hdata.id)	
+			if not status then
+				return false,chunk
 			end
 			cli.dbgmsg('rc chunk size:%d offset:%s last:%s\n',
 						chunk.size,
@@ -891,7 +894,7 @@ function chdku.rc_handler_store(store)
 						tostring(chunk.last))
 
 			chunk.imgnum = hdata.imgnum -- for convenience, store image number in chunk
-			local status,err = store_fn(chunk)
+			status,err = store_fn(chunk)
 			if status==false then -- allow nil so simple functions don't need to return a value
 				return false,err
 			end
@@ -1011,9 +1014,9 @@ function chdku.rc_handler_raw_dng_file(dir,filename_base,ext,dng_info)
 		end
 
 		cli.dbgmsg('rc chunk get %s %d\n',filename,hdata.id)
-		local raw,err=lcon:capture_get_chunk(hdata.id)	
-		if not raw then
-			return false, err
+		local status,raw=lcon:capture_get_chunk_pcall(hdata.id)	
+		if not status then
+			return false, raw
 		end
 		cli.dbgmsg('rc chunk size:%d offset:%s last:%s\n',
 						raw.size,
@@ -1052,10 +1055,11 @@ function chdku.rc_handler_file(dir,filename_base,ext)
 		-- note only jpeg has multiple chunks
 		repeat
 			cli.dbgmsg('rc chunk get %s %d %d\n',filename,hdata.id,n_chunks)
-			chunk,err=lcon:capture_get_chunk(hdata.id)	
-			if not chunk then
+			local status
+			status,chunk=lcon:capture_get_chunk_pcall(hdata.id)	
+			if not status then
 				fh:close()
-				return false,err
+				return false,chunk
 			end
 			cli.dbgmsg('rc chunk size:%d offset:%s last:%s\n',
 						chunk.size,
