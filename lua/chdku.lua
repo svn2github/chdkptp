@@ -1456,13 +1456,8 @@ function con_methods:live_get_frame(what)
 	if not self.live then
 		self.live = chdku.live_wrap()
 	end
-
-	local frame, err = self:get_live_data(self.live._frame,what)
-	if frame then
-		self.live._frame = frame
-		return true
-	end
-	return false, err
+	self.live._frame = self:get_live_data(self.live._frame,what)
+	return true
 end
 
 function con_methods:live_dump_start(filename)

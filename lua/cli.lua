@@ -1563,11 +1563,7 @@ cli:add_commands{
 			local varsubst=require'varsubst'
 			-- TODO frame source should be split out to allow dumping from existing lvdump file
 			for i=1,args.count do
-				frame, err = con:get_live_data(frame,what)
-
-				if not frame then
-					return false, err
-				end
+				frame = con:get_live_data(frame,what)
 
 				frame_num = i
 				-- time values are recorded per frame, so to avoid varying between files
