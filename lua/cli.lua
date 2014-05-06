@@ -1571,6 +1571,7 @@ cli:add_commands{
 				frame_ustime = ustime.new():float()
 
 				if args.vp then
+					-- TODO may be null if video selected on startup
 					vp_pimg = liveimg.get_viewport_pimg(vp_pimg,frame,false)
 					vp_lb = vp_pimg:to_lbuf_packed_rgb(vp_lb)
 
