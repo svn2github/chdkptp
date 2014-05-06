@@ -1563,58 +1563,27 @@ cli:add_commands{
 			local varsubst=require'varsubst'
 			-- TODO frame source should be split out to allow dumping from existing lvdump file
 			for i=1,args.count do
+				-- TODO should use wrapped frame, maybe con:live_get_frame
 				frame = con:get_live_data(frame,what)
 
 				frame_num = i
-				-- time values are recorded per frame, so to avoid varying between files
+				-- time values are recorded per frame, to avoid varying between files
 				frame_time = os.time()
 				frame_ustime = ustime.new():float()
 
 				if args.vp then
-					-- TODO may be null if video selected on startup
-					vp_pimg = liveimg.get_viewport_pimg(vp_pimg,frame,false)
-					vp_lb = vp_pimg:to_lbuf_packed_rgb(vp_lb)
-
 					local fpath = varsubst.run(vp_spec,subst_funcs)
-					-- TODO ensure directory
-
-					local fh
-
-					fh, err = io.open(fpath,'wb')
-					if not fh then
-						return false,err
-					end
 					if not args.quiet then
 						cli.infomsg('%s\n',fpath)
 					end
-					fh:write(string.format('P6\n%d\n%d\n%d\n',
-						vp_pimg:width(),
-						vp_pimg:height(),255))
-					vp_lb:fwrite(fh)
-					fh:close()
+					vp_pimg, vp_lb=chdku.live_dump_vp_pbm(fpath,frame,vp_pimg,vp_lb)
 				end
 				if args.bm then
-					bm_pimg = liveimg.get_bitmap_pimg(bm_pimg,frame,false)
-					bm_lb = bm_pimg:to_lbuf_packed_rgba(bm_lb)
 					local fpath = varsubst.run(bm_spec,subst_funcs)
-					-- TODO ensure directory
-
-					local fh
-					-- TODO pipe support
-					fh, err = io.open(fpath,'wb')
-					if not fh then
-						return false,err
-					end
 					if not args.quiet then
 						cli.infomsg('%s\n',fpath)
 					end
-					fh:write(string.format(
-						'P7\nWIDTH %d\nHEIGHT %d\nDEPTH %d\nMAXVAL %d\nTUPLTYPE RGB_ALPHA\nENDHDR\n',
-						bm_pimg:width(),
-						bm_pimg:height(),
-						4,255))
-					bm_lb:fwrite(fh)
-					fh:close()
+					bm_pimg, bm_lb=chdku.live_dump_bm_pam(fpath,frame,bm_pimg,bm_lb)
 				end
 				if args.wait and i < args.count then
 					sys.sleep(args.wait)

@@ -1445,6 +1445,55 @@ function chdku.live_wrap(frame)
 end
 
 --[[
+write viewport data to an unscaled pbm image
+vp_pimg and vp_lb are pimg and lbuf to re-use, if possible
+TODO should pass in a table instead of returning
+]]
+function chdku.live_dump_vp_pbm(fpath,frame,vp_pimg,vp_lb)
+	vp_pimg = liveimg.get_viewport_pimg(vp_pimg,frame,false)
+	-- TODO may be null if video selected on startup
+	if not vp_pimg then
+		error('no viewport data')
+	end
+	vp_lb = vp_pimg:to_lbuf_packed_rgb(vp_lb)
+
+	-- TODO ensure directory, pipe support
+	local fh, err = io.open(fpath,'wb')
+	if not fh then
+		error(err)
+	end
+	fh:write(string.format('P6\n%d\n%d\n%d\n',
+		vp_pimg:width(),
+		vp_pimg:height(),255))
+	vp_lb:fwrite(fh)
+	fh:close()
+	return vp_pimg,vp_lb
+end
+--[[
+write viewport data to an unscaled RGBA pam image
+bm_pimg and bm_lb are pimg and lbuf to re-use, if possible
+TODO should pass in a table instead of returning
+]]
+function chdku.live_dump_bm_pam(fpath,frame,bm_pimg,bm_lb)
+	bm_pimg = liveimg.get_bitmap_pimg(bm_pimg,frame,false)
+	bm_lb = bm_pimg:to_lbuf_packed_rgba(bm_lb)
+	
+	-- TODO ensure directory, pipe support
+	local fh, err = io.open(fpath,'wb')
+	if not fh then
+		error(err)
+	end
+	fh:write(string.format(
+		'P7\nWIDTH %d\nHEIGHT %d\nDEPTH %d\nMAXVAL %d\nTUPLTYPE RGB_ALPHA\nENDHDR\n',
+		bm_pimg:width(),
+		bm_pimg:height(),
+		4,255))
+	bm_lb:fwrite(fh)
+	fh:close()
+	return bm_pimg,vm_lb
+end
+
+--[[
 NOTE this only tells if the CHDK protocol supports live view
 the live sub-protocol might not be fully compatible
 ]]
