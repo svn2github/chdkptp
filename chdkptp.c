@@ -1038,8 +1038,34 @@ static int push_api_error(lua_State *L) {
 	return 1;
 }
 
+/*
+set stacktrace as field in error object
+allows catching and re-throwing with correct stack
+assumes stack top is error table, leaves it there
+*/
+static void api_error_traceback(lua_State *L, int level) {
+	// borrowed from iuplua.c
+	lua_getglobal(L, "debug");
+	if (!lua_istable(L, -1)) {
+		lua_pop(L, 1);
+		return;
+	}
+	lua_getfield(L, -1, "traceback");
+	if (!lua_isfunction(L, -1)) {
+		lua_pop(L, 2);
+		return;
+	}
+
+	lua_remove(L, -2); // remove the debug table
+	lua_pushliteral(L, ""); // empty mesage for traceback
+	lua_pushinteger(L, level);
+	lua_call(L, 2, 1);  /* call debug.traceback */
+	lua_setfield(L, -2,"traceback");
+}
+
 static int push_api_error_ptp(lua_State *L,uint16_t code) {
 	push_api_error(L);
+	api_error_traceback(L,1);
 	lua_pushnumber(L,code);
 	lua_setfield(L, -2,"ptp_rc");
 	lua_pushstring(L,ptp_strerror(code));
@@ -1051,6 +1077,7 @@ static int push_api_error_ptp(lua_State *L,uint16_t code) {
 
 static int push_api_error_misc(lua_State *L,const char* etype,const char *msg) {
 	push_api_error(L);
+	api_error_traceback(L,1);
 	if(msg) {
 		lua_pushstring(L,msg);
 		lua_setfield(L, -2,"msg");
@@ -1062,17 +1089,25 @@ static int push_api_error_misc(lua_State *L,const char* etype,const char *msg) {
 
 /*
 create an error object to throw from lua
-sets meta table on passed table
-err=chdk.newerror{etype="...",msg="...",ptp_rc=...}
+sets meta table on passed table, or create new empty table
+err=errlib.new({etype="...",msg="...",ptp_rc=...}[,level])
 */
-static int chdk_newerror(lua_State *L) {
+static int errlib_new(lua_State *L) {
 	if(lua_istable(L,1)) {
 		luaL_getmetatable(L, CHDK_API_ERROR_META);
 		lua_setmetatable(L, 1);
 	} else {
 		push_api_error(L);
 	}
+	api_error_traceback(L,luaL_optnumber(L,2,2));
 	return 1;
+}
+/*
+does errlib.new and throws the result
+*/
+static int errlib_throw(lua_State *L) {
+	errlib_new(L);
+	return lua_error(L);
 }
 /*
 if code isn't PTP_RC_OK, push error return 0
@@ -1901,7 +1936,6 @@ static const luaL_Reg chdklib[] = {
   {"list_usb_devices", chdk_list_usb_devices},
   {"get_conlist", chdk_get_conlist}, // TEMP TESTING
   {"reset_device", chdk_reset_device}, // TEMP TESTING
-  {"newerror",chdk_newerror},
   {NULL, NULL}
 };
 
@@ -2161,11 +2195,20 @@ static const luaL_Reg lua_guisyslib[] = {
   {NULL, NULL}
 };
 
+static const luaL_Reg lua_errlib[] = {
+  {"new", errlib_new},
+  {"throw", errlib_throw},
+  {NULL, NULL}
+};
+
+
 static int chdkptp_registerlibs(lua_State *L) {
 	/* set up meta table for error object */
 	luaL_newmetatable(L,CHDK_API_ERROR_META);
 	lua_pushcfunction(L,api_error_tostring);
 	lua_setfield(L,-2,"__tostring");
+
+	luaL_register(L, "errlib", lua_errlib);
 
 	// register error codes
 	init_ptp_codes(L);

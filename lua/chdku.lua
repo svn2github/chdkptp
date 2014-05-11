@@ -688,7 +688,7 @@ function con_methods:exec(code,opts_in)
 			-- this requires an extra PTP round trip per exec call
 			local status = self:script_status()
 			if status.run then
-				error(chdk.newerror({etype='execlua_scriptrun',msg='a script is already running'}))
+				errlib.throw({etype='execlua_scriptrun',msg='a script is already running'})
 			end
 			if opts.flush_cam_msgs and status.msg then
 				self:flushmsgs()
@@ -799,24 +799,24 @@ function con_methods:read_msg_strict(opts)
 	opts=extend_table({},opts)
 	local msg=self:read_msg()
 	if msg.type == 'none' then
-		error(chdk.newerror({etype='nomsg',msg='read_msg_strict no message'}))
+		errlib.throw({etype='nomsg',msg='read_msg_strict no message'})
 	end
 	if msg.script_id ~= self:get_script_id() then
-		error(chdk.newerror({etype='bad_script_id',msg='msg from unexpected script id'}))
+		errlib.throw({etype='bad_script_id',msg='msg from unexpected script id'})
 	end
 	if msg.type ~= opts.mtype then
 		if msg.type == 'error' then
-			error(chdk.newerror({etype='wrongmsg_error',msg='unexpected error: '..msg.value}))
+			errlib.throw({etype='wrongmsg_error',msg='unexpected error: '..msg.value})
 		end
-		error(chdk.newerror({etype='wrongmsg',msg='unexpected msg type: '..msg.value}))
+		errlib.throw({etype='wrongmsg',msg='unexpected msg type: '..msg.value})
 	end
 	if opts.msubtype and msg.subtype ~= opts.msubtype then
-		error(chdk.newerror({etype='wrongmsg_sub','wrong message subtype: ' ..msg.subtype}))
+		errlib.throw({etype='wrongmsg_sub',msg='wrong message subtype: ' ..msg.subtype})
 	end
 	if opts.munserialize then
 		local v = util.unserialize(msg.value)
 		if opts.msubtype and type(v) ~= opts.msubtype then
-			error(chdk.newerror({etype='unserialize','unserialize error'}))
+			errlib.throw({etype='unserialize',msg='unserialize error'})
 		end
 		return v
 	end
@@ -833,10 +833,10 @@ function con_methods:wait_msg(opts)
 	opts.run=nil
 	local status=self:wait_status(opts)
 	if status.timeout then
-		error(chdk.newerror({etype='timeout',msg='wait_msg timed out'}))
+		errlib.throw({etype='timeout',msg='wait_msg timed out'})
 	end
 	if not status.msg then
-		error(chdk.newerror({etype='nomsg',msg='wait_msg no message'}))
+		errlib.throw({etype='nomsg',msg='wait_msg no message'})
 	end
 	return self:read_msg_strict(opts)
 end
@@ -1283,7 +1283,7 @@ end
 --[[
 set condev, ptpdev apiver for current connection
 throws on error
-if CHDK extension not present, apiver is set to -1,-1
+if CHDK extension not present, apiver is set to -1,-1 but no error is thrown
 ]]
 function con_methods:update_connection_info()
 	-- this currently can't fail, devinfo is always stored in connection object
@@ -1295,8 +1295,9 @@ function con_methods:update_connection_info()
 		-- device connected doesn't support PTP_OC_CHDK
 		if err.ptp_rc == ptp.RC_OperationNotSupported then
 			self.apiver={MAJOR=-1,MINOR=-1}
+			return
 		end
-		error(err) -- re-throw TODO stack trace will point here
+		error(err) -- re-throw
 	end
 	self.apiver={MAJOR=major,MINOR=minor}
 end
