@@ -224,6 +224,17 @@ prefs._add('core_verbose','number','ptp core verbosity',0,
 		corevar.set_verbose(val)
 	end
 )
+prefs._add('err_trace','string',"stack trace on error, values: 'always', 'critical', 'never'",'critical',
+	function(self)
+		return errutil.do_traceback
+	end,
+	function(self,val)
+		if not util.in_table({'always','critical','never'},val) then
+			return false,'invalid value'
+		end
+		errutil.do_traceback = val
+	end
+)
 
 con=chdku.connection()
 dngcli.init_cli()
