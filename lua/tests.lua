@@ -129,6 +129,25 @@ t.fsmisc = function()
 	assert(fsutil.joinpath(unpack(fsutil.splitpath('foo/bar/mod'))) == './foo/bar/mod')
 end
 
+t.find_files = function()
+	-- note assumes test run from chdkptp root directory
+	-- should throw on error
+	local r=fsutil.find_files({'lua'},{dirs=false,fmatch='%.lua$'},function(t,opts) t:ff_store(t.cur.full) end)
+	assert(r)
+	local check_files = util.flag_table{'lua/camtests.lua','lua/chdku.lua','lua/cli.lua','lua/tests.lua'}
+	local found = 0
+	for i,p in ipairs(r) do
+		if check_files[p] then
+			found = found+1
+		end
+		assert(lfs.attributes(p,'mode') == 'file')
+	end
+	assert(found == 4)
+	local status,err=pcall(function() return fsutil.find_files({'a_bogus_name_1234'},{dirs=false,fmatch='%.lua$'},function(t,opts) t:ff_store(t.cur.full) end) end)
+	assert(not status)
+	assert(err.etype == 'lfs')
+end
+
 t.ustime = function()
 	local t=os.time()
 	local t0=ustime.new(t,600000)

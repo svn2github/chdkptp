@@ -158,6 +158,50 @@ function m.cliexec_ret_ok(cmd)
 	return err
 end
 
+-- return output on on fail, assert on success
+function m.cliexec_ret_fail(cmd)
+	local status,err=cli:execute(cmd)
+	if not status then
+		return err
+	end
+	assert('command succeeded when expected to fail')
+end
+
+function m.makelocalfile(path,content)
+	fsutil.mkdir_m(fsutil.dirname(path))
+	local fh,err=io.open(path,'wb')
+	if not fh then
+		error(err)
+	end
+	local status=true
+	if content:len() > 0 then
+		status,err = fh:write(content)
+	end
+	fh:close()
+	assert(status,err)
+end
+
+function m.readlocalfile(path)
+	assert(lfs.attributes(path,'mode') == 'file')
+	local fh,err=io.open(path,'rb')
+	if not fh then
+		error(err)
+	end
+	local content=fh:read('*a')
+	fh:close()
+	assert(content)
+	return content
+end
+
+function m.comparefiles(path1,path2)
+	local mode=lfs.attributes(path1,'mode')
+	assert(mode == lfs.attributes(path2,'mode'))
+	if mode ~= 'file' then
+		return
+	end
+	assert(m.readlocalfile(path1)==m.readlocalfile(path2))
+end
+
 function tests.xfer()
 	m.xfermem({count=50})
 end
@@ -252,35 +296,39 @@ function tests.msgfuncs()
 end
 function tests.filexfer()
 	local ldir='camtest'
-	if lfs.attributes(ldir,'mode') ~= 'directory' then
-		assert(fsutil.mkdir_m(ldir))
-	end
-
 	for i,size in ipairs({511,512,4096}) do
 		local fn=string.format('test%d.dat',size)
 		local lfn=string.format('%s/%s',ldir,fn)
 		local dfn=string.format('%s/d_%s',ldir,fn)
-		local fh,err=io.open(lfn,'wb')
-		if not fh then
-			error(err)
-		end
 		local s1=string.rep('x',size)
-		fh:write(s1)
-		fh:close()
+		m.makelocalfile(lfn,s1)
 		m.cliexec('u '..lfn)
 		m.cliexec('d '..fn .. ' ' .. dfn)
-		assert(lfs.attributes(dfn,'mode') == 'file')
-		local fh,err=io.open(dfn,'rb')
-		if not fh then
-			error(err)
-		end
-		local s2=fh:read('*a')
-		fh:close()
+		local s2=m.readlocalfile(dfn)
 		assert(s1==s2)
 		m.cliexec('rm '..fn)
-		assert(os.remove(lfn))
-		assert(os.remove(dfn))
 	end
+	fsutil.rm_r(ldir)
+end
+
+function tests.mfilexfer()
+	local ldir='camtest'
+	-- names are in caps since cam may change, client may be case sensitive
+	m.makelocalfile(ldir..'/up/EMPTY.TXT','')
+	m.makelocalfile(ldir..'/up/ONE.TXT','one')
+	m.makelocalfile(ldir..'/up/SUB1/SUB.TXT',string.rep('subtext',1000))
+	fsutil.mkdir_m(ldir..'/up/EMPTYSUB')
+	m.cliexec('mup '..ldir..'/up muptest')
+	m.cliexec('mdl muptest '..ldir..'/dn')
+	m.comparefiles(ldir..'/up/EMPTY.TXT',ldir..'/dn/EMPTY.TXT')
+	m.comparefiles(ldir..'/up/ONE.TXT',ldir..'/dn/ONE.TXT')
+	m.comparefiles(ldir..'/up/SUB1/SUB.TXT',ldir..'/dn/SUB1/SUB.TXT')
+	m.comparefiles(ldir..'/up/EMPTYSUB',ldir..'/dn/EMPTYSUB')
+	m.cliexec('rm muptest')
+	-- test on non-existing dir
+	local s=m.cliexec_ret_fail('mdl muptest '..ldir)
+	assert(string.sub(s,1,10) == 'A/muptest:') -- exact message varies by cam
+	fsutil.rm_r(ldir)
 end
 
 function tests.msgs()
@@ -322,6 +370,8 @@ opts:{
 	bench=bool -- run "benchmark" tests
 	filexfer=bool -- run file transfer tests
 }
+NOTE
+filexfer creates and deletes various hard coded paths, both locally and on the camera
 ]]
 function m.runbatch(opts)
 	opts = util.extend_table({},opts)
@@ -343,6 +393,7 @@ function m.runbatch(opts)
 	end
 	if opts.filexfer then
 		m.run('filexfer')
+		m.run('mfilexfer')
 	end
 	m.run('reconnect')
 	m.run('disconnect')

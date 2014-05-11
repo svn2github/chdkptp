@@ -126,7 +126,7 @@ local function do_dir_upload_dialog(data)
 
 	if status == "0" then 
 		gui.dbgmsg("d %s->%s\n",remotepath,filedlg.value)
-		add_status(con:mupload({filedlg.value},remotepath))
+		con:mupload({filedlg.value},remotepath)
 		itree:refresh_tree_by_path(remotepath)
 	end
 end
@@ -176,7 +176,7 @@ local function do_upload_dialog(remotepath)
 	-- If it did, each to-level directory contents would get dumped into the target dir
 	-- should add an option to mupload to include create top level dirs
 	-- TODO test gtk/linux
-	add_status(con:mupload(paths,remotepath))
+	con:mupload(paths,remotepath)
 	itree:refresh_tree_by_path(remotepath)
 end
 
@@ -275,7 +275,7 @@ itree.dropfiles_cb=errutil.wrap(function(self,filename,num,x,y)
 	gui.infomsg("upload %s to %s\n",filename,remotepath)
 	-- TODO no cancel, no overwrite options!
 	-- unfortunately called for each dropped item
-	add_status(con:mupload({filename},remotepath))
+	con:mupload({filename},remotepath)
 	self:refresh_tree_by_path(remotepath)
 end)
 

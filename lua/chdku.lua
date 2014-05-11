@@ -264,10 +264,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 
 
 	if not dstmode then
-		local status,err=fsutil.mkdir_m(dstpath)
-		if not status then
-			errlib.throw{etype='remote',msg=err}
-		end
+		mkdir(dstpath)
 	end
 
 	for i,finfo in ipairs(files) do
@@ -285,17 +282,11 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 		end
 		dst=fsutil.joinpath(dstpath,relpath)
 		if finfo.st.is_dir then
-			local status,err = mkdir(dst)
-			if not status then
-				errlib.throw{etype='remote',msg=err}
-			end
+			mkdir(dst)
 		else
 			local dst_dir = fsutil.dirname(dst)
 			if dst_dir ~= '.' then
-				local status,err = mkdir(dst_dir)
-				if not status then
-					errlib.throw{etype='remote',msg=err}
-				end
+				mkdir(dst_dir)
 			end
 			-- TODO this should be optional
 			printf("%s->%s\n",src,dst);
@@ -314,10 +305,10 @@ opts are as for find_files, plus
 local function mupload_fn(self,opts)
 	local con=opts.con
 	if #self.rpath == 0 and self.cur.st.mode == 'directory' then
-		return true
+		return
 	end
 	if self.cur.name == '.' or self.cur.name == '..' then
-		return true
+		return
 	end
 	local relpath
 	local src=self.cur.full
@@ -337,7 +328,7 @@ local function mupload_fn(self,opts)
 		else
 			local status,err=con:mkdir_m(dst)
 			if not status then
-				return false,err
+				errlib.throw{etype='remote',msg=tostring(err)}
 			end
 		end
 		opts.lastdir = dst
@@ -348,7 +339,7 @@ local function mupload_fn(self,opts)
 			local st,err=con:stat(dst_dir)
 			if st then
 				if not st.is_dir then
-					return false, 'not a directory: '..dst_dir
+					errlib.throw{etype='remote',msg='not a directory: '..tostring(dst_dir)}
 				end
 			else
 				if opts.pretend then
@@ -356,7 +347,7 @@ local function mupload_fn(self,opts)
 				else
 					local status,err=con:mkdir_m(dst_dir)
 					if not status then
-						return false,err
+						errlib.throw{etype='remote',msg=tostring(err)}
 					end
 				end
 			end
@@ -365,7 +356,7 @@ local function mupload_fn(self,opts)
 		-- TODO stat'ing in batches would be faster
 		local st,err=con:stat(dst)
 		if st and not st.is_file then
-			return false, 'not a file: '..dst
+			errlib.throw{etype='remote',msg='not a file: '..tostring(dst)}
 		end
 		-- TODO timestamp comparison
 		printf('%s->%s\n',src,dst)
@@ -375,12 +366,11 @@ local function mupload_fn(self,opts)
 				-- TODO updating times in batches would be faster
 				local status,err = con:utime(dst,chdku.ts_pc2cam(self.cur.st.modification))
 				if not status then
-					return false,err
+					errlib.throw{etype='remote',msg=tostring(err)}
 				end
 			end
 		end
 	end
-	return true
 end
 
 function con_methods:mupload(srcpaths,dstpath,opts)
@@ -388,7 +378,7 @@ function con_methods:mupload(srcpaths,dstpath,opts)
 	opts.dirsfirst=true
 	opts.mu_dst=dstpath
 	opts.con=self
-	return fsutil.find_files(srcpaths,opts,mupload_fn)
+	fsutil.find_files(srcpaths,opts,mupload_fn)
 end
 
 --[[
@@ -406,7 +396,7 @@ function con_methods:mdelete(paths,opts)
 	local msg_handler
 	if opts.msg_handler then
 		msg_handler = opts.msg_handler
-		opts.msg_handler = nil -- don't serialize
+		opts.msg_handler = nil -- don't pass to remote
 	else
 		results={}
 		msg_handler = chdku.msg_unbatcher(results)

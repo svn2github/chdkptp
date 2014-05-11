@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2011 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -16,7 +16,7 @@
 --]]
 --[[
 local path and filesystem related utilities
-depends on sys.ostype and lfs
+depends on sys.ostype, errlib and lfs
 ]]
 local fsutil={}
 --[[
@@ -255,14 +255,15 @@ end
 
 --[[
 make multiple subdirectories
+throws on error
 ]]
 function fsutil.mkdir_m(path)
 	local mode = lfs.attributes(path,'mode')
 	if mode == 'directory' then
-		return true
+		return
 	end
 	if mode then
-		return false,'path exists, not directory'
+		errlib.throw{etype='exists', msg='path exists, not directory'}
 	end
 	local parts = fsutil.splitpath(path)
 	-- never try to create the initial . or /
@@ -273,13 +274,12 @@ function fsutil.mkdir_m(path)
 		if not mode then
 			local status,err = lfs.mkdir(p)
 			if not status then
-				return false,err
+				errlib.throw{etype='lfs', msg=tostring(err)}
 			end
 		elseif mode ~= 'directory' then
-			return false,'path exists, not directory'
+			errlib.throw{etype='exists', msg='path exists, not directory'}
 		end
 	end
-	return true
 end
 
 --[[
@@ -305,20 +305,19 @@ end
 
 function fs_iter:recurse()
 	if not self:can_recurse() then
-		return false
+		error("tried to recurse into invalid target")
 	end
 	table.insert(self.rpath,self.cur.path[#self.cur.path])
 	local save_cur = self.cur
-	local status,err = self:singledir()
+	self:singledir()
 	self.cur = save_cur
 	table.remove(self.rpath)
-	return status,err
 end
 
 function fs_iter:singleitem(path)
 	local st,err=lfs.attributes(path)
 	if not st then
-		return false,err
+		errlib.throw{etype='lfs',msg=tostring(err)}
 	end
 	self.cur={st=st,full=path,name=fsutil.basename(path)}
 	-- root directory (or bare drive on win) returns nil
@@ -332,22 +331,14 @@ function fs_iter:singleitem(path)
 		self.cur.path = {unpack(self.rpath)}
 		table.insert(self.cur.path,self.cur.name)
 	end
-	return self:callback()
+	self:callback()
 end
 
 function fs_iter:singledir()
 	local cur_dir = self.cur.full
 	for name in lfs.dir(cur_dir) do
-		local status, err = self:singleitem(fsutil.joinpath(cur_dir,name))
-		if not status then
-			return false,err
-		end
+		self:singleitem(fsutil.joinpath(cur_dir,name))
 	end
-	return true
-end
-
-function fs_iter:end_callback(status,msg)
-	return status,msg
 end
 
 function fs_iter.run(paths,opts)
@@ -356,30 +347,27 @@ function fs_iter.run(paths,opts)
 
 	for i,path in ipairs(paths) do
 		t.rpath={}
-		local status,err=t:singleitem(path)
-		if not status then
-			return t:end_callback(false,err)
-		end
+		t:singleitem(path)
 	end
-	return t:end_callback(true)
+	if t.result_callback() then
+		return t:result_callback()
+	end
 end
 
 fsutil.fs_iter = fs_iter
 
 function fsutil.find_files_all_fn(self,opts)
 	self:ff_store(self.cur)
-	return true
 end
 
 function fsutil.find_files_fullname_fn(self,opts)
 	--print(di.cur.full)
 	self:ff_store(self.cur.full)
-	return true
 end
 
 --[[
 process directory tree with matching
-status,err = find_files(paths,opts,func)
+[results]=find_files(paths,opts,func)
 paths=<array of paths to process>
 opts={
 	fmatch='<pattern>', -- match on full path of files, default any (NOTE can match on filename with /<match>$)
@@ -437,10 +425,9 @@ function fsutil.find_files(paths,opts,func)
 		end,
 		ff_func=func,
 		ff_item=function(self,opts)
-			if not self:ff_check_match(opts) then
-				return true
+			if self:ff_check_match(opts) then
+				self:ff_func(opts)
 			end
-			return self:ff_func(opts)
 		end,
 		ff_store=function(self,data)
 			if not results then
@@ -448,48 +435,71 @@ function fsutil.find_files(paths,opts,func)
 			else
 				table.insert(results,data)
 			end
-			return true
 		end,
 		callback=function(self)
 			if self.cur.st.mode == 'directory' then
 				if opts.dirs and opts.dirsfirst then
-					local status,err = self:ff_item(opts)
-					if not status then
-						return false,err
-					end
+					self:ff_item(opts)
 				end
 				if self:depth() < opts.maxdepth and self:can_recurse() then
 					if not opts.rmatch or string.match(self.cur.full,opts.rmatch) then
-						local status,err = self:recurse()
-						if not status then
-							return false,err
-						end
+						self:recurse()
 					end
 				end
 				if opts.dirs and not opts.dirsfirst then
-					local status,err = self:ff_item(opts)
-					if not status then
-						return false,err
-					end
+					self:ff_item(opts)
 				end
 			else
-				local status,err = self:ff_item(opts)
-				if not status then
-					return false,err
+				self:ff_item(opts)
+			end
+		end,
+		result_callback=function()
+			return results
+		end,
+	})
+end
+
+--[[
+simple delete tree
+note lists ALL into memory, not recommended for huge trees
+in_paths
+	path as string, or array of paths
+opts:{
+	pretend=bool
+	verbose=bool
+}
+--]]
+function fsutil.rm_r(in_paths,opts)
+	opts = util.extend_table({},opts)
+	if type(in_paths) == 'string' then
+		in_paths={in_paths}
+	end
+	-- get full subdirectory path for each file, with files before containing dir
+	local paths=fsutil.find_files(in_paths,{dirsfirst=false})
+	for i,p in ipairs(paths) do
+		if string.sub(p,-2) ~= '/.' and string.sub(p,-3) ~= '/..' then
+			local mode = lfs.attributes(p,'mode')
+			if opts.pretend or opts.verbose then
+				if mode == 'directory' then
+					printf("lfs.rmdir('%s')\n",p)
+				else
+					printf("os.remove('%s')\n",p)
 				end
 			end
-			return true
-		end,
-		end_callback=function(self,status,msg)
-			if not status then
-				return false,msg
+			if not opts.pretend then
+				-- on windows, os.remove does not remove directories, even if empty
+				local status, err
+				if mode == 'directory' then
+					status,err=lfs.rmdir(p)
+				else
+					status,err=os.remove(p)
+				end
+				if not status then
+					error(tostring(err))
+				end
 			end
-			if results then
-				return results
-			end
-			return true
 		end
-	})
+	end
 end
 
 return fsutil

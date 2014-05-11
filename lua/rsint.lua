@@ -31,10 +31,7 @@ function init_handlers(args,opts)
 			dst_dir = string.sub(dst,1,-2)
 			if lfs.attributes(dst_dir,'mode') ~= 'directory' then
 				cli.dbgmsg('mkdir %s\n',dst_dir)
-				local status,err = fsutil.mkdir_m(dst_dir)
-				if not status then
-					return false,err
-				end
+				fsutil.mkdir_m(dst_dir)
 			end
 			dst = nil
 		elseif lfs.attributes(dst,'mode') == 'directory' then

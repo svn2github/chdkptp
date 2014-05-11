@@ -1030,7 +1030,8 @@ cli:add_commands{
 				pretend=args.pretend,
 				mtime=not args.nomtime,
 			}
-			return con:mupload(srcs,dst,opts)
+			con:mupload(srcs,dst,opts)
+			return true
 		end,
 	},
 	{
@@ -1775,10 +1776,7 @@ cli:add_commands{
 					dst_dir = string.sub(dst,1,-2)
 					if lfs.attributes(dst_dir,'mode') ~= 'directory' then
 						cli.dbgmsg('mkdir %s\n',dst_dir)
-						local status,err = fsutil.mkdir_m(dst_dir)
-						if not status then
-							return false,err
-						end
+						fsutil.mkdir_m(dst_dir)
 					end
 					dst = nil
 				elseif lfs.attributes(dst,'mode') == 'directory' then

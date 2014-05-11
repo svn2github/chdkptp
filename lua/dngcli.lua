@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2011 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -98,10 +98,7 @@ local function prepare_dst_path(d,name,opts)
 		-- doesn't exist, might need to create dir
 		if not opts.pretend then
 			local dstdir = fsutil.dirname(name)
-			local status, err = fsutil.mkdir_m(dstdir)
-			if not status then 
-				return false, err
-			end
+			fsutil.mkdir_m(dstdir)
 		end
 	end
 	return name
@@ -244,7 +241,7 @@ local function dngbatch_callback(self,opts)
 		d,err = dng.load(src)
 		-- TODO warn and continue?
 		if not d then 
-			return false, err
+			errlib.throw{etype='dng',msg=tostring(err)}
 		end
 	end
 	batch = {
@@ -258,12 +255,11 @@ local function dngbatch_callback(self,opts)
 	for i,cmd in ipairs(cmds) do
 		status,err = dngbatch_docmd(cmd,dargs)
 		if not status then
-			break
+			errlib.throw{etype='dngcmd',msg=tostring(err)}
 		end
 	end
 	-- ensure all batch vars are nil
 	batch = {}
-	return status,err
 end
 
 local dngbatch_ap=cli.argparser.create{
@@ -340,7 +336,8 @@ local function dngbatch_cmd(self,args)
 		dngbatch_cmds=cmds,
 		fsfx=sfx,
 	}
-	return fsutil.find_files({unpack(args)},opts,dngbatch_callback)
+	fsutil.find_files({unpack(args)},opts,dngbatch_callback)
+	return true
 end
 
 m.init_cli = function()
