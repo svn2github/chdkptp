@@ -272,10 +272,18 @@ itree.dropfiles_cb=errutil.wrap(function(self,filename,num,x,y)
 		gui.infomsg("can't upload to non-directory %s\n",remotepath)
 		return iup.IGNORE
 	end
+
+	local up_path = remotepath
+
+	if lfs.attributes(filename,'mode') == 'directory' then
+		-- if dropped item is dir, append the last directory component to the remote name
+		-- otherwise we would just upload the contents
+		up_path = fsutil.joinpath_cam(up_path,fsutil.basename(filename))
+	end
 	gui.infomsg("upload %s to %s\n",filename,remotepath)
 	-- TODO no cancel, no overwrite options!
 	-- unfortunately called for each dropped item
-	con:mupload({filename},remotepath)
+	con:mupload({filename},up_path)
 	self:refresh_tree_by_path(remotepath)
 end)
 
