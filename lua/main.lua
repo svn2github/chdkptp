@@ -14,16 +14,16 @@
   along with this program; if not, write to the Free Software
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 ]]
-util=require('util')
+util=require'util'
 util:import()
 errutil=require'errutil'
-ustime=require('ustime')
-fsutil=require('fsutil')
-prefs=require('prefs')
-chdku=require('chdku')
-cli=require('cli')
-exp=require('exposure')
-dng=require('dng')
+ustime=require'ustime'
+fsutil=require'fsutil'
+prefs=require'prefs'
+chdku=require'chdku'
+cli=require'cli'
+exp=require'exposure'
+dng=require'dng'
 dngcli=require'dngcli'
 
 --[[

@@ -4,16 +4,16 @@ based on the button example from the IUP distribution
 this file is licensed under the same terms as the IUP examples
 ]]
 local gui = {}
-local live = require('gui_live')
-local tree = require('gui_tree')
-local user = require('gui_user')
-local icon = require('gui_icon')
+local live = require'gui_live'
+local tree = require'gui_tree'
+local user = require'gui_user'
+local icon = require'gui_icon'
 
 -- make global for easier testing
 gui.live = live
 gui.tree = tree
 gui.user = user
-gui.sched = require('gui_sched')
+gui.sched = require'gui_sched'
 
 connect_icon = iup.label{
 	image = icon.on,

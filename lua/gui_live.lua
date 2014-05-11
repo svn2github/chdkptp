@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2011 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -17,7 +17,7 @@
 --[[
 module for live view gui
 ]]
-local stats=require('gui_live_stats')
+local stats=require'gui_live_stats'
 
 local m={
 	vp_par = 2, -- pixel aspect ratio for viewport 1:n, n=1,2
@@ -664,7 +664,7 @@ function m.init()
 	end
 
 	function icnv:resize_cb(w,h)
-		gui.dbgmsg("Resize: Width="..w.."   Height="..h)
+		gui.dbgmsg("Resize: Width="..w.."   Height="..h..'\n')
 	end
 
 	m.container_title='Live'
