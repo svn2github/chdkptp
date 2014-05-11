@@ -245,7 +245,7 @@ function cli:execute(line)
 					function()
 						return self.names[cmd]:func(args)
 					end,
-					util.err_traceback)
+					errutil.format)
 			end
 			local tdiff = ustime.diff(t0)/1000000;
 			if prefs.cli_time then
@@ -560,23 +560,22 @@ cli:add_commands{
 ]],
 		func=function(self,args) 
 			local f,r = loadstring(args)
-			if f then
-				r={xpcall(f,util.err_traceback)}
-				if not r[1] then 
-					return false, string.format("call failed:%s\n",r[2])
-				end
-				local s
-				local sopts={pretty=true,err_type=false,err_cycle=false,forceint=false,fix_bignum=false}
-				if #r > 1 then
-					s='=' .. serialize(r[2],sopts)
-					for i = 3, #r do
-						s = s .. ',' .. serialize(r[i],sopts)
-					end
-				end
-				return true, s
-			else
+			if not f then
 				return false, string.format("compile failed:%s\n",r)
 			end
+			r={xpcall(f,errutil.format)} -- TODO would be nice to be able to force backtrace or not per call
+			if not r[1] then 
+				return false, string.format("call failed:%s\n",r[2])
+			end
+			local s
+			local sopts={pretty=true,err_type=false,err_cycle=false,forceint=false,fix_bignum=false}
+			if #r > 1 then
+				s='=' .. serialize(r[2],sopts)
+				for i = 3, #r do
+					s = s .. ',' .. serialize(r[i],sopts)
+				end
+			end
+			return true, s
 		end,
 	},
 	{

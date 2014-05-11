@@ -209,7 +209,7 @@ local function dngbatch_docmd(cmd,dargs)
 		function()
 			return cli.names[cmd.name]:func(cmd.args)
 		end,
-		util.err_traceback)
+		errutil.format)
 	if not cstatus then
 		return false,status
 	end

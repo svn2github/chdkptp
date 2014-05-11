@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2011 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -16,6 +16,7 @@
 ]]
 util=require('util')
 util:import()
+errutil=require'errutil'
 ustime=require('ustime')
 fsutil=require('fsutil')
 prefs=require('prefs')

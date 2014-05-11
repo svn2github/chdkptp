@@ -308,7 +308,7 @@ end
 
 function m.run(name,...)
 	printf('%s:start\n',name)
-	status,msg = xpcall(tests[name],util.err_traceback,...)
+	status,msg = xpcall(tests[name],errutil.format_traceback,...)
 	printf('%s:',name)
 	if status then
 		m.passed = m.passed + 1

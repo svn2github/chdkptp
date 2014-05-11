@@ -447,7 +447,7 @@ function m.set_frame_time(time)
 		end
 		if not m.sched then
 			m.sched=gui.sched.run_repeat(m.frame_time,function()
-				local cstatus,msg = xpcall(timer_action,util.err_traceback)
+				local cstatus,msg = xpcall(timer_action,errutil.format)
 				if not cstatus then
 					printf('live timer update error\n%s',tostring(msg))
 					-- TODO could stop live updates here, for now just spam the console
@@ -468,7 +468,7 @@ function m.set_frame_time(time)
 			time = tostring(m.frame_time),
 			action_cb = function()
 				-- use xpcall so we don't get a popup every frame
-				local cstatus,msg = xpcall(timer_action,util.err_traceback)
+				local cstatus,msg = xpcall(timer_action,errutil.format)
 				if not cstatus then
 					printf('live timer update error\n%s',tostring(msg))
 					-- TODO could stop live updates here, for now just spam the console
