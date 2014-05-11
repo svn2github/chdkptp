@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2011 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -252,7 +252,7 @@ function itree:refresh_tree_by_path(path)
 	end
 end
 
-function itree:dropfiles_cb(filename,num,x,y)
+itree.dropfiles_cb=errutil.wrap(function(self,filename,num,x,y)
 	-- note id -1 > not on any specific item
 	local id = iup.ConvertXYToPos(self,x,y)
 	gui.dbgmsg('dropfiles_cb: %s %d %d %d %d\n',filename,num,x,y,id)
@@ -277,7 +277,7 @@ function itree:dropfiles_cb(filename,num,x,y)
 	-- unfortunately called for each dropped item
 	add_status(con:mupload({filename},remotepath))
 	self:refresh_tree_by_path(remotepath)
-end
+end)
 
 function itree:rightclick_cb(id)
 	local data=self:get_data(id)
@@ -291,67 +291,67 @@ function itree:rightclick_cb(id)
 		iup.menu{
 			iup.item{
 				title='Refresh',
-				action=function()
+				action=errutil.wrap(function()
 					self:refresh_tree_by_id(id)
-				end,
+				end),
 			},
 			-- the default file selector doesn't let you multi-select with directories
 			iup.item{
 				title='Upload files...',
-				action=function()
+				action=errutil.wrap(function()
 					do_upload_dialog(data:fullpath())
-				end,
+				end),
 			},
 			iup.item{
 				title='Upload directory contents...',
-				action=function()
+				action=errutil.wrap(function()
 					do_dir_upload_dialog(data)
-				end,
+				end),
 			},
 			iup.item{
 				title='Download contents...',
-				action=function()
+				action=errutil.wrap(function()
 					do_dir_download_dialog(data)
-				end,
+				end),
 			},
 			iup.item{
 				title='Create directory...',
-				action=function()
+				action=errutil.wrap(function()
 					do_mkdir_dialog(data)
-				end,
+				end),
 			},
 			iup.item{
 				title='Delete...',
-				action=function()
+				action=errutil.wrap(function()
 					do_delete_dialog(data)
-				end,
+				end),
 			},
 			iup.item{
 				title='Properties...',
-				action=function()
+				action=errutil.wrap(function()
 					do_properties_dialog(data)
-				end,
+				end),
 			},
 		}:popup(iup.MOUSEPOS,iup.MOUSEPOS)
 	else
 		iup.menu{
 			iup.item{
 				title='Download...',
-				action=function()
+				action=errutil.wrap(function()
 					do_download_dialog(data)
-				end,
+				end),
 			},
 			iup.item{
 				title='Delete...',
-				action=function()
+				action=errutil.wrap(function()
 					do_delete_dialog(data)
-				end,
+				end),
 			},
 			iup.item{
 				title='Properties...',
-				action=function()
+				action=errutil.wrap(function()
 					do_properties_dialog(data)
-				end,
+				end),
 			},
 		}:popup(iup.MOUSEPOS,iup.MOUSEPOS)
 	end
@@ -383,7 +383,7 @@ function itree:populate_branch(id,path)
 	end
 end
 
-function itree:branchopen_cb(id)
+itree.branchopen_cb=errutil.wrap(function(self,id)
 	gui.dbgmsg('branchopen_cb %s\n',id)
 	if not con:is_connected() then
 		gui.dbgmsg('branchopen_cb not connected\n')
@@ -401,7 +401,7 @@ function itree:branchopen_cb(id)
 	end
 	local data = self:get_data(id)
 	self:populate_branch(id,data:fullpath())
-end
+end)
 
 -- empty the tree, and add dummy we always re-populate on expand anyway
 -- this crashes in gtk

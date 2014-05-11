@@ -36,7 +36,7 @@ gui.cam_dropdown = iup.list{
 	DROPDOWN="YES",
 }
 
-function gui.cam_dropdown:valuechanged_cb()
+gui.cam_dropdown.valuechanged_cb=errutil.wrap(function(self)
 	v=tonumber(self.value)
 	-- 0 means none selected. Callback can be called with this (multiple times) when list is emptied
 	if v == 0 then
@@ -54,7 +54,7 @@ function gui.cam_dropdown:valuechanged_cb()
 	gui.dbgmsg('cam_dropdown new con %s:%s\n',con.condev.dev,con.condev.bus)
 	-- TODO cams should be in the tree
 	gui.tree.get_container().state = 'COLLAPSED' -- force refresh when switching cams
-end
+end)
 
 --[[
 info printf - message to be printed at normal verbosity
@@ -78,6 +78,9 @@ function gui.execquick(code,opts)
 	opts = util.extend_table({nodefaultlibs=true},opts)
 	gui.exec(code,opts)
 end
+gui.execquick_safe = errutil.wrap(function(code,opts)
+	gui.execquick(code,opts)
+end)
 
 function gui.update_mode_dropdown(cur)
 	gui.dbgmsg('update mode dropdown %s\n',tostring(cur))
@@ -192,25 +195,14 @@ local function timer_update_connection_status()
 	end
 end
 
-function btn_connect:action()
+btn_connect.action=errutil.wrap(function(self)
 	if con:is_connected() then
 		con:disconnect()
 	else
-		-- just connect to the 'con' selected by the dropdown
-		-- TODO error handling should be generic
-		add_status(pcall(con.connect,con))
-		--[[
-		local devs = chdk.list_usb_devices()
-		if #devs > 0 then
-			con = chdku.connection(devs[1])
-			add_status(con:connect())
-		else
-			add_status(false,"no devices available")
-		end
-		]]
+		con:connect()
 	end
 	gui.update_connection_status()
-end
+end)
 
 -- console input
 inputtext = iup.text{ 
@@ -300,7 +292,7 @@ function cam_btn(name,title)
 		title=title,
 		size='31x15', -- couldn't get normalizer to work for some reason
 		action=function(self)
-			gui.execquick('click("' .. name .. '")')
+			gui.execquick_safe('click("' .. name .. '")')
 		end,
 	}
 end
@@ -318,7 +310,7 @@ gui.mode_dropdown = iup.list{
 	VISIBLECOLUMNS="10",
 	DROPDOWN="YES",
 }
-function gui.mode_dropdown:valuechanged_cb()
+gui.mode_dropdown.valuechanged_cb=errutil.wrap(function(self)
 	gui.dbgmsg('mode_dropdown %s\n',tostring(self.value))
 	local v = tonumber(self.value)
 	-- 0 means none selected. Callback can be called with this (multiple times) when list is emptied
@@ -330,7 +322,7 @@ function gui.mode_dropdown:valuechanged_cb()
 		return
 	end
 	gui.execquick(string.format('set_capture_mode(%d)',gui.mode_map[v]))
-end
+end)
 
 cam_btn_frame = iup.vbox{
 	iup.hbox{ 
@@ -355,7 +347,7 @@ cam_btn_frame = iup.vbox{
 			title='zoom+',
 			size='45x15',
 			action=function(self)
-				gui.execquick('click("zoom_in")')
+				gui.execquick_safe('click("zoom_in")')
 			end,
 		},
 		iup.fill{
@@ -364,7 +356,7 @@ cam_btn_frame = iup.vbox{
 			title='zoom-',
 			size='45x15',
 			action=function(self)
-				gui.execquick('click("zoom_out")')
+				gui.execquick_safe('click("zoom_out")')
 			end,
 		},
 		expand="HORIZONTAL",
@@ -375,7 +367,7 @@ cam_btn_frame = iup.vbox{
 			title='wheel l',
 			size='45x15',
 			action=function(self)
-				gui.execquick('post_levent_to_ui("RotateJogDialLeft",1)')
+				gui.execquick_safe('post_levent_to_ui("RotateJogDialLeft",1)')
 			end,
 		},
 		iup.fill{
@@ -384,7 +376,7 @@ cam_btn_frame = iup.vbox{
 			title='wheel r',
 			size='45x15',
 			action=function(self)
-				gui.execquick('post_levent_to_ui("RotateJogDialRight",1)')
+				gui.execquick_safe('post_levent_to_ui("RotateJogDialRight",1)')
 			end,
 		},
 		expand="HORIZONTAL",
@@ -399,7 +391,7 @@ cam_btn_frame = iup.vbox{
 			title='shoot half',
 			size='45x15',
 			action=function(self)
-				gui.execquick(string.format([[
+				gui.execquick_safe(string.format([[
 local timeout=%d
 local rec,vid = get_mode()
 if rec and not vid then
@@ -424,7 +416,7 @@ end
 			title='video',
 			size='45x15',
 			action=function(self)
-				gui.execquick('click("video")')
+				gui.execquick_safe('click("video")')
 			end,
 		},
 		expand="HORIZONTAL",
@@ -435,7 +427,7 @@ end
 		size='94x15',
 		action=function(self)
 			-- video seems to need a small delay after half press to reliably start recording
-			gui.execquick([[
+			gui.execquick_safe([[
 local rec,vid = get_mode()
 if rec and not vid then
 	shoot()
@@ -478,7 +470,7 @@ end
 			title='shutdown',
 			size='45x15',
 			action=function(self)
-				gui.execquick('shut_down()')
+				gui.execquick_safe('shut_down()')
 			end,
 		},
 		iup.fill{},
@@ -486,7 +478,7 @@ end
 			title='reboot',
 			size='45x15',
 			action=function(self)
-				gui.execquick('reboot()')
+				gui.execquick_safe('reboot()')
 			end,
 		},
 		expand="HORIZONTAL",
@@ -684,6 +676,7 @@ function gui.cli_readline(prompt)
 	return coroutine.yield('readline')
 end
 
+-- no erruitl.wrap here, calls are protected by cli
 function btn_exec:action()
 	printf('> %s\n',inputtext.value)
 	cmd_history:add(inputtext.value)

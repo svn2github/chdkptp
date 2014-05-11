@@ -59,4 +59,26 @@ function m.format_f(err,do_traceback)
 	end
 	return tostring(err)
 end
+--[[
+wrap in function that calls with xpcall and prints errors, or returns values
+opts:{
+	err_default: - value other than nil to return on error
+]]
+function m.wrap(f,opts)
+	opts=util.extend_table({},opts)
+	return function(...)
+		local r={xpcall(f,m.format,...)}
+		if not r[1] then
+			-- TODO might want to put in opts
+			util.errf("%s\n",tostring(r[2]))
+			if type(opts.err_default) ~= 'nil' then
+				return opts.err_default
+			end
+			return
+		end
+		if table.maxn(r) > 1 then
+			return unpack(r,2,table.maxn(r))
+		end
+	end
+end
 return m
