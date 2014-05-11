@@ -58,16 +58,10 @@ function m.exectime(opts)
 	local tstart = ustime.new()
 	for i=1,opts.count do
 		local t0 = ustime.new()
-		local status, err = con:exec(opts.code,{nodefaultlib=true})
-		if not status then
-			error('exec failed '..tostring(err))
-		end
+		con:exec(opts.code,{nodefaultlib=true})
 		table.insert(times,ustime.diff(t0)/1000000)
 		-- wait for the script to be done
-		status, err = con:wait_status{run=false}
-		if not status then
-			error('wait_status failed '..tostring(err))
-		end
+		con:wait_status{run=false}
 	end
 	local wall_time = ustime.diff(tstart)/1000000
 	local stats = m.make_stats(times)
@@ -97,12 +91,9 @@ function m.execwaittime(opts)
 	local tstart = ustime.new()
 	for i=1,opts.count do
 		local t0 = ustime.new()
-		local status, err = con:execwait(opts.code,{nodefaultlib=true,poll=50})
-		if not status then
-			error('exec failed '..tostring(err))
-		end
-		if err ~= opts.retval then
-			error('bad retval '..tostring(err) .. ' ~= '..tostring(opts.retval))
+		local r = con:execwait(opts.code,{nodefaultlib=true,poll=50})
+		if r ~= opts.retval then
+			error('bad retval '..tostring(r) .. ' ~= '..tostring(opts.retval))
 		end
 		table.insert(times,ustime.diff(t0)/1000000)
 	end
@@ -177,19 +168,17 @@ function tests.exectimes()
 end
 
 function tests.exec_errors()
-	local status,err=con:exec('sleep(500)')
-	assert(status,tostring(err))
-	status,err=con:exec('print"test"')
+	con:exec('sleep(500)')
+	local status,err=con:exec_pcall('print"test"')
 	assert((not status) and err.etype == 'execlua_scriptrun')
 	-- test killscript if compatible
 	if con:is_ver_compatible(2,6) then
-		status,err=con:execwait('print"kill"',{clobber=true})
-		assert(status,tostring(err))
+		con:execwait('print"kill"',{clobber=true})
 	else
 		-- otherwise just wait
 		sys.sleep(600)
 	end
-	status,err=con:exec('bogus(')
+	status,err=con:exec_pcall('bogus(')
 	assert((not status) and err.etype == 'execlua_compile')
 end
 function tests.not_connected()
@@ -231,6 +220,12 @@ function tests.list_connected()
 		end
 	end
 	error('current dev not found')
+end
+function tests.wait_status()
+	local status=con:wait_status{msg=true,timeout=100}
+	assert(status.timeout)
+	local pstatus,status=con:wait_status_pcall{msg=true,timeout=100,timeout_error=true}
+	assert(status.etype=='timeout')
 end
 function tests.msgfuncs()
 	-- test script not running
@@ -338,6 +333,7 @@ function m.runbatch(opts)
 		return false
 	end
 	m.run('list_connected')
+	m.run('wait_status')
 	m.run('exec_errors')
 	m.run('msgfuncs')
 	if opts.bench then

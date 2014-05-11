@@ -62,40 +62,32 @@ function mc:connect()
 end
 
 function mc:start_single(lcon)
-	local status,err = lcon:script_status()
-	if not status then
-		warnf('%s: load script failed: %s\n',lcon.mc_id,tostring(err))
-		return
-	end
+	local status = lcon:script_status()
 	-- attempt to end a running mc (otherwise script id is wrong)
+	-- TODO should use killscript if safe
 	if status.run then
 		warnf('%s: attempting to stop running script\n',lcon.mc_id)
 		lcon:write_msg('exit')
-		status,err = lcon:wait_status{
+		status = lcon:wait_status{
 			run=false,
 			timeout=250,
 		}
-		if not status then
-			warnf('%s: status check failed: %s\n',lcon.mc_id,tostring(err))
-			return
-		end
 		if status.timeout then
-			warnf('%s: failed to end running script\n',lcon.mc_id)
-			return
+			errlib.throw{etype='timeout','timed out waiting for script'}
 		end
 	end
 
-	local status,err = lcon:exec('mc.run('..util.serialize(opts)..')',{libs='multicam'})
-	if not status then
-		warnf('%s: load script failed: %s\n',lcon.mc_id,tostring(err))
-	end
+	lcon:exec('mc.run('..util.serialize(opts)..')',{libs='multicam'})
 end
 --[[
 start the script on all cameras
 ]]
 function mc:start(opts)
 	for i,lcon in ipairs(self.cams) do
-		self:start_single(lcon)
+		local status, err=xpcall(self.start_single,errutil.format,self,lcon)
+		if not status then
+			warnf('%s: failed %s\n',lcon.mc_id,err)
+		end
 	end
 end
 

@@ -107,7 +107,7 @@ local function do_dir_download_dialog(data)
 
 	if status == "0" then 
 		gui.dbgmsg("d %s->%s",remotepath,filedlg.value)
-		add_status(con:mdownload({remotepath},filedlg.value))
+		con:mdownload({remotepath},filedlg.value)
 	end
 end
 

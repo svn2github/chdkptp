@@ -69,18 +69,15 @@ function gui.parsesize(size)
 end
 
 --[[
-wrapper that prints status
+wrapper that catches and prints errors
 ]]
-function gui.exec(code,opts)
-	cli:print_status(con:exec(code,opts))
-end
+gui.exec=errutil.wrap(function(code,opts)
+	con:exec(code,opts)
+end)
 function gui.execquick(code,opts)
 	opts = util.extend_table({nodefaultlibs=true},opts)
 	gui.exec(code,opts)
 end
-gui.execquick_safe = errutil.wrap(function(code,opts)
-	gui.execquick(code,opts)
-end)
 
 function gui.update_mode_dropdown(cur)
 	gui.dbgmsg('update mode dropdown %s\n',tostring(cur))
@@ -111,7 +108,7 @@ end
 function gui.update_mode_list()
 	gui.mode_list = nil
 	gui.mode_map = nil
-	local status,modes,cur = con:execwait([[
+	local modes,cur = con:execwait([[
 capmode=require'capmode'
 local l={}
 local i=1
@@ -125,11 +122,7 @@ return l,capmode.get()
 ]])
 	-- TODO need to do something about play,
 	-- would be good to select the current mode in rec mode
-	if status then
-		gui.mode_list = modes
-	else
-		add_status(false,modes)
-	end
+	gui.mode_list = modes
 	gui.update_mode_dropdown(cur)
 end
 
@@ -253,14 +246,13 @@ end
 switch play / rec mode, update capture mode dropdown
 TODO the cli command should integrate with this
 ]]
-function switch_mode(m)
+switch_mode=errutil.wrap(function(m)
 	local capmode
 	if m == 0 then
 		gui.execquick('if get_mode() then switch_mode_usb(0) end')
 	else
-		local status
 		-- switch mode, wait for complete, return current mode
-		status,capmode=con:execwait([[
+		capmode=con:execwait([[
 if not get_mode() then
 	switch_mode_usb(1)
 end
@@ -272,12 +264,9 @@ while capmode.get() == 0 and i < 300 do
 end
 return capmode.get()
 ]])
-		if not status then
-			add_status(false,capmode)
-		end
 	end
 	gui.update_mode_dropdown(capmode)
-end
+end)
 -- creates a button
 btn_exec = iup.button{ 
 	title = "Execute",
@@ -292,7 +281,7 @@ function cam_btn(name,title)
 		title=title,
 		size='31x15', -- couldn't get normalizer to work for some reason
 		action=function(self)
-			gui.execquick_safe('click("' .. name .. '")')
+			gui.execquick('click("' .. name .. '")')
 		end,
 	}
 end
@@ -310,7 +299,7 @@ gui.mode_dropdown = iup.list{
 	VISIBLECOLUMNS="10",
 	DROPDOWN="YES",
 }
-gui.mode_dropdown.valuechanged_cb=errutil.wrap(function(self)
+function gui.mode_dropdown:valuechanged_cb()
 	gui.dbgmsg('mode_dropdown %s\n',tostring(self.value))
 	local v = tonumber(self.value)
 	-- 0 means none selected. Callback can be called with this (multiple times) when list is emptied
@@ -322,7 +311,7 @@ gui.mode_dropdown.valuechanged_cb=errutil.wrap(function(self)
 		return
 	end
 	gui.execquick(string.format('set_capture_mode(%d)',gui.mode_map[v]))
-end)
+end
 
 cam_btn_frame = iup.vbox{
 	iup.hbox{ 
@@ -347,7 +336,7 @@ cam_btn_frame = iup.vbox{
 			title='zoom+',
 			size='45x15',
 			action=function(self)
-				gui.execquick_safe('click("zoom_in")')
+				gui.execquick('click("zoom_in")')
 			end,
 		},
 		iup.fill{
@@ -356,7 +345,7 @@ cam_btn_frame = iup.vbox{
 			title='zoom-',
 			size='45x15',
 			action=function(self)
-				gui.execquick_safe('click("zoom_out")')
+				gui.execquick('click("zoom_out")')
 			end,
 		},
 		expand="HORIZONTAL",
@@ -367,7 +356,7 @@ cam_btn_frame = iup.vbox{
 			title='wheel l',
 			size='45x15',
 			action=function(self)
-				gui.execquick_safe('post_levent_to_ui("RotateJogDialLeft",1)')
+				gui.execquick('post_levent_to_ui("RotateJogDialLeft",1)')
 			end,
 		},
 		iup.fill{
@@ -376,7 +365,7 @@ cam_btn_frame = iup.vbox{
 			title='wheel r',
 			size='45x15',
 			action=function(self)
-				gui.execquick_safe('post_levent_to_ui("RotateJogDialRight",1)')
+				gui.execquick('post_levent_to_ui("RotateJogDialRight",1)')
 			end,
 		},
 		expand="HORIZONTAL",
@@ -391,7 +380,7 @@ cam_btn_frame = iup.vbox{
 			title='shoot half',
 			size='45x15',
 			action=function(self)
-				gui.execquick_safe(string.format([[
+				gui.execquick(string.format([[
 local timeout=%d
 local rec,vid = get_mode()
 if rec and not vid then
@@ -416,7 +405,7 @@ end
 			title='video',
 			size='45x15',
 			action=function(self)
-				gui.execquick_safe('click("video")')
+				gui.execquick('click("video")')
 			end,
 		},
 		expand="HORIZONTAL",
@@ -427,7 +416,7 @@ end
 		size='94x15',
 		action=function(self)
 			-- video seems to need a small delay after half press to reliably start recording
-			gui.execquick_safe([[
+			gui.execquick([[
 local rec,vid = get_mode()
 if rec and not vid then
 	shoot()
@@ -470,7 +459,7 @@ end
 			title='shutdown',
 			size='45x15',
 			action=function(self)
-				gui.execquick_safe('shut_down()')
+				gui.execquick('shut_down()')
 			end,
 		},
 		iup.fill{},
@@ -478,7 +467,7 @@ end
 			title='reboot',
 			size='45x15',
 			action=function(self)
-				gui.execquick_safe('reboot()')
+				gui.execquick('reboot()')
 			end,
 		},
 		expand="HORIZONTAL",

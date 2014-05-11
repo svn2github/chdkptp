@@ -92,7 +92,7 @@ function m.finish_test()
 end
 
 function m.load()
-	local status,err=con:exec('msg_shell:run()',{libs={'msg_shell','serialize'}})
+	con:exec('msg_shell:run()',{libs={'msg_shell','serialize'}})
 	con:write_msg([[exec
 msg_shell.read_msg_timeout = nil
 msg_shell.default_cmd=function(msg)

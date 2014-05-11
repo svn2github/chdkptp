@@ -137,10 +137,10 @@ function con_methods:is_ver_compatible(major,minor)
 end
 --[[
 return a list of remote directory contents
-dirlist[,err]=con:listdir(path,opts)
+dirlist=con:listdir(path,opts)
 path should be directory, without a trailing slash (except in the case of A/...)
 opts may be a table, or a string containing lua code for a table
-returns directory listing as table, or false,error
+returns directory listing as table, throws on local or remote error
 note may return an empty table if target is not a directory
 ]]
 function con_methods:listdir(path,opts) 
@@ -156,15 +156,12 @@ function con_methods:listdir(path,opts)
 	end
 	local results={}
 	local i=1
-	local status,rstatus,err=self:execwait("return ls('"..path.."'"..opts..")",{
+	local rstatus,err=self:execwait("return ls('"..path.."'"..opts..")",{
 		libs='ls',
 		msgs=chdku.msg_unbatcher(results),
 	})
-	if not status then
-		return false,rstatus
-	end
 	if not rstatus then
-		return false,err
+		errlib.throw{etype='remote',msg=err}
 	end
 
 	return results
@@ -212,11 +209,12 @@ end
 
 --[[
 download files and directories
-status[,err]=con:mdownload(srcpaths,dstpath,opts)
+con:mdownload(srcpaths,dstpath,opts)
 opts:
 	mtime=bool -- keep (default) or discard remote mtime NOTE files only for now
 	overwrite=bool|function -- overwrite if existing found
 other opts are passed to find_files
+throws on error
 ]]
 function con_methods:mdownload(srcpaths,dstpath,opts)
 	if not dstpath then
@@ -230,7 +228,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	ropts.overwrite=nil
 	local dstmode = lfs.attributes(dstpath,'mode')
 	if dstmode and dstmode ~= 'directory' then
-		return false,'mdownload: dest must be a directory'
+		errlib.throw{etype='badparm',msg='mdownload: dest must be a directory'}
 	end
 	local files={}
 	if lopts.dbgmem then
@@ -240,14 +238,11 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 			end
 		end
 	end
-	local status,rstatus,rerr = self:execwait('return ff_mdownload('..serialize(srcpaths)..','..serialize(ropts)..')',
+	local rstatus,rerr = self:execwait('return ff_mdownload('..serialize(srcpaths)..','..serialize(ropts)..')',
 										{libs={'ff_mdownload'},msgs=chdku.msg_unbatcher(files)})
 
-	if not status then
-		return false,rstatus
-	end
 	if not rstatus then
-		return false,rerr
+		errlib.throw{etype='remote',msg=rerr}
 	end
 
 	if #files == 0 then
@@ -271,7 +266,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	if not dstmode then
 		local status,err=fsutil.mkdir_m(dstpath)
 		if not status then
-			return false,err
+			errlib.throw{etype='remote',msg=err}
 		end
 	end
 
@@ -292,14 +287,14 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 		if finfo.st.is_dir then
 			local status,err = mkdir(dst)
 			if not status then
-				return false,err
+				errlib.throw{etype='remote',msg=err}
 			end
 		else
 			local dst_dir = fsutil.dirname(dst)
 			if dst_dir ~= '.' then
 				local status,err = mkdir(dst_dir)
 				if not status then
-					return false,err
+					errlib.throw{etype='remote',msg=err}
 				end
 			end
 			-- TODO this should be optional
@@ -307,7 +302,6 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 			download(self,finfo,lopts,src,dst)
 		end
 	end
-	return true
 end
 
 --[[
@@ -431,7 +425,7 @@ end
 --[[
 wrapper for remote functions, serialize args, combine remote and local error status 
 func must be a string that evaluates to a function on the camera
-returns remote function return values on success, false + message on failure
+returns remote function return values on success, throws on error
 ]]
 function con_methods:call_remote(func,opts,...)
 	local args = {...}
@@ -444,13 +438,7 @@ function con_methods:call_remote(func,opts,...)
 	local code = "return "..func.."("..table.concat(argstrs,',')..")"
 --	printf("%s\n",code)
 	local results = {self:execwait(code,opts)}
-	-- if local status is good, return remote
-	if results[1] then
-		-- start at 2 to discard local status
-		return unpack(results,2,table.maxn(results)) -- maxn expression preserves nils
-	end
-	-- else return local error
-	return false,results[2]
+	return unpack(results,1,table.maxn(results)) -- maxn expression preserves nils
 end
 
 function con_methods:stat(path)
@@ -593,11 +581,11 @@ function chdku.msg_unbatcher(t)
 	local i=1
 	return function(msg)
 		if msg.subtype ~= 'table' then
-			return false, 'unexpected message value'
+			return errlib.throw{etype='wrongmsg_sub',msg='wrong message subtype: ' ..tostring(msg.subtype)}
 		end
 		local chunk,err=unserialize(msg.value)
 		if err then
-			return false, err
+			return errlib.throw{etype='unserialize',msg=tostring(err)}
 		end
 		for j,v in ipairs(chunk) do
 			t[i]=v
@@ -611,7 +599,7 @@ function chdku.msg_unbatcher(t)
 end
 --[[ 
 wrapper for chdk.execlua, using optional code from rlibs
-status[,err]=con:exec("code",opts)
+[remote results]=con:exec("code",opts)
 opts {
 	libs={"rlib name1","rlib name2"...} -- rlib code to be prepended to "code"
 	wait=bool -- wait for script to complete, return values will be returned after status if true
@@ -630,8 +618,15 @@ opts {
 	pollstart={ms|false} -- passed to wait_status, initial poll interval, ramps up to poll
 }
 callbacks
-	status[,err] = f(message,fdata)
-	processing continues if status is true, otherwise aborts and returns err
+	f(message,fdata)
+	callbacks should throw an error to abort processing
+	return value is ignored
+
+returns
+	if wait is set and rets is not, returns values returned by remote code
+	otherwise returns nothing
+
+throws on error
 ]]
 -- use serialize by default
 chdku.default_libs={
@@ -708,25 +703,24 @@ function con_methods:exec(code,opts_in)
 		if err.etype == 'execlua_compile' then
 			local msg = self:get_error_msg()
 			if msg then
+				-- add full details to message
+				-- TODO could just add to a new field and let caller deal with it
+				-- but would need lib code
 				err.msg = format_exec_error(libs,code,msg)
-				return false,err
 			end
-		elseif err.etype == 'execlua_scriptrun' then
-			return false,err
 		end
 		--  other unspecified error, or fetching syntax/compile error message failed
-		return false,err
+		error(err)
 	end
 
 	-- if not waiting, we're done
 	if not opts.wait then
-		return true
+		return
 	end
 
 	-- to collect return values
-	-- first result is our status
-	local results={true}
-	local i=2
+	local results={}
+	local i=1
 
 	-- process messages and wait for script to end
 	while true do
@@ -743,10 +737,7 @@ function con_methods:exec(code,opts_in)
 				util.warnf("chdku.exec: message from unexpected script %d %s\n",msg.script_id,chdku.format_script_msg(msg))
 			elseif msg.type == 'user' then
 				if type(opts.msgs) == 'function' then
-					local status,err = opts.msgs(msg,opts.fdata)
-					if not status then
-						return false,err
-					end
+					opts.msgs(msg,opts.fdata)
 				elseif type(opts.msgs) == 'table' then
 					table.insert(opts.msgs,msg)
 				else
@@ -754,10 +745,7 @@ function con_methods:exec(code,opts_in)
 				end
 			elseif msg.type == 'return' then
 				if type(opts.rets) == 'function' then
-					local status,err = opts.rets(msg,opts.fdata)
-					if not status then
-						return false,err
-					end
+					opts.rets(msg,opts.fdata)
 				elseif type(opts.rets) == 'table' then
 					table.insert(opts.rets,msg)
 				else
@@ -770,15 +758,15 @@ function con_methods:exec(code,opts_in)
 					i=i+1
 				end
 			elseif msg.type == 'error' then
-				return false, format_exec_error(libs,code,msg)
+				errlib.throw{etype='exec_runtime',msg=format_exec_error(libs,code,msg)}
 			else
-				return false, 'unexpected message type'
+				errlib.throw({etype='wrongmsg',msg='unexpected msg type: '..tostring(msg.type)})
 			end
 		-- script is completed and all messages have been processed
 		elseif status.run == false then
 			-- returns were handled by callback or table
 			if opts.rets then
-				return true
+				return
 			else
 				return unpack(results,1,table.maxn(results)) -- maxn expression preserves nils
 			end
@@ -808,7 +796,7 @@ function con_methods:read_msg_strict(opts)
 		if msg.type == 'error' then
 			errlib.throw({etype='wrongmsg_error',msg='unexpected error: '..msg.value})
 		end
-		errlib.throw({etype='wrongmsg',msg='unexpected msg type: '..msg.value})
+		errlib.throw({etype='wrongmsg',msg='unexpected msg type: '..tostring(msg.type)})
 	end
 	if opts.msubtype and msg.subtype ~= opts.msubtype then
 		errlib.throw({etype='wrongmsg_sub',msg='wrong message subtype: ' ..msg.subtype})
@@ -1106,7 +1094,7 @@ handler_data:
 	store_return() -- a function that can be used to store values for the return value of capture_get_data
 rets
 	true or array of store_return[bitnum][value] values on success
-	throw on error
+	throws on error
 ]]
 function con_methods:capture_get_data(opts)
 	opts=util.extend_table({
@@ -1182,14 +1170,14 @@ function con_methods:capture_get_data(opts)
 			done = true
 		end
 	end
-	if #rets then
+	if #rets > 0 then
 		return rets
 	end
 	return true
 end
 --[[
-sleep until specified status is met
-status,errmsg=con:wait_status(opts)
+sleep until specified status is matched
+status=con:wait_status(opts)
 opts:
 {
 	-- msg/run bool values cause the function to return when the status matches the given value
@@ -1198,6 +1186,7 @@ opts:
 	run=bool
 	rsdata=bool -- if true, return when remote capture data available, data in status.rsdata
 	timeout=<number> -- timeout in ms
+	timeout_error=bool -- if true, an error is thrown on timeout instead of returning it in status
 	poll=<number> -- polling interval in ms
 	pollstart=<number> -- if not false, start polling at pollstart, double interval each iteration until poll is reached
 	initwait=<number> -- wait N ms before first poll. If this is long enough for call to finish, saves round trip
@@ -1274,6 +1263,9 @@ function con_methods:wait_status(opts)
 			chdku.sleep(sleeptime)
 			timeleft = timeleft - sleeptime
 		else
+			if opts.timeout_error then
+				errlib.throw{etype='timeout',msg='timed out'}
+			end
 			status.timeout=true
 			return status
 		end
@@ -1602,16 +1594,19 @@ init_connection_methods()
 
 -- methods with pcall wrappers
 -- generally stuff you would expect to want to examine the error rather than just throwing
--- TODO not sure if I want this yet
---[[
+-- or for direct use with cli:print_status
 local con_pcall_methods={
 	'connect',
 	'exec',
 	'execwait',
 	'wait_status',
+	'capture_get_data',
 }
 local function init_pcall_wrappers()
 	for i,name in ipairs(con_pcall_methods) do
+		if type(con_methods[name]) ~= 'function' then
+			error('tried to wrap non-function '..tostring(name))
+		end
 		-- pcall variants for things that want to catch errors
 		con_methods[name..'_pcall'] = function(self,...)
 			return pcall(con_methods[name],self,...)
@@ -1619,7 +1614,6 @@ local function init_pcall_wrappers()
 	end
 end
 init_pcall_wrappers()
-]]
 
 -- host api version
 chdku.apiver = chdk.host_api_version()

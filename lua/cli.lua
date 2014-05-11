@@ -646,7 +646,7 @@ cli:add_commands{
  Return values or error messages can be retrieved with getm after the script is completed.
 ]],
 		func=function(self,args) 
-			return con:exec(args)
+			con:exec(args)
 		end,
 	},
 	{
@@ -684,10 +684,7 @@ cli:add_commands{
 		func=function(self,args) 
 			local rets={}
 			local msgs={}
-			local status,err = con:execwait(args,{rets=rets,msgs=msgs})
-			if not status then
-				return false,err
-			end
+			con:execwait(args,{rets=rets,msgs=msgs})
 			local r=''
 			for i=1,#msgs do
 				r=r .. chdku.format_script_msg(msgs[i]) .. '\n'
@@ -721,18 +718,12 @@ cli:add_commands{
 			-- execute an empty script with kill options set
 			-- wait ensures it will be all done
 			local flushmsgs = not args.noflush;
-			local status,err = con:exec("",{
+			con:exec("",{
 					flush_cam_msgs=flushmsgs,
 					flush_host_msgs=flushmsgs,
 					clobber=true})
-			if not status then
-				return false, err
-			end
 			-- use standalone wait_status because we don't want execwait message handling
-			status, err = con:wait_status{run=false}
-			if not status then
-				return false, err
-			end
+			con:wait_status{run=false}
 			return true
 		end,
 	},
@@ -990,7 +981,8 @@ cli:add_commands{
 			else
 				return false,'unrecognized overwrite option '..tostring(args.overwrite)
 			end
-			return con:mdownload(srcs,dst,opts)
+			con:mdownload(srcs,dst,opts)
+			return true
 		end,
 	},
 	{
@@ -1376,10 +1368,7 @@ cli:add_commands{
 			end
 			-- sleep and disconnect to avoid later connection problems on some cameras
 			-- clobber because we don't care about memory leaks
-			local status,err=con:exec('sleep(1000);reboot('..bootfile..')',{clobber=true})
-			if not status then
-				return false,err
-			end
+			con:exec('sleep(1000);reboot('..bootfile..')',{clobber=true})
 			if args.norecon then
 				return true
 			end
@@ -1667,14 +1656,12 @@ cli:add_commands{
 				return true,cmd
 			end
 			if args.nowait then
-				return con:exec(cmd,{libs={'rlib_shoot'}})
+				con:exec(cmd,{libs={'rlib_shoot'}})
+				return
 			end
 
-			local status,rstatus,rerr = con:execwait('return '..cmd,{libs={'serialize_msgs','rlib_shoot'}})
+			local rstatus,rerr = con:execwait('return '..cmd,{libs={'serialize_msgs','rlib_shoot'}})
 
-			if not status then
-				return false,rstatus
-			end
 			if not rstatus then
 				return false, rerr
 			end
@@ -1851,21 +1838,14 @@ cli:add_commands{
 			end
 			local opts_s = serialize(opts)
 			cli.dbgmsg('rs_init\n')
-			local status,rstatus,rerr = con:execwait('return rs_init('..opts_s..')',{libs={'rs_shoot_init'}})
-			if not status then
-				return false,rstatus
-			end
+			local rstatus,rerr = con:execwait('return rs_init('..opts_s..')',{libs={'rs_shoot_init'}})
 			if not rstatus then
 				return false,rerr
 			end
 
 			cli.dbgmsg('rs_shoot\n')
 			-- TODO script errors will not get picked up here
-			local status,err = con:exec('rs_shoot('..opts_s..')',{libs={'rs_shoot'}})
-			-- rs_shoot should not initialize remotecap if there's an error, so no need to uninit
-			if not status then
-				return false,err
-			end
+			con:exec('rs_shoot('..opts_s..')',{libs={'rs_shoot'}})
 
 			local rcopts={}
 			if args.jpg then
@@ -1902,7 +1882,7 @@ cli:add_commands{
 			local shot = 1
 			repeat 
 				cli.dbgmsg('get data %d\n',shot)
-				status,err = con:capture_get_data(rcopts)
+				status,err = con:capture_get_data_pcall(rcopts)
 				if not status then
 					warnf('capture_get_data error %s\n',tostring(err))
 					break
@@ -1916,18 +1896,18 @@ cli:add_commands{
 
 			local t0=ustime.new()
 			-- wait for shot script to end or timeout
-			local wstatus,werr=con:wait_status{
+			local wpstatus,wstatus=con:wait_status_pcall{
 				run=false,
 				timeout=30000,
 			}
-			if not wstatus then
+			if not wpstatus then
 				warnf('error waiting for shot script %s\n',tostring(werr))
 			elseif wstatus.timeout then
 				warnf('timed out waiting for shot script\n')
 			end
 			cli.dbgmsg("script wait time %.4f\n",ustime.diff(t0)/1000000)
 
-			local ustatus, uerr = con:execwait('init_usb_capture(0)') -- try to uninit
+			local ustatus, uerr = con:execwait_pcall('init_usb_capture(0)') -- try to uninit
 			-- if uninit failed, combine with previous status
 			if not ustatus then
 				uerr = 'uninit '..tostring(uerr)
@@ -1938,7 +1918,10 @@ cli:add_commands{
 					err = uerr
 				end
 			end
-			return status, err
+			if not status then
+				return false,err
+			end
+			return true
 		end,
 	},
 	{
@@ -1992,7 +1975,7 @@ cli:add_commands{
 		names={'rec'},
 		help='switch camera to shooting mode',
 		func=function(self,args) 
-			local status,rstatus,rerr = con:execwait([[
+			local rstatus,rerr = con:execwait([[
 if not get_mode() then
 	switch_mode_usb(1)
 	local i=0
@@ -2008,9 +1991,6 @@ end
 return false,'already in rec'
 ]])
 			cli:mode_change()
-			if not status then
-				return false,rstatus
-			end
 			return rstatus,rerr
 		end,
 	},
@@ -2018,7 +1998,7 @@ return false,'already in rec'
 		names={'play'},
 		help='switch camera to playback mode',
 		func=function(self,args) 
-			local status,rstatus,rerr = con:execwait([[
+			local rstatus,rerr = con:execwait([[
 if get_mode() then
 	switch_mode_usb(0)
 	local i=0
@@ -2034,9 +2014,6 @@ end
 return false,'already in play'
 ]])
 			cli:mode_change()
-			if not status then
-				return false,rstatus
-			end
 			return rstatus,rerr
 		end,
 	},

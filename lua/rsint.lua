@@ -112,11 +112,8 @@ m.rsint_once = function(args,opts,rcopts)
 		-- TODO could check if remotecap has timed out here
 		con:write_msg(cmd..' '..rest)
 		if cmd == 's' or cmd == 'l' then
-			-- TODO not all converted to throw
-			status,err = con:capture_get_data(rcopts)
-			if not status then
-				warnf('capture_get_data error %s\n',tostring(err))
-			end
+			-- throws on error
+			con:capture_get_data(rcopts)
 			if cmd == 'l' then
 				return true
 			end
@@ -186,24 +183,18 @@ m.cli_cmd_func = function(self,args)
 
 	local opts_s = serialize(opts)
 	cli.dbgmsg('rs_init\n')
-	local status,rstatus,rerr = con:execwait('return rsint_init('..opts_s..')',{libs={'rsint'}})
-	if not status then
-		return false,rstatus
-	end
+	local rstatus,rerr = con:execwait('return rsint_init('..opts_s..')',{libs={'rsint'}})
 	if not rstatus then
 		return false,rerr
 	end
 
-	local status,err = con:exec('return rsint_run('..opts_s..')',{libs={'rsint'}})
-	-- rs_shoot should not initialize remotecap if there's an error, so no need to uninit
-	if not status then
-		return false,err
-	end
+	-- throws on error, rs_shoot should not initialize remotecap if there's an error, so no need to uninit
+	con:exec('return rsint_run('..opts_s..')',{libs={'rsint'}})
 
 	local status
 	repeat
 		local r
-		status,r = pcall(m.rsint_once,args,opts,rcopts)
+		status,r = xpcall(m.rsint_once,errutil.format,args,opts,rcopts)
 		if not status then
 			warnf("%s",tostring(r))
 		end
@@ -211,10 +202,10 @@ m.cli_cmd_func = function(self,args)
 
 	local t0=ustime.new()
 	-- wait for shot script to end or timeout
-	local pstatus,wstatus=pcall(con.wait_status,con,{
+	local pstatus,wstatus=con:wait_status_pcall{
 		run=false,
 		timeout=30000,
-	})
+	}
 	if not pstatus then
 		warnf('error waiting for shot script %s\n',tostring(wstatus))
 	elseif wstatus.timeout then
@@ -224,7 +215,7 @@ m.cli_cmd_func = function(self,args)
 	-- TODO check messages
 
 	-- TODO remote script should try to uninit when done
-	local ustatus, uerr = con:execwait('init_usb_capture(0)') -- try to uninit
+	local ustatus, uerr = con:execwait_pcall('init_usb_capture(0)') -- try to uninit
 	-- if uninit failed, combine with previous status
 	if not ustatus then
 		uerr = 'uninit '..tostring(uerr)

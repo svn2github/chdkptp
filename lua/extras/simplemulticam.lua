@@ -104,7 +104,7 @@ do con:exec on all connections
 --]]
 function m.exec(code,opts)
 	for i,lcon in ipairs(m.cams) do
-		status,err = lcon:exec(code,opts)
+		local status,err = lcon:exec_pcall(code,opts)
 		if not status then
 			error(string.format('exec cam %d failed %s',i,tostring(err)))
 		end
