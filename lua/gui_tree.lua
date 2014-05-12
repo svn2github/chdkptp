@@ -58,6 +58,12 @@ local filetreedata_getfullpath = function(self)
 	return self.path .. '/' .. self.name
 end
 
+local function get_all_files_filter()
+	if sys.ostype() == 'Windows' then
+		return "*.*"
+	end
+	return "*"
+end
 function itree:set_data(id,data)
 	data.fullpath = filetreedata_getfullpath
 	iup.TreeSetUserId(self,id,data)
@@ -68,7 +74,7 @@ local function do_download_dialog(data)
 	local filedlg = iup.filedlg{
 		dialogtype = "SAVE",
 		title = "Download "..remotepath, 
-		filter = "*.*", 
+		filter = get_all_files_filter(), 
 		filterinfo = "all files",
 		file = fsutil.basename(remotepath)
 	} 
@@ -136,7 +142,7 @@ local function do_upload_dialog(remotepath)
 	local filedlg = iup.filedlg{
 		dialogtype = "OPEN",
 		title = "Upload to: "..remotepath, 
-		filter = "*.*", 
+		filter = get_all_files_filter(), 
 		filterinfo = "all files",
 		multiplefiles = "yes",
 	} 
