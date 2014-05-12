@@ -1083,10 +1083,7 @@ cli:add_commands{
 				skip_topdirs=args.skip_topdirs,
 			}
 			-- TODO use msg_handler to print as they are deleted instead of all at the end
-			local results,err = con:mdelete(tgts,opts)
-			if not results then
-				return false,err
-			end
+			local results = con:mdelete(tgts,opts)
 			for i,v in ipairs(results) do
 				-- TODO success should not be displayed at low verbosity
 				printf("%s: ",v.file)
@@ -1314,32 +1311,29 @@ cli:add_commands{
 				listopts = { stat='/' }
 			end
 			listopts.dirsonly=false
-			local list,msg = con:listdir(path,listopts)
-			if type(list) == 'table' then
-				local r = ''
-				if args.l then
-					-- alphabetic sort TODO sorting/grouping options
-					chdku.sortdir_stat(list)
-					for i,st in ipairs(list) do
-						local name = st.name
-						local size = st.size
-						if st.is_dir then
-							name = name..'/'
-							size = '<dir>'
-						else
-						end
-						r = r .. string.format("%s %10s %s\n",os.date('%c',chdku.ts_cam2pc(st.mtime)),tostring(size),name)
+			local list = con:listdir(path,listopts)
+			local r = ''
+			if args.l then
+				-- alphabetic sort TODO sorting/grouping options
+				chdku.sortdir_stat(list)
+				for i,st in ipairs(list) do
+					local name = st.name
+					local size = st.size
+					if st.is_dir then
+						name = name..'/'
+						size = '<dir>'
+					else
 					end
-				else
-					table.sort(list)
-					for i,name in ipairs(list) do
-						r = r .. name .. '\n'
-					end
+					r = r .. string.format("%s %10s %s\n",os.date('%c',chdku.ts_cam2pc(st.mtime)),tostring(size),name)
 				end
-
-				return true,r
+			else
+				table.sort(list)
+				for i,name in ipairs(list) do
+					r = r .. name .. '\n'
+				end
 			end
-			return false,msg
+
+			return true,r
 		end,
 	},
 	{

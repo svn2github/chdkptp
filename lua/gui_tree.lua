@@ -201,7 +201,7 @@ local function do_delete_dialog(data)
 		msg = 'delete ' .. fullpath .. ' ?'
 	end
 	if iup.Alarm('Confirm delete',msg,'OK','Cancel') == 1 then
-		add_status(con:mdelete({fullpath}))
+		con:mdelete({fullpath})
 		itree:refresh_tree_by_path(fsutil.dirname_cam(fullpath))
 	end
 end

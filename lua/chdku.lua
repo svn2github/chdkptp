@@ -404,12 +404,11 @@ function con_methods:mdelete(paths,opts)
 	local status,err = self:call_remote('ff_mdelete',{libs={'ff_mdelete'},msgs=msg_handler},paths,opts)
 
 	if not status then
-		return false,err
+		errlib.throw{etype='remote',msg=tostring(err)}
 	end
 	if results then
 		return results
 	end
-	return true
 end
 
 --[[
