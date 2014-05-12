@@ -113,7 +113,7 @@ void *_GdipFontFamilyCachedGenericSerif;
 
 /* CHDK additions */
 #define CHDKPTP_VERSION_MAJOR 0
-#define CHDKPTP_VERSION_MINOR 4
+#define CHDKPTP_VERSION_MINOR 5
 
 /* lua registry indexes */
 /* meta table for connection objects */
@@ -1075,12 +1075,16 @@ static int push_api_error_ptp(lua_State *L,uint16_t code) {
 	return 1;
 }
 
-static int push_api_error_misc(lua_State *L,const char* etype,const char *msg) {
+static int push_api_error_misc(lua_State *L,const char* etype,const char *msg,int critical) {
 	push_api_error(L);
 	api_error_traceback(L,1);
 	if(msg) {
 		lua_pushstring(L,msg);
 		lua_setfield(L, -2,"msg");
+	}
+	if(critical) {
+		lua_pushboolean(L,1);
+		lua_setfield(L, -2,"critical");
 	}
 	lua_pushstring(L,etype);
 	lua_setfield(L, -2,"etype");
@@ -1136,7 +1140,7 @@ static int api_check_ptp_throw(lua_State *L,uint16_t code) {
 
 /*
 static void api_set_error(lua_State *L,const char *etype, const char *msg) {
-	push_api_error_misc(L,etype,msg);
+	push_api_error_misc(L,etype,msg,0);
 }
 */
 
@@ -1144,7 +1148,15 @@ static void api_set_error(lua_State *L,const char *etype, const char *msg) {
 doesn't actually return, type int to match lua_error() pattern
 */
 static int api_throw_error(lua_State *L,const char *etype, const char *msg) {
-	push_api_error_misc(L,etype,msg);
+	push_api_error_misc(L,etype,msg,0);
+	return lua_error(L);
+}
+
+/*
+throw "critical" error - for internal errors, bad args etc, triggers stack trace by default
+*/
+static int api_throw_error_critical(lua_State *L,const char *etype, const char *msg) {
+	push_api_error_misc(L,etype,msg,1);
 	return lua_error(L);
 }
 
@@ -1399,7 +1411,7 @@ static int chdk_execlua(lua_State *L) {
 		} else if(status == PTP_CHDK_S_ERR_SCRIPTRUNNING) {
 			return api_throw_error(L,"execlua_scriptrun","a script is already running");
 		} else {
-			return api_throw_error(L,"unknown","unknown error");
+			return api_throw_error_critical(L,"unknown","unknown error");
 		}
 	}
 }
@@ -1595,7 +1607,7 @@ static int chdk_call_function(lua_State *L) {
 	memset(args,0,sizeof(args));
 	int size = lua_gettop(L)-1; // args excluding self
 	if(size > 10 || size < 1) {
-		return api_throw_error(L,"bad_arg","invalid number of arguments");
+		return api_throw_error_critical(L,"bad_arg","invalid number of arguments");
 	}
 	int i;
 	for(i=2;i<=size+1;i++) {
@@ -1650,10 +1662,10 @@ static int chdk_get_live_data(lua_State *L) {
 	api_check_ptp_throw(L,ptp_chdk_get_live_data(params,flags,&data,&data_size));
 
 	if(!data) {
-		return api_throw_error(L,"internal_error","no data");
+		return api_throw_error_critical(L,"internal_error","no data");
 	}
 	if(!data_size) {
-		return api_throw_error(L,"internal_error","zero data size");
+		return api_throw_error_critical(L,"internal_error","zero data size");
 	}
 	if(buf) {
 		if(buf->flags & LBUF_FL_FREE) {
@@ -1773,7 +1785,7 @@ static int chdk_write_msg(lua_State *L) {
 
 	str = lua_tolstring(L,2,&len);
 	if(!str || !len) {
-		return api_throw_error(L,"bad_arg","invalid data");
+		return api_throw_error_critical(L,"bad_arg","invalid data");
 	}
 
 	api_check_ptp_throw(L,ptp_chdk_write_script_msg(params,(char *)str,len,target_script_id,&status));
@@ -1788,7 +1800,7 @@ static int chdk_write_msg(lua_State *L) {
 		case PTP_CHDK_S_MSGSTATUS_BADID:
 			return api_throw_error(L,"msg_badid","bad script id");
 	}
-	return api_throw_error(L,"internal_error","unexpected status code");
+	return api_throw_error_critical(L,"internal_error","unexpected status code");
 }
 
 /*
