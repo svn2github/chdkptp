@@ -234,7 +234,7 @@ function itree:refresh_tree_by_id(id)
 	end
 	local oldstate=self['state'..id]
 	local data=self:get_data(id)
-	gui.dbgmsg('old state %s\n', oldstate)
+	gui.dbgmsg('old state %s\n', tostring(oldstate))
 	self:populate_branch(id,data:fullpath())
 	if oldstate and oldstate ~= self['state'..id] then
 		self['state'..id]=oldstate
