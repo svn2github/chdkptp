@@ -389,6 +389,50 @@ t.bit_util = function()
 	assert(util.bit_packstr(b)=='hello world1')
 end
 
+t.errutil = function()
+	local last_err_str
+	local last_err
+	local f=errutil.wrap(function(a,...)
+		if a=='error' then 
+			error('errortext')
+		end
+		if a=='throw' then
+			errlib.throw({etype='test',msg='test msg'})
+		end
+		if a=='critical' then
+			errlib.throw({etype='testcrit',msg='test msg',critical=true})
+		end
+		return ... 
+	end,
+	{
+		output=function(err_str)
+			last_err_str=err_str
+		end,
+		handler=function(err)
+			last_err=err
+			return errutil.format(err)
+		end,
+	})
+	local t={f('ok',1,'two')}
+	assert(util.compare_values(t,{1,'two'}))
+	t={f()}
+	assert(#t==0)
+	local t={f('ok',1,nil,3)}
+	assert(util.compare_values(t,{[1]=1,[3]=3}))
+	local t={f('error',1,2,3)}
+	assert(#t==0)
+	assert(string.sub(last_err,-9) == 'errortext')
+	assert(string.find(last_err_str,'stack traceback:'))
+	local t={f('throw',1,2,3)}
+	assert(#t==0)
+	assert(last_err.etype == 'test')
+	assert(not string.find(last_err_str,'stack traceback:'))
+	local t={f('critical')}
+	assert(#t==0)
+	assert(last_err.etype == 'testcrit')
+	assert(string.find(last_err_str,'stack traceback:'))
+end
+
 function m:run(name)
 	-- TODO side affects galore
 	printf('%s:start\n',name)
@@ -396,15 +440,25 @@ function m:run(name)
 	printf('%s:',name)
 	if status then
 		printf('ok\n')
+		return true
 	else
 		printf('failed %s\n',msg)
+		return false
 	end
 end
 
 function m:runall()
+	local passed=0
+	local failed=0
 	for k,v in pairs(t) do
-		self:run(k)
+		if self:run(k) then
+			passed=passed+1
+		else
+			failed=failed+1
+		end
 	end
+	printf("passed %d\nfailed %d\n",passed,failed)
+	return (failed == 0)
 end
 
 return m

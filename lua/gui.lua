@@ -37,7 +37,7 @@ gui.cam_dropdown = iup.list{
 }
 
 gui.cam_dropdown.valuechanged_cb=errutil.wrap(function(self)
-	v=tonumber(self.value)
+	local v=tonumber(self.value)
 	-- 0 means none selected. Callback can be called with this (multiple times) when list is emptied
 	if v == 0 then
 		return
@@ -737,7 +737,7 @@ function gui:run()
 	s,gui.cli_thread_status = coroutine.resume(gui.cli_thread)
 
 	-- TODO in lua 5.1, can't use xpcall because rsint needs to yield in readline
-	if util.lua_ver_minor < 2 and cli.names.rsint then
+	if util.is_lua_ver(5,1) and cli.names.rsint then
 		cli.names.rsint.noxpcall=true
 	end
 	gui.sched.init_timer(20)

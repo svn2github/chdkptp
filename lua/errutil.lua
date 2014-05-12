@@ -62,22 +62,51 @@ end
 --[[
 wrap in function that calls with xpcall and prints errors, or returns values
 opts:{
-	err_default: - value other than nil to return on error
+	err_default:value - value other than nil to return on error
+	output:function - receives formatted error messages, default util.errf("%s\n",err)
+	handler:function - handles/formats error, default m.format
 ]]
+function m.default_err_output(err)
+	util.errf('%s\n',tostring(err))
+end
 function m.wrap(f,opts)
-	opts=util.extend_table({},opts)
-	return function(...)
-		local r={xpcall(f,m.format,...)}
-		if not r[1] then
-			-- TODO might want to put in opts
-			util.errf("%s\n",tostring(r[2]))
-			if type(opts.err_default) ~= 'nil' then
-				return opts.err_default
+	opts=util.extend_table({
+		output=m.default_err_output,
+		handler=m.format,
+	},opts)
+-- in 5.1, xpcall can't pass args
+	if util.is_lua_ver(5,1) then
+		return function(...)
+			local args = {...}
+			local r={xpcall(function() return f(unpack(args,1,table.maxn(args))) end,opts.handler)}
+			if not r[1] then
+				if opts.output then
+					opts.output(tostring(r[2]))
+				end
+				if type(opts.err_default) ~= 'nil' then
+					return opts.err_default
+				end
+				return
 			end
-			return
+			if table.maxn(r) > 1 then
+				return unpack(r,2,table.maxn(r))
+			end
 		end
-		if table.maxn(r) > 1 then
-			return unpack(r,2,table.maxn(r))
+	else
+		return function(...)
+			local r={xpcall(f,opts.handler,...)}
+			if not r[1] then
+				if opts.output then
+					opts.output(tostring(r[2]))
+				end
+				if type(opts.err_default) ~= 'nil' then
+					return opts.err_default
+				end
+				return
+			end
+			if table.maxn(r) > 1 then
+				return unpack(r,2,table.maxn(r))
+			end
 		end
 	end
 end

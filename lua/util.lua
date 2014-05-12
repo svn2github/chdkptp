@@ -38,6 +38,10 @@ end
 
 util.lua_ver_major,util.lua_ver_minor = util.lua_version()
 
+function util.is_lua_ver(major,minor)
+	return (major == util.lua_ver_major and minor == util.lua_ver_minor)
+end
+
 function util.fprintf(f,...)
 	local args={...}
 	if #args == 0 or type(args[1]) ~= 'string' then
