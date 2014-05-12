@@ -2,8 +2,8 @@
 # these can be set on the command line or config.mk
 
 # use Lua 5.2 
-# experimental, sets correct suffix for IUP and CD libs
-#USE_LUA_52=1
+# Lua 5.1 is no longer supported by chdkptp, but it might work
+USE_LUA_52=1
 
 # should IUP gui be built ?
 IUP_SUPPORT=0
@@ -27,8 +27,8 @@ READLINE_SUPPORT=1
 
 # for distro provided Lua, you probably want something like this
 # exact paths may vary depending on distro and Lua version
-LUA_INCLUDE_DIR=/usr/include/lua5.1
-LUA_LIB=lua5.1
+LUA_INCLUDE_DIR=/usr/include/lua5.2
+LUA_LIB=lua5.2
 
 # for self built lua, use something like
 #LUA_INCLUDE_DIR=/path/to/installed/lua/include

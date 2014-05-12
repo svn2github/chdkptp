@@ -424,6 +424,7 @@ cli_time=false       - boolean: show cli execution times
 cli_xferstats=false  - boolean: show cli data transfer stats
 cli_verbose=1        - number: control verbosity of cli
 cli_source_max=10    - number: max nested source calls
+warn_deprecated=true - boolean: warn on deprecated libraries
 core_verbose=0       - number: ptp core verbosity
 err_trace=critical   - string: stack trace on error, values: 'always', 'critical', 'never'
 

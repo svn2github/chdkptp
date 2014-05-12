@@ -38,8 +38,8 @@ chdkptp includes software from several other projects, see THANKS.TXT for detail
   Optional, edit config.mk to build without IUP GUI support
 - CD Version 5.7 http://www.tecgraf.puc-rio.br/cd/ (earlier 5.x versions may also work)
   Optional, used for remote display
-- Lua version 5.1 http://www.lua.org/
-  There is also experimental support for Lua 5.2
+- Lua version 5.2 http://www.lua.org/
+  chdkptp no longer supports Lua 5.1, although it may work
 - LibUSB (libusb-win32 on windows)
 - GNU readline
   Optional, recommended on Linux
@@ -67,7 +67,7 @@ The examples and win32 binaries are not required, but may be helpful
 Similar to IUP, from http://sourceforge.net/projects/canvasdraw/files/
 
 ==Installing and building Lua==
-Get the lua 5.1.x source from http://www.lua.org/download.html
+Get the lua 5.2.x source from http://www.lua.org/download.html
 In a msys shell, go to the lua directory and type
 make mingw
 make local
@@ -98,8 +98,8 @@ libusb-dev (may be called libusb-1.0-dev ?)
 
 Lua
 Packages will be called something like
-liblua5.1-0-dev
-liblua5.1-0
+liblua5.2-dev
+liblua5.2
 
 Alternately, you may download and build your own. This is suggested
 if you are building IUP and CD from source.
@@ -132,6 +132,11 @@ See README-OSX.TXT
 =Building=
 make
 
+On windows, link occasionally fails with something like
+ /mingw/bin/../lib/gcc/mingw32/4.8.1/../../../../mingw32/bin/ld.exe: reopening chdkptp.exe: Permission denied
+
+Rebuilding seems to work around the problem
+
 =Testing your build=
 To test some internal functions use
 chdkptp -e"exec require'tests':runall()"
@@ -151,6 +156,9 @@ in the current working directory. If you already have a directory of this name,
 it will be deleted when the test completes.
 
 Camtests will also create and delete some files and directories on the camera.
+
+The final line of output from both test modules should be 
+failed 0
 
 For for vesions prior to r562, camtests shoud be invoked with
 chdkptp -e"exec require'camtests'.runstd()"

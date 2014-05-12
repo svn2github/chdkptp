@@ -55,8 +55,8 @@ http://www.tecgraf.puc-rio.br/iup/en/building.html
 but several additional workarounds are required. The build was done
 without using the distro provided Lua packages, and without using tecmake.
 
-Both Lua 5.1 and Lua 5.2 are used, to simplify building the other libraries,
-and to provide the ability to build chdkptp with Lua 5.2
+Both Lua 5.1 and Lua 5.2 are used, to simplify building the other libraries.
+It is strongly recommended that you build chdkptp with Lua 5.2
 
 The following packages should be installed
 libreadline-dev

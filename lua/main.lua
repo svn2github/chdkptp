@@ -196,11 +196,23 @@ function do_execute_option()
 	end
 end
 
+local function check_versions()
+	if prefs.warn_deprecated and util.is_lua_ver(5,1) then
+		util.warnf("Lua 5.1 is deprecated\n")
+	end
+	local v=chdk.program_version()
+	if v.MAJOR ~= 0 or v.MINOR ~= 5 then
+		error("incompatible chdkptp binary version")
+	end
+	-- TODO could check IUP and CD, but need to be initialized
+end
+
 function do_gui_startup()
 	printf('starting gui...\n')
 	if guisys.init() then
 		gui=require('gui')
 		do_rc_file('.chdkptpguirc')
+		check_versions()
 		return gui:run()
 	else
 		printf('gui not supported')
@@ -210,12 +222,14 @@ end
 
 local function do_no_gui_startup()
 	do_rc_file('.chdkptprc')
+	check_versions()
 	do_connect_option()
 	do_execute_option()
 	if options.i then
 		return cli:run()
 	end
 end
+prefs._add('warn_deprecated','boolean','warn on deprecated libraries',true)
 prefs._add('core_verbose','number','ptp core verbosity',0,
 	function(self)
 		return corevar.get_verbose()
