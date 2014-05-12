@@ -135,14 +135,27 @@ make
 =Testing your build=
 To test some internal functions use
 chdkptp -e"exec require'tests':runall()"
+note, this should be run from the same directory as the CHDKPTP executable
 
-To run some tests against a camera, use
-chdkptp -e"exec require'camtests'.runstd()"
-or for vesions after r562
+This will create (or overwrite) a file called lbuftest.dat in the current
+directory, and delete it when the test completes.
+
+To test functions that connect to the camera, use
 chdkptp -e"exec require'camtests'.runbatch{bench=true,filexfer=true}"
-(if more than one camera is connected to the system, a random one will be used)
 
-Neither of these is a comprehensive test.
+If more than one camera is connected to the system, a random one will be used
+unless you also specify devspec={dev="device name",bus="bus id"}
+
+The filexfer tests will create and delete a local directory called camtests
+in the current working directory. If you already have a directory of this name,
+it will be deleted when the test completes.
+
+Camtests will also create and delete some files and directories on the camera.
+
+For for vesions prior to r562, camtests shoud be invoked with
+chdkptp -e"exec require'camtests'.runstd()"
+
+None of the above is a comprehensive test of chdkptp functionality.
 
 =Running=
 See USAGE.TXT
