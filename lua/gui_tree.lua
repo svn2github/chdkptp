@@ -175,7 +175,7 @@ local function do_upload_dialog(remotepath)
 	-- note native windows dialog does not allow multi-select to include directories.
 	-- If it did, each to-level directory contents would get dumped into the target dir
 	-- should add an option to mupload to include create top level dirs
-	-- TODO test gtk/linux
+	-- gtk/linux doesn't allow either
 	con:mupload(paths,remotepath)
 	itree:refresh_tree_by_path(remotepath)
 end
