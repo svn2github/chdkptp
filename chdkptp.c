@@ -1708,12 +1708,13 @@ static const char* script_msg_error_type_to_name(unsigned type_id) {
 
 /*
 msg=con:read_msg()
-on success rturns message as table:
-{
-value=<val>
-script_id=<id>
-mtype=<type_name>
-msubtype=<subtype_name>
+msg:{
+	value=<val> -- lua value, tables are serialized strings
+	script_id=number
+	mtype=string -- one of "none","error","return","user"
+	msubtype=string -- for returns and user messages, one of
+	                -- "unsupported","nil","boolean","integer","string","table" 
+					-- for errors, one of "compile","runtime"
 }
 no message: type is set to 'none'
 throws error on error
@@ -1771,7 +1772,7 @@ static int chdk_read_msg(lua_State *L) {
 }
 
 /*
-status=con:write_msg(msgstring,[script_id])
+con:write_msg(msgstring,[script_id])
 script_id defaults to the most recently started script
 throws error on falure, error.etype can be used to identify full queue etc
 */
