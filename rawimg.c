@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2010-2012 <reyalp (at) gmail dot com>
+ * Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -821,7 +821,7 @@ static const luaL_Reg rawimg_methods[] = {
 	{NULL, NULL}
 };
 
-void rawimg_open(lua_State *L) {
+int luaopen_rawimg(lua_State *L) {
 	luaL_newmetatable(L,RAWIMG_META);
 
 	/* use a table of methods for the __index method */
@@ -842,4 +842,5 @@ void rawimg_open(lua_State *L) {
 	lua_pop(L,1); // done with list table
 
 	luaL_register(L, "rawimg", rawimg_lib);  
+	return 1;
 }

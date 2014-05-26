@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2010-2012 <reyalp (at) gmail dot com>
+ * Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -740,7 +740,7 @@ static const luaL_Reg pimg_meta_methods[] = {
 
 // TODO based on lbuf,
 // would be nice to have a way to extend lbuf with additional custom bindings
-void liveimg_open(lua_State *L) {
+int luaopen_liveimg(lua_State *L) {
 	luaL_newmetatable(L,LIVEIMG_PIMG_META);
 	luaL_register(L, NULL, pimg_meta_methods);  
 
@@ -749,9 +749,10 @@ void liveimg_open(lua_State *L) {
 	luaL_register(L, NULL, pimg_methods);  
 	lua_setfield(L,-2,"__index");
 
+	lua_pop(L,2);
+
 	/* global lib */
 	lua_newtable(L);
 	luaL_register(L, "liveimg", liveimg_funcs);  
-	lua_pop(L,3);
+	return 1;
 }
-

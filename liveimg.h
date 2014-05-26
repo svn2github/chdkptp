@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2010-2012 <reyalp (at) gmail dot com>
+ * Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 #ifndef LIVEIMG_H
 #define LIVEIMG_H
 #define LIVEIMG_PIMG_META "chdkptp.liveimg.pimg"
-void liveimg_open(lua_State *L);
+int luaopen_liveimg(lua_State *L);
 #endif
 
 

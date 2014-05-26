@@ -2246,7 +2246,7 @@ static int chdkptp_registerlibs(lua_State *L) {
 	luaL_register(L, "corevar", lua_corevar);
 	luaL_register(L, "guisys", lua_guisyslib);
 
-	liveimg_open(L);	
+	luaopen_liveimg(L);	
 	
 	// create a table to keep track of connections
 	lua_newtable(L);
@@ -2288,8 +2288,8 @@ int main(int argc, char ** argv)
 	lua_State *L = luaL_newstate();
 	luaL_openlibs(L);
 	luaopen_lfs(L);
-	lbuf_open(L);
-	rawimg_open(L);	
+	luaopen_lbuf(L);
+	luaopen_rawimg(L);	
 	chdkptp_registerlibs(L);
 	exec_lua_string(L,"require('main')");
 	uninit_gui_libs(L);

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2010-2012 <reyalp (at) gmail dot com>
+ * Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,6 +30,6 @@ typedef struct {
 } lBuf_t;
 int lbuf_create(lua_State *L,void *data,unsigned len,unsigned flags);
 lBuf_t* lbuf_getlbuf(lua_State *L,int i);
-void lbuf_open(lua_State *L);
+int luaopen_lbuf(lua_State *L);
 #endif
 

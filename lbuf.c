@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2010-2012 <reyalp (at) gmail dot com>
+ * Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -586,16 +586,18 @@ static const luaL_Reg lbuf_meta_methods[] = {
   {NULL, NULL}
 };
 
-void lbuf_open(lua_State *L) {
+int luaopen_lbuf(lua_State *L) {
 	luaL_newmetatable(L,LBUF_META);
 	luaL_register(L, NULL, lbuf_meta_methods);  
 	/* use a table of methods for the __index method */
 	lua_newtable(L);
 	luaL_register(L, NULL, lbuf_methods);  
 	lua_setfield(L,-2,"__index");
-	/* global lib (mostly for testing*/
+	lua_pop(L,2);
+
+	/* global lib*/
 	lua_newtable(L);
 	luaL_register(L, "lbuf", lbuf_methods);  
 	luaL_register(L, NULL, lbuf_funcs);  
-	lua_pop(L,3);
+	return 1;
 }

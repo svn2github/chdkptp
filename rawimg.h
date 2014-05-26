@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2010-2012 <reyalp (at) gmail dot com>
+ * Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,5 +20,5 @@
 #ifndef RAWIMG_H
 #define RAWIMG_H
 #define RAWIMG_META "rawimg.rawimg_meta"
-void rawimg_open(lua_State *L);
+int luaopen_rawimg(lua_State *L);
 #endif
