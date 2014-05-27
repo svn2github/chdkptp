@@ -837,58 +837,27 @@ static int check_connection_status_tcp(PTP_CON_STATE *ptp_cs) {
 }
 
 /*
-convenience - values extracted from a devinfo table
+get dev and bus from table arg
+return 1 on success, 0 on failure leaving rbus and rdev unchanged
 */
-typedef struct {
+static int get_lua_devspec_usb(lua_State *L, int index, const char **rbus, const char **rdev) {
 	const char *bus;
 	const char *dev;
-	unsigned vendor_id; // these are shorts in USB, but we want to allow special values
-	unsigned product_id;
-} devinfo_lua;
-#define DEVINFO_LUA_ID_NONE 0x10000
-/*
-read lua devinfo table into C values
-TODO this will go away, just use dev/bus, let lua deal with product id / vendor id if needed
-*/
-static int get_lua_devinfo(lua_State *L, int index, devinfo_lua *devinfo) {
-	if(!devinfo) {
-		return 0;
-	}
 	if(!lua_istable(L,index)) {
-		// TODO HACKY - returns a blank devinfo if not table 
-		devinfo->dev = devinfo->bus = NULL;
-		devinfo->vendor_id = devinfo->product_id = DEVINFO_LUA_ID_NONE;
 		return 0;
 	}
-	// TODO throw an error ? allow wildcards ?
 	lua_getfield(L,index,"dev");
-	devinfo->dev = lua_tostring(L,-1);
+	dev = lua_tostring(L,-1);
 	lua_pop(L,1);
-
 	lua_getfield(L,index,"bus");
-	devinfo->bus = lua_tostring(L,-1);
+	bus = lua_tostring(L,-1);
 	lua_pop(L,1);
-
-	lua_getfield(L,index,"vendor_id");
-	devinfo->vendor_id = luaL_optnumber(L,-1,DEVINFO_LUA_ID_NONE);
-	lua_pop(L,1);
-
-	lua_getfield(L,index,"product_id");
-	devinfo->product_id = luaL_optnumber(L,-1,DEVINFO_LUA_ID_NONE);
-	lua_pop(L,1);
+	if(!dev || !bus) {
+		return 0;
+	}
+	*rdev = dev;
+	*rbus = bus;
 	return 1;
-}
-
-/*
-compare an devinfo_lua with a USB dev
-undefined values (ID_NONE or NULL) match any
-*/
-static int compare_ldevinfo(devinfo_lua *ldevinfo,struct usb_device *dev) {
-	return ( dev && ldevinfo
-			&& (!ldevinfo->bus || strcmp(dev->bus->dirname,ldevinfo->bus) == 0)
-			&& (!ldevinfo->dev || strcmp(dev->filename,ldevinfo->dev) == 0)
-			&& (ldevinfo->vendor_id == DEVINFO_LUA_ID_NONE || dev->descriptor.idVendor == ldevinfo->vendor_id)
-			&& (ldevinfo->product_id == DEVINFO_LUA_ID_NONE || dev->descriptor.idProduct == ldevinfo->product_id));
 }
 
 /*
@@ -909,26 +878,6 @@ int get_connection_list_udata(lua_State *L, const char *key) {
 		lua_pop(L, 2); // nil, connection list
 		return 0;
 	}
-}
-
-// TODO this will go way, use by_path
-struct usb_device *find_device_ldev(devinfo_lua *ldev) {
-	struct usb_bus *bus;
-	struct usb_device *dev;
-
-	bus=get_busses();
-	for (; bus; bus = bus->next) {
-		for (dev = bus->devices; dev; dev = dev->next) {
-			if (dev->config) {
-				if ((dev->config->interface->altsetting->bInterfaceClass==USB_CLASS_PTP)) {
-					if(compare_ldevinfo(ldev,dev)) {
-						return dev;
-					}
-				}
-			}
-		}
-	}
-	return NULL;
 }
 
 struct usb_device *find_device_by_path(const char *find_bus, const char *find_dev) {
@@ -1189,13 +1138,7 @@ static int chdk_connection(lua_State *L) {
 	int con_type;
 
 	if(lua_istable(L,1)) {
-		lua_getfield(L,1,"dev");
-		dev = lua_tostring(L,-1);
-		lua_pop(L,1);
-
-		lua_getfield(L,1,"bus");
-		bus = lua_tostring(L,-1);
-		lua_pop(L,1);
+		get_lua_devspec_usb(L,1,&bus,&dev);
 
 		lua_getfield(L,1,"host");
 		host = lua_tostring(L,-1);
@@ -1927,20 +1870,22 @@ static int chdk_get_conlist(lua_State *L) {
 }
 
 static int chdk_reset_device(lua_State *L) {
-	devinfo_lua ldevinfo;
-	if(get_lua_devinfo(L,1,&ldevinfo)) {
-		struct usb_device *dev = find_device_ldev(&ldevinfo);
-		reset_device(dev);
+	const char *busname, *devname;
+	if(get_lua_devspec_usb(L,1,&busname,&devname)) {
+		struct usb_device *dev = find_device_by_path(busname,devname);
+		if(dev) {
+			reset_device(dev);
+		} else {
+			return api_throw_error(L,"nodev","no matching device");
+		}
+	} else {
+		return api_throw_error(L,"baddev","invalid device spec");
 	}
 	return 0;
 }
 
 /*
-most functions return result[,errormessage]
-result is false or nil on error
-some also throw errors with lua_error
-TODO should be either all lua_error (with pcall) or not.
-TODO many errors are still printed to the console
+most functions throw an error on failure
 */
 static const luaL_Reg chdklib[] = {
   {"connection", chdk_connection},
