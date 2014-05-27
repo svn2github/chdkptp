@@ -1459,6 +1459,7 @@ cli:add_commands{
 			bm=false,
 			nopal=false,
 			quiet=false,
+			nosubst=false,
 		}),
 -- TODO
 --   -infile=<file> lvdump file to use as source instead of camera
@@ -1470,6 +1471,7 @@ cli:add_commands{
    -bm[=file] get ui overlay data to file
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
+   -nosubst   don't do pattern substitution on file names
   file may include substitution pattern
    ${date,datefmt}  current time formatted with os.date()
    ${frame,strfmt}  current frame number formatted with string.format
@@ -1555,14 +1557,24 @@ cli:add_commands{
 				frame_ustime = ustime.new():float()
 
 				if args.vp then
-					local fpath = varsubst.run(vp_spec,subst_funcs)
+					local fpath
+					if not args.nosubst then
+						fpath = varsubst.run(vp_spec,subst_funcs)
+					else
+						fpath = vp_spec
+					end
 					if not args.quiet then
 						cli.infomsg('%s\n',fpath)
 					end
 					vp_pimg, vp_lb=chdku.live_dump_vp_pbm(fpath,frame,vp_pimg,vp_lb)
 				end
 				if args.bm then
-					local fpath = varsubst.run(bm_spec,subst_funcs)
+					local fpath
+					if not args.nosubst then
+						fpath = varsubst.run(bm_spec,subst_funcs)
+					else
+						fpath = bm_spec
+					end
 					if not args.quiet then
 						cli.infomsg('%s\n',fpath)
 					end
