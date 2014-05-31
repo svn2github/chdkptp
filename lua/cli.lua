@@ -647,6 +647,7 @@ cli:add_commands{
 ]],
 		func=function(self,args) 
 			con:exec(args)
+			return true
 		end,
 	},
 	{
