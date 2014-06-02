@@ -258,6 +258,7 @@ lvdumpimg    [options]   : - dump camera display frames to images
    -bm[=file] get ui overlay data to file
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
+   -nosubst   don't do pattern substitution on file names
   file may include substitution pattern
    ${date,datefmt}  current time formatted with os.date()
    ${frame,strfmt}  current frame number formatted with string.format
