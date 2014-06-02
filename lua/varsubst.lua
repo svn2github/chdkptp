@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2014 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -16,38 +16,101 @@
 --]]
 --[[
 utility for substitution strings
+
+substitution strings are of the form
+${name} or ${name,args}
 ]]
 local m={}
 
+local methods={}
+
 --[[
-funcs={
-	name=f(argstr),
-}
-where f returns the substitution value
+expend a single ${} expression
+]]
+function methods.process_var(self,str)
+	-- discard {}
+	str=str:sub(2,-2)
+	-- extract func name
+	local s,e,func=str:find('^([%w]+)')
+	-- no match, try args (format is arbitrary)
+	local argstr
+	if e ~= str:len() then
+		s,e,argstr=str:find(',%s*(.*)$')
+	end
+	if not s then
+		error('parse failed '..tostring(str))
+	end
+	-- recursively expand args, so ${foo, ${bar}} gets expanded
+	-- TODO there is no way to prevent any {} from being counted in the %b{}
+	if argstr then
+		argstr=self:run(argstr)
+	end
+	if self.funcs[func] then
+		return self.funcs[func](argstr,self)
+	end
+	error('unknown substitution function '..tostring(func))
+end
+
+--[[
+process a string
 --]]
-m.run=function(str,funcs)
-	-- TODO this won't catch many error cases, since they won't match
-	-- TODO doesn't handle nesting
-	-- TODO doesn't allow escaping
-	-- TODO error isn't friendly
+methods.run=function(obj,str)
 	local r=str:gsub('$(%b{})',
-		function(str)
-			-- try with just name
-			local argstr
-			local s,e,func=str:find('{([%w]+)}$')
-			-- no match, try args (format is arbitrary)
-			if not s then
-				s,e,func,argstr=str:find('{([%w]+),%s*([^}]*)}$')
-			end
-			if not s then
-				error('parse failed '..tostring(str))
-			end
-			-- could run recursively on argstr to support nesting
-			if funcs[func] then
-				return funcs[func](argstr)
-			end
-			error('unknown substitution function '..tostring(func))
+		function(s)
+			return obj:process_var(s)
 		end)
 	return r
+end
+
+--[[
+return a function that passes the named value from state through string.format, 
+using the first arg as the format string, or default_fmt if not specified
+]]
+m.format_state_val=function(name,default_fmt)
+	return function(argstr,obj)
+		if not argstr then 
+			argstr=default_fmt
+		end
+		return string.format(argstr,obj.state[name])
+	end
+end
+--[[
+return a function that passes the named value from state through os.date
+using the first arg as the date format, or default_fmt if not specified
+]]
+m.format_state_date=function(name,default_fmt)
+	return function(argstr,obj)
+		if not argstr then 
+			argstr=default_fmt
+		end
+		return os.date(argstr,obj.state[name])
+	end
+end
+
+--[[
+general purpose ${sprintf,format,arg....}
+TODO doesn't have quoting, so format better not contain , or {} or leading spaces
+]]
+m.sprintf=function(argstr,obj)
+	local args=util.string_split(argstr,',%s*')
+	return string.format(unpack(args))
+end
+--[[
+funcs={
+	name,f(str,obj)
+}
+state=table containing any state to be used by funcs, keying by func name recommended
+--]]
+m.new=function(funcs,state)
+	local t={
+		funcs=funcs,
+		state=state,
+		run=m.run,
+	}
+	if not t.state then
+		t.state={}
+	end
+	util.extend_table(t,methods)
+	return t
 end
 return m

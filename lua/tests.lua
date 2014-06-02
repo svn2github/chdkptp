@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2012-2014 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -431,6 +431,27 @@ t.errutil = function()
 	assert(#t==0)
 	assert(last_err.etype == 'testcrit')
 	assert(string.find(last_err_str,'stack traceback:'))
+end
+
+t.varsubst = function()
+	local vs=require'varsubst'
+	local s={
+		fmt=123.4,
+		date=os.time{year=2001,month=11,day=10},
+	}
+	local subst=vs.new({
+		fmt=vs.format_state_val('fmt','%d'),
+		date=vs.format_state_date('date','%Y%m%d_%H%M%S'),
+		sprintf=vs.sprintf,
+	},s)
+	assert(subst:run('${fmt}') == '123')
+	assert(subst:run('whee${fmt}ee') == 'whee123ee')
+	assert(subst:run('${fmt, %3.2f}') == '123.40')
+	assert(subst:run('${sprintf, hello world}') == 'hello world')
+	assert(subst:run('${sprintf,hello world %d,${fmt}}') == 'hello world 123')
+	assert(subst:run('${date}') == '20011110_120000')
+	assert(subst:run('${date,%Y}') == '2001')
+	assert(subst:run('${date,whee %H:%M:%S}') == 'whee 12:00:00')
 end
 
 function m:run(name)

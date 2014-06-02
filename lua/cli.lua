@@ -1521,46 +1521,28 @@ cli:add_commands{
 
 			local frame, vp_pimg, bm_pimg, vp_lb, bm_lb
 
-			-- closure upvalues for substitutions
-			local frame_time
-			local frame_ustime
-			local frame_num
-
-			local subst_funcs = {
-				frame=function(argstr)
-					if not argstr then 
-						argstr='%06d'
-					end
-					return string.format(argstr,frame_num)
-				end,
-				time=function(argstr)
-					if not argstr then 
-						argstr='%d'
-					end
-					return string.format(argstr,frame_ustime)
-				end,
-				date=function(argstr)
-					if not argstr then 
-						argstr='%Y%m%d_%H%M%S'
-					end
-					return os.date(argstr,frame_time)
-				end,
-			}
 			local varsubst=require'varsubst'
+			-- state for substitutions
+			local subst=varsubst.new({
+				frame=varsubst.format_state_val('frame','%06d'),
+				time=varsubst.format_state_val('time','%d'),
+				date=varsubst.format_state_date('date','%Y%m%d_%H%M%S'),
+			})
+
 			-- TODO frame source should be split out to allow dumping from existing lvdump file
 			for i=1,args.count do
 				-- TODO should use wrapped frame, maybe con:live_get_frame
 				frame = con:get_live_data(frame,what)
 
-				frame_num = i
+				subst.state.frame = i
 				-- time values are recorded per frame, to avoid varying between files
-				frame_time = os.time()
-				frame_ustime = ustime.new():float()
+				subst.state.date = os.time()
+				subst.state.time = ustime.new():float()
 
 				if args.vp then
 					local fpath
 					if not args.nosubst then
-						fpath = varsubst.run(vp_spec,subst_funcs)
+						fpath = subst:run(vp_spec)
 					else
 						fpath = vp_spec
 					end
@@ -1572,7 +1554,7 @@ cli:add_commands{
 				if args.bm then
 					local fpath
 					if not args.nosubst then
-						fpath = varsubst.run(bm_spec,subst_funcs)
+						fpath = subst:run(bm_spec)
 					else
 						fpath = bm_spec
 					end
