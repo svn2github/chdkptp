@@ -365,7 +365,10 @@ function mc:print_cmd_status(status,results)
 	end
 end
 function mc:testshots(opts) 
-	opts = util.extend_table({ nshots=1 },opts)
+	opts = util.extend_table({ 
+		nshots=1,
+		shoot_cmd='shoot',
+	},opts)
 	if not self.min_sync_delay then
 		warnf('sync not initialized\n')
 		return
@@ -396,13 +399,15 @@ function mc:testshots(opts)
 		end
 		self:print_cmd_status(self:cmdwait('preshoot'))
 		local t=ustime.new()
-		self:cmd('shoot',{syncat=opts.synctime})
-		sys.sleep(opts.synctime - 60)
+		self:cmd(opts.shoot_cmd,{syncat=opts.synctime})
+		if opts.synctime > 60 then
+			sys.sleep(opts.synctime - 60)
+		end
 		for j=1,25 do
 			printf('%d %d\n',i,ustime.diffms(t)-opts.synctime)
 			sys.sleep(20)
 		end
-		self:print_cmd_status(self:wait_status_msg('shoot'))
+		self:print_cmd_status(self:wait_status_msg(opts.shoot_cmd))
 		self:print_cmd_status(self:cmdwait('call return get_exp_count()'))
 		sys.sleep(500)
 	end
@@ -436,6 +441,8 @@ mc={
 	shoot_complete_timeout=5000,
 	msg_timeout=100000,
 	shoot_hold=10,
+	shoot_hook_timeout=5000,
+	shoot_hook_ready_timeout=10000,
 }
 
 cmds={}
@@ -499,6 +506,32 @@ function cmds.shoot()
 	return wait_timeout(get_shooting,false,100,mc.shoot_complete_timeout,'get_shooting timeout')
 end
 
+function cmds.shoot_hook_sync()
+	if type(hook_shoot) ~= 'table' then
+		write_status(false, 'build does not support shoot hook')
+		return
+	end
+	hook_shoot.set(mc.shoot_hook_timeout)
+	press('shoot_full')
+	local wait_time = 0
+	while not hook_shoot.is_ready() do
+		if wait_time > mc.shoot_hook_ready_timeout then
+			hook_shoot.set(0)
+			release('shoot_full')
+			write_status(false, 'hook_shoot ready timeout')
+			return
+		end
+		sleep(10)
+		wait_time = wait_time + 10
+	end
+	wait_tick(tonumber(mc.args))
+	hook_shoot.continue()
+	sleep(mc.shoot_hold)
+	release('shoot_full')
+	hook_shoot.set(0)
+	return wait_timeout(get_shooting,false,100,mc.shoot_complete_timeout,'get_shooting timeout')
+end
+
 function cmds.tick()
 	write_status(get_tick_count())
 end
@@ -542,7 +575,7 @@ function mc.run(opts)
 	repeat 
 		local msg=read_usb_msg(mc.msg_timeout)
 		if msg then
-			mc.cmd,mc.args=string.match(msg,'^(%w+)%s*(.*)')
+			mc.cmd,mc.args=string.match(msg,'^([%w_]+)%s*(.*)')
 			if type(cmds[mc.cmd]) == 'function' then
 				cmds[mc.cmd]()
 			else
