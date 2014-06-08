@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2012-2014 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -467,8 +467,7 @@ end
 
 function wait_tick(synctick)
 	if synctick then
-		-- current chdk builds sleep an extra 20ms on top of requested amount
-		local s=synctick - get_tick_count() - 20
+		local s=synctick - get_tick_count()
 		if s >= 10 then
 			sleep(s)
 		end
