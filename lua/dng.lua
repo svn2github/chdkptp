@@ -74,6 +74,7 @@ m.tags_map = {
 	ApertureValue				=0x9202,
 	ExposureBiasValue			=0x9204,
 	MaxApertureValue			=0x9205,
+	SubjectDistance				=0x9206,
 	MeteringMode				=0x9207,
 	Flash						=0x9209,
 	FocalLength					=0x920A,
