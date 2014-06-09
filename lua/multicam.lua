@@ -202,6 +202,8 @@ end
 initialize values to allow all cameras to execute a given command as close as possible to the same real time
 ]]
 function mc:init_sync()
+	-- flush any old messages
+	self:flushmsgs()
 	self.min_sync_delay = 0 -- minimum time required to send to all cams
 	for i,lcon in ipairs(self.cams) do
 		local status,err=pcall(self.init_sync_cam,self,lcon)
@@ -413,6 +415,21 @@ function mc:testshots(opts)
 	end
 end
 
+-- quick and dirty download last shot to camera number/image name
+function mc:download_last()
+	local status,images=self:cmdwait('getlastimg')
+	if not status then
+		error('failed to get image paths')
+	end
+	local save_con = con
+	for i, r in ipairs(images) do
+		con = self.cams[i]
+		printf("%s %s\n",i,con.mc_id,r.status.msg)
+		fsutil.mkdir_m(tostring(i))
+		cli:print_status(cli:execute(string.format('d -nolua %s %d/',r.status.msg,i)))
+	end
+	con = save_con
+end
 --[[
 remote script
 waits in a loop for messages
@@ -482,11 +499,15 @@ function wait_tick(synctick)
 end
 
 function cmds.rec()
-	switch_mode_usb(1)
+	if not get_mode() then
+		switch_mode_usb(1)
+	end
 	return wait_timeout(get_mode,true,100,mc.mode_sw_timeout)
 end
 function cmds.play()
-	switch_mode_usb(0)
+	if get_mode() then
+		switch_mode_usb(0)
+	end
 	return wait_timeout(get_mode,false,100,mc.mode_sw_timeout)
 end
 function cmds.preshoot()
@@ -567,6 +588,9 @@ function cmds.pcall()
 	else
 		write_status(false,err)
 	end
+end
+function cmds.getlastimg()
+	write_status(true,string.format('%s/IMG_%04d.JPG',get_image_dir(),get_exp_count()))
 end
 
 function mc.run(opts)
