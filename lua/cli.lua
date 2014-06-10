@@ -880,19 +880,13 @@ cli:add_commands{
 			if not dst then
 				-- no dest, use final component of source path
 				dst = fsutil.basename(src)
-			elseif string.match(dst,'[\\/]+$') then
-				-- explicit / treat it as a directory
-				dst = fsutil.joinpath(dst,fsutil.basename(src))
-				-- and check if it is
-				local dst_dir = fsutil.dirname(dst)
-				-- TODO should create it
-				if lfs.attributes(dst_dir,'mode') ~= 'directory' then
-					return false,'not a directory: '..dst_dir
-				end
-			elseif lfs.attributes(dst,'mode') == 'directory' then
-				-- if target is a directory download into it
+			-- if target is a directory or has explicit trailing / download into it
+			elseif lfs.attributes(dst,'mode') == 'directory' or fsutil.is_dir_sep(string.sub(dst,-1,-1)) then
 				dst = fsutil.joinpath(dst,fsutil.basename(src))
 			end
+
+			-- ensure target dir exists
+			fsutil.mkdir_parent(dst)
 
 			src = fsutil.make_camera_path(src)
 			if not args.nolua then

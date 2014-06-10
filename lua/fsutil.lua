@@ -32,10 +32,20 @@ function fsutil.dir_sep_chars()
 	return '/'
 end
 
+function fsutil.is_dir_sep(c)
+	if c == '/' then
+		return true
+	end
+	if fsutil.ostype() == 'Windows' then
+		return c == '\\'
+	end
+	return false
+end
+
 --[[
 remove suffix from a path if found
 opts {
-	ignorecase=bool -- is suffix case sensitive? default rue
+	ignorecase=bool -- is suffix case sensitive? default true
 }
 ]]
 function fsutil.remove_sfx(path,sfx,opts)
@@ -280,6 +290,13 @@ function fsutil.mkdir_m(path)
 			errlib.throw{etype='exists', msg='path exists, not directory'}
 		end
 	end
+end
+
+--[[
+make a directory containing the target path
+]]
+function fsutil.mkdir_parent(path)
+	fsutil.mkdir_m(fsutil.dirname(path))
 end
 
 --[[
