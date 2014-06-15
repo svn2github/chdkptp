@@ -432,7 +432,11 @@ function dng_methods.print_ifd(self,ifd,opts)
 				if e:type().string then
 					str = string.format('"%s"',v)
 				elseif e:type().rational then
-					str = string.format('%d/%d',v[1],v[2])
+					if e:type().signed then
+						str = string.format('%d/%d',v[1],v[2])
+					else
+						str = string.format('%u/%u',v[1],v[2])
+					end
 					if v[2] ~= 0 then
 						str = string.format('%23s %12f',str,v[1]/v[2])
 					end
