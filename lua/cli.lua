@@ -1498,12 +1498,17 @@ cli:add_commands{
 				return false,'incompatible api'
 			end
 			local vp_spec
+			local vp_use_pipe
 			local bm_spec
 
 			if args.vp == true then
 				vp_spec = 'vp_${time,%014.3f}.ppm'
 			else
 				vp_spec = args.vp
+				if string.sub(vp_spec,1,1) == '!' and not args.nosubst then
+					vp_use_pipe = true
+					vp_spec = string.sub(vp_spec,2,-1)
+				end
 			end
 
 			if args.bm == true then
@@ -1523,6 +1528,15 @@ cli:add_commands{
 				date=varsubst.format_state_date('date','%Y%m%d_%H%M%S'),
 			})
 
+			local vp_pipe
+			if vp_use_pipe then
+				local err
+				vp_pipe,err = io.popen(vp_spec,"w")
+				if not vp_pipe then
+					error(err)
+				end
+			end
+
 			-- TODO frame source should be split out to allow dumping from existing lvdump file
 			for i=1,args.count do
 				-- TODO should use wrapped frame, maybe con:live_get_frame
@@ -1534,16 +1548,23 @@ cli:add_commands{
 				subst.state.time = ustime.new():float()
 
 				if args.vp then
-					local fpath
-					if not args.nosubst then
-						fpath = subst:run(vp_spec)
+					if vp_pipe then
+						vp_pimg, vp_lb=chdku.live_dump_vp_pbm(vp_pipe,frame,vp_pimg,vp_lb)
+						if not args.quiet then
+							cli.infomsg('frame %d\n',i)
+						end
 					else
-						fpath = vp_spec
+						local fpath
+						if not args.nosubst then
+							fpath = subst:run(vp_spec)
+						else
+							fpath = vp_spec
+						end
+						if not args.quiet then
+							cli.infomsg('%s\n',fpath)
+						end
+						vp_pimg, vp_lb=chdku.live_dump_vp_pbm(fpath,frame,vp_pimg,vp_lb)
 					end
-					if not args.quiet then
-						cli.infomsg('%s\n',fpath)
-					end
-					vp_pimg, vp_lb=chdku.live_dump_vp_pbm(fpath,frame,vp_pimg,vp_lb)
 				end
 				if args.bm then
 					local fpath
@@ -1560,6 +1581,9 @@ cli:add_commands{
 				if args.wait and i < args.count then
 					sys.sleep(args.wait)
 				end
+			end
+			if vp_pipe then
+				vp_pipe:close()
 			end
 			return true
 		end,

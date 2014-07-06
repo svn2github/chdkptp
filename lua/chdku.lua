@@ -1439,16 +1439,31 @@ function chdku.live_dump_vp_pbm(fpath,frame,vp_pimg,vp_lb)
 	end
 	vp_lb = vp_pimg:to_lbuf_packed_rgb(vp_lb)
 
-	-- TODO ensure directory, pipe support
-	local fh, err = io.open(fpath,'wb')
-	if not fh then
-		error(err)
+	-- TODO ensure directory
+	local fh
+	-- pipe support
+	if type(fpath) == 'userdata' then
+		if string.sub(tostring(fpath),1,4) == 'file' then
+			fh = fpath
+		else
+			error("unexpected userdata")
+		end
+	elseif type(fpath) == 'string' then
+		local err
+		fh, err = io.open(fpath,'wb')
+		if not fh then
+			error(err)
+		end
+	else
+		error("unexpected type "..type(fpath))
 	end
 	fh:write(string.format('P6\n%d\n%d\n%d\n',
 		vp_pimg:width(),
 		vp_pimg:height(),255))
 	vp_lb:fwrite(fh)
-	fh:close()
+	if type(fpath) ~= 'userdata' then
+		fh:close()
+	end
 	return vp_pimg,vp_lb
 end
 --[[
