@@ -131,6 +131,11 @@ function gui.set_connection_status(status)
 		gui.last_connection_status = true
 		connect_icon.active = "YES"
 		btn_connect.title = "Disconnect"
+		-- if connection was initialized in a different chdku con wrapper
+		-- connection info might not be up to date
+		if not con.apiver then
+			con:update_connection_info()
+		end
 		connect_label.title = string.format("host:%d.%d cam:%d.%d",
 											chdku.apiver.MAJOR,chdku.apiver.MINOR,
 											con.apiver.MAJOR,con.apiver.MINOR)
