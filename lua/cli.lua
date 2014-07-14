@@ -1449,7 +1449,8 @@ cli:add_commands{
 		args=argparser.create({
 --			infile=false,
 			count=1,
-			wait=100,
+			wait=false,
+			fps=10,
 			vp=false,
 			bm=false,
 			nopal=false,
@@ -1462,6 +1463,7 @@ cli:add_commands{
  options:
    -count=<N> number of frames to dump, default 1
    -wait=<N>  wait N ms between frames
+   -fps=<N>   specify wait as a frame rate, default 10
    -vp[=file] get viewfinder data to file
    -bm[=file] get ui overlay data to file
    -nopal     don't get palette for ui overlay
@@ -1489,6 +1491,12 @@ cli:add_commands{
 			end
 			if args.wait then
 				args.wait = tonumber(args.wait)
+			end
+			if args.fps then
+				if args.wait then
+					return false,'specify wait or fps, not both'
+				end
+				args.wait = 1000/tonumber(args.fps)
 			end
 			if args.count then
 				args.count = tonumber(args.count)
@@ -1542,8 +1550,12 @@ cli:add_commands{
 				end
 			end
 
+			local t0=ustime.new()
+			local t_frame_start=ustime.new()
+
 			-- TODO frame source should be split out to allow dumping from existing lvdump file
 			for i=1,args.count do
+				t_frame_start:get()
 				-- TODO should use wrapped frame, maybe con:live_get_frame
 				frame = con:get_live_data(frame,what)
 
@@ -1583,12 +1595,17 @@ cli:add_commands{
 					end
 					bm_pimg, bm_lb=chdku.live_dump_bm_pam(fpath,frame,bm_pimg,bm_lb)
 				end
-				if args.wait and i < args.count then
-					sys.sleep(args.wait)
+				if args.wait and i < args.count and t_frame_start:diffms() < args.wait then
+					sys.sleep(args.wait - t_frame_start:diffms())
 				end
 			end
 			if vp_pipe then
 				vp_pipe:close()
+			end
+			if subst.state.frame and not args.quiet then
+				-- note we don't sleep for final frame, so fps will look slightly high
+				local t_total = t0:diffms()/1000
+				cli.dbgmsg('frames:%d time:%f fps:%f\n',subst.state.frame,t_total,subst.state.frame/t_total)
 			end
 			return true
 		end,
