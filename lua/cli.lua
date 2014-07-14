@@ -1531,7 +1531,12 @@ cli:add_commands{
 			local vp_pipe
 			if vp_use_pipe then
 				local err
-				vp_pipe,err = io.popen(vp_spec,"w")
+				local mode = 'w'
+				-- non-windows doesn't accept text / binary but windows needs to bin
+				if sys.ostype() == 'Windows' then
+					mode = 'wb'
+				end
+				vp_pipe,err = io.popen(vp_spec,mode)
 				if not vp_pipe then
 					error(err)
 				end
