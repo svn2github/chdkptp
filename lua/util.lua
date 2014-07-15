@@ -279,6 +279,40 @@ function util.table_amean(table)
 end
 
 --[[
+return table with sum, min, max, mean and standard deviation of values in table
+all values are nil if table is empty
+]]
+function util.table_stats(table)
+	if #table == 0 then
+		return {}
+	end
+	local sum = 0
+	local min = table[1]
+	local max = table[1]
+	for i=1,#table do
+		sum = sum + table[i]
+		if table[i] < min then
+			min = table[i]
+		end
+		if table[i] > max then
+			max = table[i]
+		end
+	end
+	local mean = sum/#table
+	local vsum = 0
+	for i=1,#table do
+		vsum = vsum + (table[i] - mean)^2
+	end
+	return {
+		min=min,
+		max=max,
+		sum=sum,
+		mean=mean,
+		sd=math.sqrt(vsum/#table)
+	}
+end
+
+--[[
 --turn an integer into a zero based array of bits
 --]]
 function util.bit_unpack(n,limit)

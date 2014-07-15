@@ -136,59 +136,86 @@ function mc:init_sync_single_send(i,lcon,lt0,rt0,ticks,sends)
 	table.insert(ticks,expect-msg.status)
 end
 
-function mc:init_sync_single_check(lcon)
-	local expect = self:get_sync_tick(lcon,ustime.new(),100)
-	lcon:write_msg(string.format('synctick %d',expect))
-	local msg=lcon:wait_msg({
-			mtype='user',
-			msubtype='table',
-			munserialize=true,
-	})
-	printf('%s: expect=%d r=%d d=%d %s\n',
-		lcon.mc_id,
-		expect,
-		msg.status,
-		expect-msg.status,
-		msg.msg)
+--[[
+get tick count as a sync'd command
+all variation should be due to the cameras 10 ms tick resolution
+]]
+function mc:check_sync_single(lcon,opts)
+	opts=util.extend_table({
+		count=10,
+		verbose=true,
+		syncat=100,
+	},opts)
+	local deltas = {}
+	for i=1,opts.count do
+		local expect = self:get_sync_tick(lcon,ustime.new(),opts.syncat)
+		lcon:write_msg(string.format('synctick %d',expect))
+		local msg=lcon:wait_msg({
+				mtype='user',
+				msubtype='table',
+				munserialize=true,
+		})
+		deltas[i] = expect-msg.status
+		if opts.verbose then
+			printf('%s: expect=%d r=%d d=%d %s\n',
+				lcon.mc_id,
+				expect,
+				msg.status,
+				expect-msg.status,
+				msg.msg)
+		end
+	end
+	local stats=util.table_stats(deltas)
+	printf('%s: n=%d min=%d max=%d mean=%f sd=%f\n',
+			lcon.mc_id,
+			#deltas,
+			stats.min,
+			stats.max,
+			stats.mean,
+			stats.sd)
 end
 
-function mc:init_sync_single(lcon,lt0,rt0)
+function mc:init_sync_single(lcon,lt0,rt0,count)
 	local ticks={}
 	local sends={}
 	--printf('lt0 %d rt0 %d\n',lt0,rt0)
-	for i=1,10 do
+	for i=1,count do
 		local status,err=pcall(self.init_sync_single_send,self,i,lcon,lt0,rt0,ticks,sends)
 		if not status then
 			warnf('init_sync_single_send %s\n',tostring(err))
 		end
-		sys.sleep(50) -- don't want messages to get queued
 	end
 -- average difference between predicted and returned time in test
 -- large |value| implies initial from init_sync was an exteme
-	local tickoff = util.table_amean(ticks)
+	local tick_stats = util.table_stats(ticks)
 -- msend average time to complete a send, accounts for a portion of latency
 -- not clear what this includes, or how much is spent in each direction
-	local msend = util.table_amean(sends)
-	printf('%s: mean offset %f (%d)\n',lcon.mc_id,tickoff,#ticks)
-	printf('%s: mean send %f (%d)\n',lcon.mc_id,msend,#sends)
+	local send_stats = util.table_stats(sends)
+	printf('%s: ticks=%d min=%d max=%d mean=%f sd=%f\n',
+			lcon.mc_id,
+			#ticks,
+			tick_stats.min,
+			tick_stats.max,
+			tick_stats.mean,
+			tick_stats.sd)
+	printf('%s: sends=%d min=%d max=%d mean=%f sd=%f\n',
+			lcon.mc_id,
+			#sends,
+			send_stats.min,
+			send_stats.max,
+			send_stats.mean,
+			send_stats.sd)
 	lcon.mc_sync = {
 		lt0=lt0, -- base local time
 		rt0=rt0, -- base remote time obtained at lt0 + latency
-		tickoff=tickoff,
-		msend=msend,
+		tickoff=tick_stats.mean,
+		msend=send_stats.mean,
+		sdsend=send_stats.sd,
 		-- adjusted base remote time 
-		rtadj = rt0 - tickoff - msend/2,
+		rtadj = rt0 - tick_stats.mean - send_stats.mean/2,
 	}
-	--local t0=ustime.new()
-	for i=1,10 do
-		local status,err=pcall(self.init_sync_single_check,self,lcon)
-		if not status then
-			warnf('init_sync_single_check',tostring(err))
-		end
-		sys.sleep(50) -- don't want messages to get queued
-	end
 end
-function mc:init_sync_cam(lcon)
+function mc:init_sync_cam(lcon,count)
 	local t0=ustime.new()
 	lcon:write_msg('tick')
 	local msg=lcon:wait_msg({
@@ -196,20 +223,23 @@ function mc:init_sync_cam(lcon)
 		msubtype='table',
 		munserialize=true,
 	})
-	self:init_sync_single(lcon,t0,msg.status)
+	self:init_sync_single(lcon,t0,msg.status,count)
 end
 --[[
 initialize values to allow all cameras to execute a given command as close as possible to the same real time
 ]]
-function mc:init_sync()
+function mc:init_sync(count)
 	-- flush any old messages
 	self:flushmsgs()
 	self.min_sync_delay = 0 -- minimum time required to send to all cams
+	if not count then
+		count = 10
+	end
 	for i,lcon in ipairs(self.cams) do
-		local status,err=pcall(self.init_sync_cam,self,lcon)
+		local status,err=pcall(self.init_sync_cam,self,lcon,count)
 		if status then
-			-- TODO mean send time might not be enough
-			self.min_sync_delay = self.min_sync_delay + lcon.mc_sync.msend 
+			-- TODO mean send time might not be enough, add one SD
+			self.min_sync_delay = self.min_sync_delay + lcon.mc_sync.msend + lcon.mc_sync.sdsend
 		else
 			warnf('%d:init_sync_cam: %s\n',i,tostring(err))
 		end
