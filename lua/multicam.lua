@@ -353,7 +353,7 @@ command must accept a camera tick time as it's argument (e.g. shoot)
 ]]
 function mc:cmd(cmd,opts)
 	local tstart = ustime.new()
-	opts=util.extend_table({},opts)
+	opts=util.extend_table({flushmsgs=true},opts)
 	if opts.flushmsgs then
 		self:flushmsgs()
 	end
