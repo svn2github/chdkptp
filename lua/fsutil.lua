@@ -519,4 +519,23 @@ function fsutil.rm_r(in_paths,opts)
 	end
 end
 
+--[[
+handle windows file mode on popen in a portable way
+accept b or a suffix on all platforms, default to binary on windows
+]]
+function fsutil.popen(prog,mode)
+	if not mode then
+		mode = 'r'
+	end
+	-- windows - add a b if mode is one char, othewise leave alone
+	if fsutil.ostype() == 'Windows' then
+		if string.len(mode) == 1 then
+			mode = mode .. 'b'
+		end
+	elseif string.len(mode) == 2 then
+		-- other os - if mode is two chars, truncate to 1
+		mode = string.sub(mode,1,1)
+	end
+	return io.popen(prog,mode)
+end
 return fsutil
