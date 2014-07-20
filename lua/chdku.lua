@@ -114,7 +114,7 @@ function con_methods:match_ptp_info(match)
 	if self.ptpdev.serial_number then
 		serial = self.ptpdev.serial_number
 	end
-	if match.serial and not string.find(serial,match.serial,1,match.plain) then
+	if match.serial_number and not string.find(serial,match.serial_number,1,match.plain) then
 		return false
 	end
 	return true
