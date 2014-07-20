@@ -138,19 +138,30 @@ function process_options(args)
 	end
 end
 
+--[[
+return directory for rc files etc
+def_path can be used to set the default if nothing reasonable is found, default nil
+]]
+function get_chdkptp_home(def_path)
+	local path=sys.getenv('CHDKPTP_HOME')
+	if not path then
+		path=sys.getenv('HOME')
+		if not path then
+			return def_path
+		end
+	end
+	return path
+end
+
 function do_rc_file(name)
 	local path
 	-- -r with no file
 	if options.r == true then
 		return
 	elseif not options.r then
-		path=sys.getenv('CHDKPTP_HOME')
+		path=get_chdkptp_home()
 		if not path then
-			path=sys.getenv('HOME')
-			-- TODO profile dir on windows ? exe dir ?
-			if not path then
-				return false
-			end
+			return
 		end
 		-- fix . to _ on windows
 		-- TODO check for both ?
