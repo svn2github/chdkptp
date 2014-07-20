@@ -29,13 +29,44 @@ usage:
 ]]
 
 local mc={}
+
+--[[
+find specified device/bus in cams list, returns connection or nil
+]]
+function mc:find_dev(devspec)
+	for i,lcon in ipairs(self.cams) do
+		if devspec.dev == lcon.condev.dev and devspec.bus == lcon.condev.bus then
+			return lcon
+		end
+	end
+end
+
 --[[
 connect to all available cams
 TODO add matching support
+opts:{
+	add=bool -- don't reset existing list, just add any matching camereas
+	match={ -- match spec as used in CLI connect
+		bus=string 
+		dev=string
+		product_id=number
+		serial_number=string
+		model=string
+		plain=bool -- controls whether dev, bus, model, and serial are pattern or plain text match
+	}
+}
 ]]
-function mc:connect()
+function mc:connect(opts)
+	opts=util.extend_table({
+	},opts)
+	if not opts.match then
+		opts.match = {}
+	end
+
 	local devices = chdk.list_usb_devices()
-	self.cams={}
+	if not opts.add then
+		self.cams={}
+	end
 	for i, devinfo in ipairs(devices) do
 		local lcon,msg = chdku.connection(devinfo)
 		-- if not already connected, try to connect
@@ -49,14 +80,24 @@ function mc:connect()
 		end
 		-- if connection didn't fail
 		if lcon:is_connected() then
-			printf('%d:%s bus=%s dev=%s sn=%s\n',
+			local status = '-'
+			if not self:find_dev(devinfo) then
+				-- empty match matches everything
+				if chdku.match_device(devinfo,opts.match) and lcon:match_ptp_info(opts.match) then
+					status='+'
+					lcon.mc_id = string.format('%d:%s',i,lcon.ptpdev.model)
+					table.insert(self.cams,lcon)
+				else
+					status='i'
+				end
+			end
+			printf('%s %d:%s bus=%s dev=%s s=%s\n',
+				status,
 				i,
 				lcon.ptpdev.model,
 				lcon.condev.dev,
 				lcon.condev.bus,
 				tostring(lcon.ptpdev.serial_number))
-			lcon.mc_id = string.format('%d:%s',i,lcon.ptpdev.model)
-			table.insert(self.cams,lcon)
 		end
 	end
 end
