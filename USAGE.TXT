@@ -250,20 +250,26 @@ lvdump (dumpframes) [options] [file]: - dump camera display frames to file
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
 
-lvdumpimg    [options]   : - dump camera display frames to images
+lvdumpimg    [options]   : - dump camera display frames to netpbm images
  options:
    -count=<N> number of frames to dump, default 1
    -wait=<N>  wait N ms between frames
-   -vp[=file] get viewfinder data to file
-   -bm[=file] get ui overlay data to file
+   -fps=<N>   specify wait as a frame rate, default 10
+   -vp[=dest] get viewfinder in ppm format
+   -bm[=dest] get ui overlay in pam format
+   -pipevp[=oneproc]
+   -pipebm[=oneproc]
+      treat vp or bm 'dest' as a command to pipe to. With =oneproc a single process
+      receives all frames. Otherwise, a new process is spawned for each frame
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
    -nosubst   don't do pattern substitution on file names
-  file may include substitution pattern
-   ${date,datefmt}  current time formatted with os.date()
-   ${frame,strfmt}  current frame number formatted with string.format
-   ${time,strfmt}   current time in seconds, as float, formatted with string.format
-   default vp_${time,%014.3f}.pbm bm_${time,%014.3f}.pam for viewfinder and ui respectively
+  vp and bm 'dest' may include substitution patterns
+   ${date,datefmt} current time formatted with os.date()
+   ${frame,strfmt} current frame number formatted with string.format
+   ${time,strfmt}  current time in seconds, as float, formatted with string.format
+   default vp_${time,%014.3f}.ppm bm_${time,%014.3f}.pam for viewfinder and ui respectively
+   if piping with oneproc, time will be the start of the first frame and frame will be 1
 
 shoot        [options]   : - shoot a picture with specified exposure
  options:
@@ -519,3 +525,48 @@ If you want to have a script that runs for a long time on the camera, but still
 be able to control it over ptp, you will probably need to write your own script
 using the ptp message interface. Some examples of this in the chdkptp lua code
 lua/rlibs.lua msg_shell and lua/multicam.lua
+
+==Grabbing images from the camera display==
+lvdumpimg can be used capture the viewfinder (viewport) and UI (bitmap) from
+the camera display. The output may be saved to files or piped to the standard
+input of another process.
+
+The -vp and -bm options are used to specify the output files or pipe commands.
+
+The -pipevp and -pipebm options are used to indicate that -vp or -bm specifies
+a command to pipe to rather than a file.
+
+By default, a new process is started for each frame. To send all frames to a
+single process, pass oneproc to the pipe option, like -pipevm=oneproc
+
+It is not currently possible to pipe both viewport and bitmap data to the same
+process.
+
+The viewport is saved before the bitmap, so if oneproc is not used, commands
+for the bitmap may also access the previously saved viewport data.
+
+By default substitution patterns of the form ${foo} may be used to generate
+unique files names using the date, time captured frame counter. Substitutions
+may be disabled using -nosubst.
+
+Some examples:
+Grab 10 viewport frames to files organized in date and time directories
+lvdumpimg -vp=vp_${date,%Y%m%d}/${date,%H%M%S}/${frame}.ppm -count=10
+
+Grab a single viewport frame, use imagemagick to convert to jpeg, re-size to 640x480
+and naming by date and time:
+
+lvdumpimg -vp='convert - -resize 640x480! vp_${date,%B_%d_%Y-%H_%M_%S}.jpg' -pipevp -count=1
+
+NOTE:
+On windows, convert conflicts with system file. You might need to use a full path.
+
+Capture viewport and bitmap, and merge them into a single PNG:
+lvdumpimg -pipebm -count=3 -vp=tmp.ppm -bm='convert tmp.ppm - -resize 640x480! -layers merge merged_${frame}.png'
+
+pipe 100 frames of viewport to ffmpeg and stream over rtp 
+lvdumpimg -pipevp=oneproc -count=100 -vp='ffmpeg -vcodec pgm -f image2pipe -i - -vcodec mpeg2video -s 640x480 -r 24 -pix_fmt yuv420p -f rtp rtp://127.0.0.1:1234'
+
+NOTE:
+You could use VLC and open rtp://127.0.0.1:1234 to watch the stream
+These probably aren't the best parameters to use

@@ -510,6 +510,59 @@ function cli.list_dev_single(desc)
 	return con_status,msg
 end
 
+--[[
+helper function to setup lvdumpimg files
+]]
+function cli.init_lvdumpimg_file_opts(which,args,subst)
+	local opts={}
+	local pipeopt, ext, write_fn
+	if which == 'vp' then
+		pipeopt = 'pipevp'
+		ext='ppm'
+		write_fn = chdku.live_dump_vp_pbm
+	elseif which == 'bm' then
+		pipeopt = 'pipebm'
+		ext='pam'
+		write_fn = chdku.live_dump_bm_pam
+	else
+		error('invalid type '..tostring(which))
+	end
+	local filespec
+	if args[which] == true then
+		if args[pipeopt] then
+			error('must specify command with '..pipeopt)
+		end
+		filespec = which..'_${time,%014.3f}.'..ext
+	else
+		filespec = args[which]
+	end
+
+	if args[pipeopt] then
+		opts.pipe = true
+		if args[pipeopt] == 'oneproc' then
+			opts.pipe_oneproc = true
+		end
+	end
+
+	opts.write = function(frame)
+		if not args.nosubst then
+			opts.filename = subst:run(filespec)
+		else
+			opts.filename = filespec
+		end
+		write_fn(frame,opts)
+		if not args.quiet then
+			if opts.pipe_oneproc then
+				cli.infomsg('frame %d\n',subst.state.frame)
+			else
+				cli.infomsg('%s\n',opts.filename)
+			end
+		end
+	end
+
+	return opts
+end
+
 -- TODO should have a system to split up command code
 local rsint=require'rsint'
 rsint.register_rlib()
@@ -1444,7 +1497,7 @@ cli:add_commands{
 	},
 	{
 		names={'lvdumpimg'},
-		help='dump camera display frames to images',
+		help='dump camera display frames to netpbm images',
 		arghelp="[options]",
 		args=argparser.create({
 --			infile=false,
@@ -1453,6 +1506,8 @@ cli:add_commands{
 			fps=10,
 			vp=false,
 			bm=false,
+			pipevp=false,
+			pipebm=false,
 			nopal=false,
 			quiet=false,
 			nosubst=false,
@@ -1464,16 +1519,21 @@ cli:add_commands{
    -count=<N> number of frames to dump, default 1
    -wait=<N>  wait N ms between frames
    -fps=<N>   specify wait as a frame rate, default 10
-   -vp[=file] get viewfinder data to file
-   -bm[=file] get ui overlay data to file
+   -vp[=dest] get viewfinder in ppm format
+   -bm[=dest] get ui overlay in pam format
+   -pipevp[=oneproc]
+   -pipebm[=oneproc]
+      treat vp or bm 'dest' as a command to pipe to. With =oneproc a single process
+      receives all frames. Otherwise, a new process is spawned for each frame
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
    -nosubst   don't do pattern substitution on file names
-  file may include substitution pattern
-   ${date,datefmt}  current time formatted with os.date()
-   ${frame,strfmt}  current frame number formatted with string.format
-   ${time,strfmt}   current time in seconds, as float, formatted with string.format
-   default vp_${time,%014.3f}.pbm bm_${time,%014.3f}.pam for viewfinder and ui respectively 
+  vp and bm 'dest' may include substitution patterns
+   ${date,datefmt} current time formatted with os.date()
+   ${frame,strfmt} current frame number formatted with string.format
+   ${time,strfmt}  current time in seconds, as float, formatted with string.format
+   default vp_${time,%014.3f}.ppm bm_${time,%014.3f}.pam for viewfinder and ui respectively
+   if piping with oneproc, time will be the start of the first frame and frame will be 1
 ]],
 		func=function(self,args) 
 			local what = 0
@@ -1501,32 +1561,15 @@ cli:add_commands{
 			if args.count then
 				args.count = tonumber(args.count)
 			end
+
+			if not con:is_connected() then
+				return false,'not connected'
+			end
+
 			local status,err
 			if not con:live_is_api_compatible() then
 				return false,'incompatible api'
 			end
-			local vp_spec
-			local vp_use_pipe
-			local bm_spec
-
-			if args.vp == true then
-				vp_spec = 'vp_${time,%014.3f}.ppm'
-			else
-				vp_spec = args.vp
-				if string.sub(vp_spec,1,1) == '!' and not args.nosubst then
-					vp_use_pipe = true
-					vp_spec = string.sub(vp_spec,2,-1)
-				end
-			end
-
-			if args.bm == true then
-				bm_spec = 'bm_${time,%014.3f}.pam'
-			else
-				bm_spec = args.bm
-			end
-			-- TODO check if spec is a directory?
-
-			local frame, vp_pimg, bm_pimg, vp_lb, bm_lb
 
 			local varsubst=require'varsubst'
 			-- state for substitutions
@@ -1536,19 +1579,8 @@ cli:add_commands{
 				date=varsubst.format_state_date('date','%Y%m%d_%H%M%S'),
 			})
 
-			local vp_pipe
-			if vp_use_pipe then
-				local err
-				local mode = 'w'
-				-- non-windows doesn't accept text / binary but windows needs to bin
-				if sys.ostype() == 'Windows' then
-					mode = 'wb'
-				end
-				vp_pipe,err = io.popen(vp_spec,mode)
-				if not vp_pipe then
-					error(err)
-				end
-			end
+			local vp_opts = cli.init_lvdumpimg_file_opts('vp',args,subst)
+			local bm_opts = cli.init_lvdumpimg_file_opts('bm',args,subst)
 
 			local t0=ustime.new()
 			local t_frame_start=ustime.new()
@@ -1560,51 +1592,33 @@ cli:add_commands{
 				frame = con:get_live_data(frame,what)
 
 				subst.state.frame = i
-				-- time values are recorded per frame, to avoid varying between files
+				-- set time state once per frame to avoid varying between viewport and bitmap
 				subst.state.date = os.time()
 				subst.state.time = ustime.new():float()
 
 				if args.vp then
-					if vp_pipe then
-						vp_pimg, vp_lb=chdku.live_dump_vp_pbm(vp_pipe,frame,vp_pimg,vp_lb)
-						if not args.quiet then
-							cli.infomsg('frame %d\n',i)
-						end
-					else
-						local fpath
-						if not args.nosubst then
-							fpath = subst:run(vp_spec)
-						else
-							fpath = vp_spec
-						end
-						if not args.quiet then
-							cli.infomsg('%s\n',fpath)
-						end
-						vp_pimg, vp_lb=chdku.live_dump_vp_pbm(fpath,frame,vp_pimg,vp_lb)
-					end
+					vp_opts.write(frame)
 				end
 				if args.bm then
-					local fpath
-					if not args.nosubst then
-						fpath = subst:run(bm_spec)
-					else
-						fpath = bm_spec
-					end
-					if not args.quiet then
-						cli.infomsg('%s\n',fpath)
-					end
-					bm_pimg, bm_lb=chdku.live_dump_bm_pam(fpath,frame,bm_pimg,bm_lb)
+					bm_opts.write(frame)
 				end
 				if args.wait and i < args.count and t_frame_start:diffms() < args.wait then
 					sys.sleep(args.wait - t_frame_start:diffms())
 				end
 			end
-			if vp_pipe then
-				vp_pipe:close()
+			-- if using oneproc pipe, need to close
+			if vp_opts.filehandle then
+				vp_opts.filehandle:close()
+			end
+			if bm_opts.filehandle then
+				bm_opts.filehandle:close()
 			end
 			if subst.state.frame and not args.quiet then
-				-- note we don't sleep for final frame, so fps will look slightly high
 				local t_total = t0:diffms()/1000
+				-- fudge to handle the final sleep being skipped
+				if args.wait and t_frame_start:diffms() < args.wait then
+					t_total = t_total + (args.wait - t_frame_start:diffms())/1000
+				end
 				cli.dbgmsg('frames:%d time:%f fps:%f\n',subst.state.frame,t_total,subst.state.frame/t_total)
 			end
 			return true

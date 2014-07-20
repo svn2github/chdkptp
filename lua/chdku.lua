@@ -1426,68 +1426,100 @@ function chdku.live_wrap(frame)
 	return t
 end
 
---[[
-write viewport data to an unscaled pbm image
-vp_pimg and vp_lb are pimg and lbuf to re-use, if possible
-TODO should pass in a table instead of returning
-]]
-function chdku.live_dump_vp_pbm(fpath,frame,vp_pimg,vp_lb)
-	vp_pimg = liveimg.get_viewport_pimg(vp_pimg,frame,false)
-	-- TODO may be null if video selected on startup
-	if not vp_pimg then
-		error('no viewport data')
-	end
-	vp_lb = vp_pimg:to_lbuf_packed_rgb(vp_lb)
 
-	-- TODO ensure directory
-	local fh
-	-- pipe support
-	if type(fpath) == 'userdata' then
-		if string.sub(tostring(fpath),1,4) == 'file' then
-			fh = fpath
-		else
-			error("unexpected userdata")
-		end
-	elseif type(fpath) == 'string' then
-		local err
-		fh, err = io.open(fpath,'wb')
-		if not fh then
-			error(err)
+--[[
+helper functions for live image dump
+open file or pipe for pbm / pam dump
+opts are from chdku.live_dump_*
+TODO this isn't really live dump specific
+]]
+local function live_dump_img_open(opts)
+	if opts.filehandle then
+		return opts.filehandle
+	end
+	if not opts.filename then
+		error('no filename or filehandle')
+	end
+
+	local fh, err
+	if opts.pipe then
+		fh,err = fsutil.popen(opts.filename,'wb')
+		if opts.pipe_oneproc then
+			opts.filehandle = fh
 		end
 	else
-		error("unexpected type "..type(fpath))
+		-- ensure parent dir exists
+		fsutil.mkdir_parent(opts.filename)
+		fh, err = io.open(opts.filename,'wb')
 	end
-	fh:write(string.format('P6\n%d\n%d\n%d\n',
-		vp_pimg:width(),
-		vp_pimg:height(),255))
-	vp_lb:fwrite(fh)
-	if type(fpath) ~= 'userdata' then
-		fh:close()
-	end
-	return vp_pimg,vp_lb
-end
---[[
-write viewport data to an unscaled RGBA pam image
-bm_pimg and bm_lb are pimg and lbuf to re-use, if possible
-TODO should pass in a table instead of returning
-]]
-function chdku.live_dump_bm_pam(fpath,frame,bm_pimg,bm_lb)
-	bm_pimg = liveimg.get_bitmap_pimg(bm_pimg,frame,false)
-	bm_lb = bm_pimg:to_lbuf_packed_rgba(bm_lb)
-	
-	-- TODO ensure directory, pipe support
-	local fh, err = io.open(fpath,'wb')
 	if not fh then
 		error(err)
 	end
+	return fh
+end
+local function live_dump_img_close(fh,opts)
+	-- open was passed a handle, don't mess with it
+	if opts.filehandle then
+		return
+	end
+	fh:close()
+end
+
+--[[
+write viewport data to an unscaled pbm image
+frame: live view frame
+opts:{
+	filename=string -- filename or pipe command
+	pipe=bool -- filename is a command to pipe to
+	pipe_oneproc=bool -- start pipe process once and use for all subsequent writes,
+						caller must close opts.filehandle when done
+	filehandle=handle -- already open handle to write to, filename ignored
+	lb=lbuf -- lbuf for image to re-use, created and set if not given
+	pimg=pimg -- pimg to re-use, created if and set if not given
+	skip=bool -- downsample image width 50% in X (faster, rough aspect correction for some cams)
+}
+]]
+function chdku.live_dump_vp_pbm(frame,opts)
+	opts.pimg = liveimg.get_viewport_pimg(opts.pimg,frame,opts.skip)
+	-- TODO may be null if video selected on startup
+	if not opts.pimg then
+		error('no viewport data')
+	end
+	opts.lb = opts.pimg:to_lbuf_packed_rgb(opts.lb)
+	local width = opts.pimg:width()
+	if opts.skip then
+		width = width/2
+	end
+
+	local fh = live_dump_img_open(opts)
+	fh:write(string.format('P6\n%d\n%d\n%d\n',
+		width,
+		opts.pimg:height(),255))
+	opts.lb:fwrite(fh)
+	live_dump_img_close(fh,opts)
+end
+--[[
+write viewport data to an unscaled RGBA pam image
+opts as above
+]]
+function chdku.live_dump_bm_pam(frame,opts)
+	opts.pimg = liveimg.get_bitmap_pimg(opts.pimg,frame,opts.skip)
+	opts.lb = opts.pimg:to_lbuf_packed_rgba(opts.lb)
+
+	local width = opts.pimg:width()
+	if opts.skip then
+		width = width/2
+	end
+
+	local fh = live_dump_img_open(opts)
+
 	fh:write(string.format(
 		'P7\nWIDTH %d\nHEIGHT %d\nDEPTH %d\nMAXVAL %d\nTUPLTYPE RGB_ALPHA\nENDHDR\n',
-		bm_pimg:width(),
-		bm_pimg:height(),
+		width,
+		opts.pimg:height(),
 		4,255))
-	bm_lb:fwrite(fh)
-	fh:close()
-	return bm_pimg,vm_lb
+	opts.lb:fwrite(fh)
+	live_dump_img_close(fh,opts)
 end
 
 --[[
