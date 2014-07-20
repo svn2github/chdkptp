@@ -54,7 +54,7 @@ function m.run_repeat(time,fn,data)
 	return t
 end
 
-function m.tick()
+m.tick=errutil.wrap(function()
 	m.now:get()
 	local num_pending = 0
 	for k,v in pairs(m.pending) do
@@ -80,7 +80,7 @@ function m.tick()
 	if num_pending == 0 and num_repeating == 0 then
 		m.timer.run = "NO"
 	end
-end
+end)
 
 function m.init_timer(time)
 	if not time then

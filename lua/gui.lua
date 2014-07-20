@@ -731,7 +731,6 @@ function gui:run()
 	util.util_stdout = status_out
 	util.util_stderr = status_out
 	do_connect_option()
-	gui.update_connection_status()
 	do_execute_option()
 	live.on_dlg_run()
 	gui.resize_for_content()
