@@ -28,14 +28,43 @@ usage:
 !mc:cmd('exit')
 ]]
 
-local mc={}
+local mc={
+	cams={},    -- array of all connections
+	selected={} -- array of selected connects, ordered by ID
+}
 
+--[[
+return an iterator over selected cams
+]]
+function mc:icams()
+	local i=0
+	return function()
+		i=i+1
+		return self.selected[i]
+	end
+end
 --[[
 find specified device/bus in cams list, returns connection or nil
 ]]
 function mc:find_dev(devspec)
 	for i,lcon in ipairs(self.cams) do
 		if devspec.dev == lcon.condev.dev and devspec.bus == lcon.condev.bus then
+			return lcon
+		end
+	end
+end
+
+function mc:find_serial(serial)
+	for i,lcon in ipairs(self.cams) do
+		if lcon.ptpdev.serial_number == serial then
+			return lcon
+		end
+	end
+end
+
+function mc:find_id(id)
+	for i,lcon in ipairs(self.cams) do
+		if lcon.mc_id == id then
 			return lcon
 		end
 	end
@@ -54,22 +83,40 @@ opts:{
 		model=string
 		plain=bool -- controls whether dev, bus, model, and serial are pattern or plain text match
 	}
+	list=bool or string -- list file defining serial numbers and order, exclusive with add and match
+	close_tempcons -- disconnect non-selected cameras, otherwise left connected but not in the mc list
 }
 ]]
 function mc:connect(opts)
 	opts=util.extend_table({
 	},opts)
+	if opts.list and opts.match or opts.add then
+		error('list may not be combined with match or add')
+	end
 	if not opts.match then
 		opts.match = {}
 	end
 
-	local devices = chdk.list_usb_devices()
 	if not opts.add then
 		self.cams={}
+		self.cams_by_serial={}
 	end
+
+	local ser_list
+	if opts.list then
+		if opts.list == true then
+			ser_list = self:load_list()
+		else
+			ser_list = self:load_list(opts.list)
+		end
+	end
+
+	local devices = chdk.list_usb_devices()
+
 	for i, devinfo in ipairs(devices) do
 		local lcon,msg = chdku.connection(devinfo)
-		-- if not already connected, try to connect
+		-- if already connected just update connection info on wrapper
+		-- otherwise, try to connect
 		if lcon:is_connected() then
 			lcon:update_connection_info()
 		else
@@ -80,26 +127,183 @@ function mc:connect(opts)
 		end
 		-- if connection didn't fail
 		if lcon:is_connected() then
+			-- TODO alt serial mechanism for cams that don't have
+			local serial = lcon.ptpdev.serial_number
 			local status = '-'
-			if not self:find_dev(devinfo) then
-				-- empty match matches everything
-				if chdku.match_device(devinfo,opts.match) and lcon:match_ptp_info(opts.match) then
-					status='+'
-					lcon.mc_id = string.format('%d:%s',i,lcon.ptpdev.model)
-					table.insert(self.cams,lcon)
+			if opts.list then
+				if serial then
+					if ser_list[serial] then
+						status='+'
+						lcon.mc_id = ser_list[serial].id
+						table.insert(self.cams,lcon)
+						-- TODO this should probably be an error
+						-- also duplicate ID
+						if self.cams_by_serial[serial] then
+							warnf('%d: duplicate serial:%s\n',i,lcon.ptpdev.serial_number)
+						end
+						self.cams_by_serial[serial]=lcon
+					else
+						status='i'
+					end
 				else
+					warnf('ignoring camera with no serial\n')
 					status='i'
 				end
+			else
+				if not self:find_dev(devinfo) then
+					-- empty match matches everything
+					if chdku.match_device(devinfo,opts.match) and lcon:match_ptp_info(opts.match) then
+						status='+'
+						table.insert(self.cams,lcon)
+						-- TODO this could conflict with serial based ID
+						lcon.mc_id = #self.cams
+						if serial then
+							self.cams_by_serial[serial]=lcon
+						end
+					else
+						status='i'
+					end
+				end
 			end
-			printf('%s %d:%s bus=%s dev=%s s=%s\n',
+			printf('%s %d:%s b=%s d=%s s=%s\n',
 				status,
 				i,
 				lcon.ptpdev.model,
 				lcon.condev.dev,
 				lcon.condev.bus,
 				tostring(lcon.ptpdev.serial_number))
+			-- disconnect temporary connections
+			if status == 'i' and opts.close_tempcons then
+				lcon:disconnect()
+			end
 		end
 	end
+	-- warn on missing cams
+	if opts.list then
+		for serial, cam_data in pairs(ser_list) do
+			if not self.cams_by_serial[serial] then
+				warnf('missing cam %s:%s\n',cam_data.id,serial)
+			end
+		end
+	end
+	self:sel('all')
+end
+
+--[[
+select cameras by ID
+what is one of
+'all'
+array of ids
+single id
+]]
+function mc:sel(what)
+	-- treat single id like array
+	if type(what) == 'number' then
+		what={what}
+	end
+	if what == 'all' then
+		self.selected = util.extend_table({},self.cams)
+	elseif type(what) == 'table' then
+		self.selected = {}
+		for i,v in ipairs(what) do
+			local lcon = self:find_id(v)
+			if lcon then
+				table.insert(self.selected,lcon)
+			end
+
+		end
+	else
+		error('invalid selection')
+	end
+	-- sort by ID so operations happen in a consistent order
+	table.sort(self.selected, function(a,b) return a.mc_id < b.mc_id end)
+end
+
+function mc:describe(lcon)
+	local status = '?'
+	if util.in_table(self.selected,lcon) then
+		status = '*'
+	elseif util.in_table(self.cams,lcon) then
+		status = ' '
+	end
+	printf('%s id=%s %s b=%s d=%s s=%s\n',
+		status,
+		lcon.mc_id,
+		lcon.ptpdev.model,
+		lcon.condev.dev,
+		lcon.condev.bus,
+		tostring(lcon.ptpdev.serial_number))
+end
+
+function mc:list_sel()
+	for lcon in self:icams() do
+		self:describe(lcon)
+	end
+end
+
+function mc:list_all()
+	for i,lcon in ipairs(self.cams) do
+		self:describe(lcon)
+	end
+end
+
+local function get_list_path(path)
+	if not path then
+		path=fsutil.joinpath(get_chdkptp_home('.'),'mccams.txt')
+	end
+	return path
+end
+--[[
+write a list of camera serial numbers 
+path=string --path to file default CHDKPTP_HOME/mccams.txt
+opts:{
+	overwrite=bool
+}
+]]
+function mc:save_list(path,opts)
+	opts=util.extend_table({},opts)
+	if #mc.cams == 0 then
+		warnf("no cameras\n")
+		return
+	end
+	path=get_list_path(path)
+
+	if not opts.overwrite and lfs.attributes(path,'mode') then
+		warnf("%s exists, overwrite not enabled\n",path)
+	end
+
+	local t={}
+	for lcon in self:icams() do
+		if lcon.ptpdev.serial_number then
+			-- TODO might want to include additional data
+			t[lcon.ptpdev.serial_number] = {id=lcon.mc_id}
+		else
+			warnf("%s: missing serial\n",lcon.mc_id)
+		end
+	end
+	local s=util.serialize(t,{pretty=true})
+
+	fsutil.mkdir_parent(path)
+	local fh,err=io.open(path,'wb')
+	if not fh then
+		error(err)
+	end
+	fh:write(s)
+	fh:close()
+	printf("wrote: %s\n",path)
+end
+--[[
+load and return saved camera list
+]]
+function mc:load_list(path)
+	path=get_list_path(path)
+	local fh,err=io.open(path)
+	if not fh then
+		error(err)
+	end
+	local list=fh:read('*a')
+	fh:close()
+	return util.unserialize(list)
 end
 
 function mc:start_single(lcon)
@@ -124,7 +328,7 @@ end
 start the script on all cameras
 ]]
 function mc:start(opts)
-	for i,lcon in ipairs(self.cams) do
+	for lcon in self:icams() do
 		local status, err=xpcall(self.start_single,errutil.format,self,lcon)
 		if not status then
 			warnf('%s: failed %s\n',lcon.mc_id,err)
@@ -133,24 +337,24 @@ function mc:start(opts)
 end
 
 function mc:check_errors()
-	for i,lcon in ipairs(self.cams) do
+	for lcon in self:icams() do
 		local status,msg=lcon:read_msg_pcall()
 		if status then
 			if msg.type ~= 'none' then
 				if msg.script_id ~= lcon:get_script_id() then
-					warnf("%d: message from unexpected script %d %s\n",i,msg.script_id,chdku.format_script_msg(msg))
+					warnf("%s: message from unexpected script %d %s\n",lcon.mc_id,msg.script_id,chdku.format_script_msg(msg))
 				elseif msg.type == 'user' then
-					warnf("%d: unexpected user message %s\n",i,chdku.format_script_msg(msg))
+					warnf("%s: unexpected user message %s\n",lcon.mc_id,chdku.format_script_msg(msg))
 				elseif msg.type == 'return' then
-					warnf("%d: unexpected return message %s\n",i,chdku.format_script_msg(msg))
+					warnf("%s: unexpected return message %s\n",lcon.mc_id,chdku.format_script_msg(msg))
 				elseif msg.type == 'error' then
-					warnf('%d:%s\n',i,msg.value)
+					warnf('%s:%s\n',lcon.mc_id,msg.value)
 				else
-					warnf("%d: unknown message type %s\n",i,tostring(msg.type))
+					warnf("%s: unknown message type %s\n",lcon.mc_id,tostring(msg.type))
 				end
 			end
 		else
-			warnf('%d:read_msg error %s\n',i,tostring(err))
+			warnf('%s:read_msg error %s\n',lcon.mc_id,tostring(err))
 		end
 	end
 end
@@ -276,13 +480,13 @@ function mc:init_sync(count)
 	if not count then
 		count = 10
 	end
-	for i,lcon in ipairs(self.cams) do
+	for lcon in self:icams() do
 		local status,err=pcall(self.init_sync_cam,self,lcon,count)
 		if status then
 			-- TODO mean send time might not be enough, add one SD
 			self.min_sync_delay = self.min_sync_delay + lcon.mc_sync.msend + lcon.mc_sync.sdsend
 		else
-			warnf('%d:init_sync_cam: %s\n',i,tostring(err))
+			warnf('%s:init_sync_cam: %s\n',lcon.mc_id,tostring(err))
 		end
 	end
 	printf('minimum sync delay %d\n',self.min_sync_delay)
@@ -336,8 +540,8 @@ function mc:wait_status_msg(cmd,opts)
 		sys.sleep(opts.initwait)
 	end
 	local results={}
-	for i,lcon in ipairs(self.cams) do
-		results[i] = {
+	for lcon in self:icams() do
+		results[lcon.mc_id] = {
 			failed=false,
 			done=false,
 		}
@@ -347,15 +551,15 @@ function mc:wait_status_msg(cmd,opts)
 	while true do
 		local complete = 0
 		tpoll:get()
-		for i,lcon in ipairs(self.cams) do
-			local r = results[i]
+		for lcon in self:icams() do
+			local r = results[lcon.mc_id]
 			if r.failed or r.done then
 				complete = complete + 1
 			else
 				self:get_single_status(lcon,cmd,r)
 			end
 		end
-		if complete == #self.cams then
+		if complete == #self.selected then
 			return true, results
 		end
 		if ustime.diffms(tstart) > opts.timeout then
@@ -375,7 +579,7 @@ function mc:get_sync_tick(lcon,tstart,syncat)
 	return lcon.mc_sync.rtadj + ustime.diffms(tstart,lcon.mc_sync.lt0) + syncat
 end
 function mc:flushmsgs()
-	for i,lcon in ipairs(self.cams) do
+	for lcon in self:icams() do
 		lcon:flushmsgs()
 	end
 end
@@ -399,7 +603,7 @@ function mc:cmd(cmd,opts)
 		self:flushmsgs()
 	end
 	local sendcmd = cmd
-	for i,lcon in ipairs(self.cams) do
+	for lcon in self:icams() do
 		local status,err
 		if opts.syncat then
 			sendcmd = string.format('%s %d',cmd,self:get_sync_tick(lcon,tstart,opts.syncat))
@@ -432,8 +636,9 @@ function mc:print_cmd_status(status,results)
 		printf("errors\n")
 	end
 	if results then
-		for i,v in ipairs(results) do
-			printf('%d: %s\n',i,tostring(util.serialize(v,{pretty=true})))
+		for lcon in mc:icams() do
+			local v=results[lcon.mc_id]
+			printf('%s: %s\n',lcon.mc_id,tostring(util.serialize(v,{pretty=true})))
 		end
 	end
 end
@@ -493,11 +698,12 @@ function mc:download_last()
 		error('failed to get image paths')
 	end
 	local save_con = con
-	for i, r in ipairs(images) do
-		con = self.cams[i]
-		printf("%s %s\n",i,con.mc_id,r.status.msg)
+	for lcon in self:icams() do
+		con = lcon
+		local r = images[lcon.mc_id]
+		printf("%s %s\n",con.mc_id,r.status.msg)
 		fsutil.mkdir_m(tostring(i))
-		cli:print_status(cli:execute(string.format('d -nolua %s %d/',r.status.msg,i)))
+		cli:print_status(cli:execute(string.format('d -nolua %s %s/',r.status.msg,lcon.mc_id)))
 	end
 	con = save_con
 end
