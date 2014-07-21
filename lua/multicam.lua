@@ -306,7 +306,9 @@ function mc:load_list(path)
 	return util.unserialize(list)
 end
 
-function mc:start_single(lcon)
+function mc:start_single(lcon,opts)
+	opts = util.extend_table({},opts)
+	opts.id = lcon.mc_id
 	local status = lcon:script_status()
 	-- attempt to end a running mc (otherwise script id is wrong)
 	-- TODO should use killscript if safe
@@ -329,7 +331,7 @@ start the script on all cameras
 ]]
 function mc:start(opts)
 	for lcon in self:icams() do
-		local status, err=xpcall(self.start_single,errutil.format,self,lcon)
+		local status, err=xpcall(self.start_single,errutil.format,self,lcon,opts)
 		if not status then
 			warnf('%s: failed %s\n',lcon.mc_id,err)
 		end
@@ -721,8 +723,11 @@ commands
 	play: switch to playback
 	preshoot: press shoot half and wait for get_shooting
 	shoot [ms]: wait [ms], press shoot full, wait for get_shooting
+	shoot_hook_sync [ms]: as above, except using chdk 1.3 shoot hook
 	tick: return the value of get_tick_count
 	exit: end script
+	id: toggle id display
+	lastimg: return full path of last shot image
 ]]
 local function init()
 	chdku.rlibs:register({
@@ -733,10 +738,20 @@ mc={
 	mode_sw_timeout=1000,
 	preshoot_timeout=5000,
 	shoot_complete_timeout=5000,
-	msg_timeout=100000,
+	msg_timeout=100,
 	shoot_hold=10,
 	shoot_hook_timeout=5000,
 	shoot_hook_ready_timeout=10000,
+}
+
+color={
+	transparent=256,
+	black=257,
+	white=258,
+	red=259,
+	green=263,
+	blue=266,
+	yellow=271,
 }
 
 cmds={}
@@ -773,6 +788,24 @@ function wait_tick(synctick)
 			sleep(s)
 		end
 	end
+end
+
+function draw_id()
+	if not mc.show_id then
+		return
+	end
+	if mc.id then
+		draw_string(5, 5, string.format('%02d',mc.id), color.white, color.blue, 4) 
+	else
+		draw_string(5, 5, "-", color.white, color.red, 4) 
+	end
+end
+
+function cmds.id()
+	mc.show_id=not mc.show_id
+	draw_clear()
+	draw_id()
+	write_status(true,mc.show_id)
 end
 
 function cmds.rec()
@@ -870,6 +903,10 @@ function cmds.getlastimg()
 	write_status(true,string.format('%s/IMG_%04d.JPG',get_image_dir(),get_exp_count()))
 end
 
+function mc.idle()
+	draw_id()
+end
+
 function mc.run(opts)
 	extend_table(mc,opts)
 	set_yield(-1,-1)
@@ -882,6 +919,8 @@ function mc.run(opts)
 			else
 				write_status(false,'unknown')
 			end
+		else
+			mc.idle()
 		end
 	until mc.done
 end
