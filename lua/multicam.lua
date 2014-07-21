@@ -72,7 +72,6 @@ end
 
 --[[
 connect to all available cams
-TODO add matching support
 opts:{
 	add=bool -- don't reset existing list, just add any matching camereas
 	match={ -- match spec as used in CLI connect
