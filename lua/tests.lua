@@ -364,6 +364,16 @@ t.extend_table = function()
 	assert(util.compare_values(util.extend_table({a='a'},t,{keys={1,2,'a'}}),{1,2,a='a'}))
 end
 
+t.flip_table = function()
+	assert(util.compare_values(util.flip_table({}),{}))
+	assert(util.compare_values(util.flip_table({'a','b','c'}),{a=1,b=2,c=3}))
+	local t=util.flip_table{'a','b','c',foo='bar',dup='c',d=1}
+	-- undefined which key is kept for dupes
+	assert(t.c == 'dup' or t.c == 3)
+	t.c=nil
+	assert(util.compare_values(t,{'d',a=1,b=2,bar='foo'}))
+end
+
 t.bit_util = function()
 	local b=util.bit_unpack(0)
 	assert(#b==31)

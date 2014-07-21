@@ -205,6 +205,17 @@ function util.extend_table(target,source,opts)
 end
 
 --[[
+swap keys and values
+dupe values will be lost
+]]
+function util.flip_table(t)
+	local r={}
+	for k,v in pairs(t) do
+		r[v]=k
+	end
+	return r
+end
+--[[
 compare v1 and v2
 table values are compared recursively, returning true if all key/values in v2 exist in v1
 ]]
