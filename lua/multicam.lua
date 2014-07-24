@@ -29,8 +29,9 @@ usage:
 ]]
 
 local mc={
-	cams={},    -- array of all connections
-	selected={} -- array of selected connects, ordered by ID
+	cams={},     -- array of all connections
+	selected={}, -- array of selected connects, ordered by ID
+	max_id=0,    -- max used ID, since list may not be contiguous
 }
 
 --[[
@@ -198,6 +199,7 @@ select cameras by ID
 what is one of
 array of ids
 table specifying range with {min=min_id,max=max_id}
+min,max default to 1, max_id respectively
 single id
 ]]
 function mc:sel(what,range)
@@ -211,8 +213,11 @@ function mc:sel(what,range)
 		local new_sel = {}
 		-- range
 		if what.min or what.max then
-			if not (what.min and what.max) then
-				error('must specify both min and max')
+			if not what.min then
+				what.min = 1
+			end
+			if not what.max then
+				what.max = self.max_id
 			end
 			for i=what.min,what.max do
 				local lcon = self:find_id(i)
@@ -291,6 +296,7 @@ function mc:save_list(path,opts)
 
 	if not opts.overwrite and lfs.attributes(path,'mode') then
 		warnf("%s exists, overwrite not enabled\n",path)
+		return
 	end
 
 	local t={}
@@ -347,6 +353,43 @@ function mc:start_single(lcon,opts)
 
 	lcon:exec('mc.run('..util.serialize(opts)..')',{libs='multicam'})
 end
+
+--[[
+change the id of a camera
+old_id = number -- existing id of camera to change
+new_id = number -- new id value
+conflicts = 'swap' | 'error' -- what to do if new exists, default 'swap'
+selection is reset to all
+]]
+function mc:set_id(old_id,new_id,conflicts)
+	if not conflicts then
+		conflicts = 'swap'
+	end
+	old_con=self:find_id(old_id)
+	if not old_con then
+		error('no matching id: '..tostring(old_id))
+	end
+	new_con=self:find_id(new_id)
+	if new_con then
+		if conflicts == 'error' then
+			error('new id already exists: '..tostring(new_id))
+		elseif conflicts ~= 'swap' then
+			error('invalid conflict option: '..tostring(conflicts))
+		end
+		-- otherwise, swap
+		new_con.mc_id = old_id
+	end
+	old_con.mc_id = new_id
+
+	-- update max_id if needed
+	if new_id > self.max_id then
+		self.max_id = new_id
+	end
+
+	-- reset selection, since it may no longer be valid
+	self:sel('all')
+end
+
 --[[
 start the script on all cameras
 ]]
