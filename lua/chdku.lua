@@ -570,11 +570,11 @@ function chdku.msg_unbatcher(t)
 	local i=1
 	return function(msg)
 		if msg.subtype ~= 'table' then
-			return errlib.throw{etype='wrongmsg_sub',msg='wrong message subtype: ' ..tostring(msg.subtype)}
+			errlib.throw{etype='wrongmsg_sub',msg='wrong message subtype: ' ..tostring(msg.subtype)}
 		end
 		local chunk,err=unserialize(msg.value)
 		if err then
-			return errlib.throw{etype='unserialize',msg=tostring(err)}
+			errlib.throw{etype='unserialize',msg=tostring(err)}
 		end
 		for j,v in ipairs(chunk) do
 			t[i]=v
