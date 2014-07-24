@@ -793,6 +793,74 @@ function mc:download_last()
 	end
 	con = save_con
 end
+
+--[[
+return a list of camera image file paths and stat info
+]]
+function mc:imglist_cam(lcon,opts)
+	local ropts=util.extend_table({
+		dirs=false,
+		fmatch='%a%a%a_%d%d%d%d%.%w%w%w',
+	},opts,{
+		keys={
+			'start_dirs',
+			'paths',
+			'fmatch',
+			'dmatch',
+			'rmatch',
+			'maxdepth',
+			'batchsize',
+		}
+	})
+	local sendcmd = string.format('imglist %s',util.serialize(ropts))
+	local status,err = lcon:write_msg_pcall(sendcmd)
+	if not status then
+		warnf('%s: send %s cmd failed: %s\n',lcon.mc_id,tostring(sendcmd),tostring(err))
+		return
+	end
+	local r={}
+	while true do
+		local msg=lcon:wait_msg({
+				mtype='user',
+				msubtype='table',
+				munserialize=true,
+		})
+		-- batcher message, should just have numeric indexes
+		if msg.status == nil then
+			for k,v in ipairs(msg) do
+				table.insert(r,v)
+			end
+		-- error
+		elseif not msg.status then 
+			warnf('%s: failed %s\n',lcon.mc_id,tostring(msg.msg))
+			return
+		-- done
+		else
+			return r
+		end
+	end
+end
+
+--[[
+list images for all cams, return in array indexed by mc_id
+]]
+function mc:imglist(opts)
+	local r={}
+	for lcon in self:icams() do
+		local l=self:imglist_cam(lcon,opts)
+		if l then
+			r[lcon.mc_id] = l
+		end
+	end
+	return r
+end
+--[[
+]]
+--[[
+function mc:download_images(opts)
+end
+]]
+
 --[[
 remote script
 waits in a loop for messages
@@ -812,11 +880,15 @@ commands
 	exit: end script
 	id: toggle id display
 	lastimg: return full path of last shot image
+	imglist: send a list of images using using find_files, terminated by a status message
+			must NOT be used directly with cmdwait
+			args should be a serialized lua table of options for find_files, optionally specifying
+			initial paths with start_dirs
 ]]
 local function init()
 	chdku.rlibs:register({
 		name='multicam',
-		depend={'extend_table','serialize_msgs'},
+		depend={'extend_table','serialize_msgs','unserialize','find_files'},
 		code=[[
 mc={
 	mode_sw_timeout=1000,
@@ -992,6 +1064,25 @@ function cmds.pcall()
 end
 function cmds.getlastimg()
 	write_status(true,string.format('%s/IMG_%04d.JPG',get_image_dir(),get_exp_count()))
+end
+
+function ff_imglist_fn(self,opts)
+	if #self.rpath == 0 and self.cur.st.is_dir then
+		return true
+	end
+	return self:ff_bwrite(self.cur)
+end
+
+function cmds.imglist()
+	local args,err=unserialize(mc.args)
+	if not args then
+		write_status(false,'unserialize failed '..tostring(err))
+	end
+	if not args.start_dirs then
+		args.start_dirs={'A/DCIM'}
+	end
+	find_files(args.start_dirs,args,ff_imglist_fn)
+	write_status(true,'done')
 end
 
 function mc.idle()
