@@ -355,6 +355,25 @@ function mc:start_single(lcon,opts)
 end
 
 --[[
+set id on cam if script is running. Otherwise will be updated on next start
+local ID must already be set and consistent
+]]
+function mc:set_id_cam(lcon)
+	if lcon:script_status().run then
+		local saved_sel = util.extend_table({},self.selected)
+		-- send command to just this camera
+		self:sel(lcon.mc_id)
+		local status, rstatus, err = self:cmdwait(string.format('setid %d',lcon.mc_id))
+		if not status then
+			warnf("setid failed %s",tostring(err))
+		end
+		if rstatus.failed then
+			warnf("setid failed %s",tostring(rstatus.err))
+		end
+		self.selected=saved_sel
+	end
+end
+--[[
 change the id of a camera
 old_id = number -- existing id of camera to change
 new_id = number -- new id value
@@ -380,6 +399,11 @@ function mc:set_id(old_id,new_id,conflicts)
 		new_con.mc_id = old_id
 	end
 	old_con.mc_id = new_id
+	-- don't update remote IDs until local are set, since it relies on sel
+	self:set_id_cam(old_con)
+	if new_con then
+		self:set_id_cam(new_con)
+	end
 
 	-- update max_id if needed
 	if new_id > self.max_id then
@@ -870,6 +894,13 @@ function cmds.id()
 	draw_clear()
 	draw_id()
 	write_status(true,mc.show_id)
+end
+
+function cmds.setid()
+	local old_id = mc.id
+	local new_id = tonumber(mc.args)
+	mc.id = new_id
+	write_status(true, string.format('%d=>%d',old_id,new_id))
 end
 
 function cmds.rec()
