@@ -214,6 +214,27 @@ end
 ]],
 },
 --[[
+unserialize, copied from util 5.1 code
+useful if you are sending messages with lua data structures
+]]
+{
+	name='unserialize',
+	code=[[
+function unserialize(s)
+	local f,err=loadstring('return ' .. s)
+	if not f then
+		return false, err
+	end
+	setfenv(f,{}) -- empty fenv
+	local status,r=pcall(f)
+	if status then
+		return r
+	end
+	return false,r
+end
+]]
+},
+--[[
 mt_inherit from util
 ]]
 {
