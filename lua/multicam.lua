@@ -89,7 +89,7 @@ opts:{
 function mc:connect(opts)
 	opts=util.extend_table({
 	},opts)
-	if opts.list and opts.match or opts.add then
+	if opts.list and (opts.match or opts.add) then
 		error('list may not be combined with match or add')
 	end
 	if not opts.match then
@@ -109,6 +109,7 @@ function mc:connect(opts)
 			ser_list = self:load_list(opts.list)
 		end
 	end
+
 
 	local devices = chdk.list_usb_devices()
 
@@ -154,8 +155,9 @@ function mc:connect(opts)
 					if chdku.match_device(devinfo,opts.match) and lcon:match_ptp_info(opts.match) then
 						status='+'
 						table.insert(self.cams,lcon)
-						-- TODO this could conflict with serial based ID
-						lcon.mc_id = #self.cams
+						-- ensure new cams have a unique id even, loaded list may not be contiguous
+						self.max_id = self.max_id + 1
+						lcon.mc_id = self.max_id
 						if serial then
 							self.cams_by_serial[serial]=lcon
 						end
@@ -177,11 +179,14 @@ function mc:connect(opts)
 			end
 		end
 	end
-	-- warn on missing cams
+	-- warn on missing cams, update max id
 	if opts.list then
 		for serial, cam_data in pairs(ser_list) do
 			if not self.cams_by_serial[serial] then
 				warnf('missing cam %s:%s\n',cam_data.id,serial)
+			end
+			if cam_data.id > self.max_id then
+				self.max_id = cam_data.id
 			end
 		end
 	end
@@ -191,11 +196,11 @@ end
 --[[
 select cameras by ID
 what is one of
-'all'
 array of ids
+table specifying range with {min=min_id,max=max_id}
 single id
 ]]
-function mc:sel(what)
+function mc:sel(what,range)
 	-- treat single id like array
 	if type(what) == 'number' then
 		what={what}
@@ -203,14 +208,31 @@ function mc:sel(what)
 	if what == 'all' then
 		self.selected = util.extend_table({},self.cams)
 	elseif type(what) == 'table' then
-		self.selected = {}
-		for i,v in ipairs(what) do
-			local lcon = self:find_id(v)
-			if lcon then
-				table.insert(self.selected,lcon)
+		local new_sel = {}
+		-- range
+		if what.min or what.max then
+			if not (what.min and what.max) then
+				error('must specify both min and max')
 			end
-
+			for i=what.min,what.max do
+				local lcon = self:find_id(i)
+				-- note ids may have gaps, so missing is not an error
+				if lcon then
+					table.insert(new_sel,lcon)
+				end
+			end
+		else
+		-- array of explicit IDs
+			for i,v in ipairs(what) do
+				local lcon = self:find_id(v)
+				if lcon then
+					table.insert(new_sel,lcon)
+				else
+					error('attempted to select non-existent id '..tostring(v))
+				end
+			end
 		end
+		self.selected = new_sel
 	else
 		error('invalid selection')
 	end
