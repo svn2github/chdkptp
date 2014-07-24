@@ -355,14 +355,15 @@ function mc:start_single(lcon,opts)
 end
 
 --[[
-set id on cam if script is running. Otherwise will be updated on next start
-local ID must already be set and consistent
+set id on connection and on cam if script is running.
+If script not running, will be updated on next start
 ]]
-function mc:set_id_cam(lcon)
+function mc:set_id_cam(lcon,id)
+	lcon.mc_id = id
 	if lcon:script_status().run then
+		-- copy table
 		local saved_sel = util.extend_table({},self.selected)
-		-- send command to just this camera
-		self:sel(lcon.mc_id)
+		self.selected={lcon} -- allow using normal command functions on just this connection
 		local status, rstatus, err = self:cmdwait(string.format('setid %d',lcon.mc_id))
 		if not status then
 			warnf("setid failed %s",tostring(err))
@@ -384,26 +385,21 @@ function mc:set_id(old_id,new_id,conflicts)
 	if not conflicts then
 		conflicts = 'swap'
 	end
-	old_con=self:find_id(old_id)
-	if not old_con then
+	local lcon=self:find_id(old_id)
+	if not lcon then
 		error('no matching id: '..tostring(old_id))
 	end
-	new_con=self:find_id(new_id)
-	if new_con then
+	local conflict_con=self:find_id(new_id)
+	if conflict_con then
 		if conflicts == 'error' then
 			error('new id already exists: '..tostring(new_id))
 		elseif conflicts ~= 'swap' then
 			error('invalid conflict option: '..tostring(conflicts))
 		end
 		-- otherwise, swap
-		new_con.mc_id = old_id
+		self:set_id_cam(conflict_con,old_id)
 	end
-	old_con.mc_id = new_id
-	-- don't update remote IDs until local are set, since it relies on sel
-	self:set_id_cam(old_con)
-	if new_con then
-		self:set_id_cam(new_con)
-	end
+	self:set_id_cam(lcon,new_id)
 
 	-- update max_id if needed
 	if new_id > self.max_id then
@@ -680,7 +676,7 @@ opts {
 	arg=string
 	flushmsgs=bool - flush any pending messages
 	syncat=<ms> -- number of ms after now command should execute (TODO accept a ustime)
-	--
+	cons={} -- explicit table of connections
 }
 if syncat is set, sends a synchronized command
 to execute at approximately local issue time + syncat
