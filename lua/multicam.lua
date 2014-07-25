@@ -777,23 +777,6 @@ function mc:testshots(opts)
 	end
 end
 
--- quick and dirty download last shot to camera number/image name
-function mc:download_last()
-	local status,images=self:cmdwait('getlastimg')
-	if not status then
-		error('failed to get image paths')
-	end
-	local save_con = con
-	for lcon in self:icams() do
-		con = lcon
-		local r = images[lcon.mc_id]
-		printf("%s %s\n",con.mc_id,r.status.msg)
-		fsutil.mkdir_m(tostring(i))
-		cli:print_status(cli:execute(string.format('d -nolua %s %s/',r.status.msg,lcon.mc_id)))
-	end
-	con = save_con
-end
-
 --[[
 return a list of camera image file paths and stat info
 ]]
