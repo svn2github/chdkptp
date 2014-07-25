@@ -50,7 +50,7 @@ opts {
 ]]
 function fsutil.remove_sfx(path,sfx,opts)
 	opts = util.extend_table({ignorecase=true},opts)
-	if string.len(sfx) < string.len(path) then
+	if string.len(sfx) <= string.len(path) then
 		if (opts.ignorecase and string.lower(string.sub(path,-string.len(sfx))) == string.lower(sfx))
 				or string.sub(path,-string.len(sfx)) == sfx then
 			return string.sub(path,1,string.len(path) - string.len(sfx))
@@ -72,6 +72,7 @@ function fsutil.basename(path,sfx,opts)
 	if not s then
 		return nil
 	end
+	-- unix basename returns full name if suffix is equal to original
 	if sfx and string.len(sfx) < string.len(bn) then
 		bn = fsutil.remove_sfx(bn,sfx,opts)
 	end
@@ -106,7 +107,8 @@ function fsutil.basename_cam(path,sfx,opts)
 	if not s then
 		return nil
 	end
-	if sfx then
+	-- unix basename returns full name if suffix is equal to original
+	if sfx and string.len(sfx) < string.len(bn) then
 		bn = fsutil.remove_sfx(bn,sfx,opts)
 	end
 	return bn
@@ -244,6 +246,24 @@ function fsutil.splitpath_cam(path)
 	end
 end
 
+--[[
+return final .chars or empty string
+]]
+function fsutil.get_ext(path)
+	local ext=string.match(path,'(%.[^.'..fsutil.dir_sep_chars()..']*)$')
+	if not ext then
+		return ''
+	end
+	return ext
+end
+
+--[[
+return name, ext
+]]
+function fsutil.split_ext(path)
+	local ext=fsutil.get_ext(path)
+	return fsutil.remove_sfx(path,ext),ext
+end
 --[[
 ensure path starts with A/, replace \ with / 
 ]]
