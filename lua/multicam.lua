@@ -934,6 +934,8 @@ ${name} Image full name, like IMG_1234.JPG
 ${basename} Image name without extension, like IMG_1234
 ${ext} Image extension, like .JPG
 ${subdir} Image DCIM subdirectory, like 100CANON or 100___01 or 100_0101
+${imgnum} Image number like 1234
+${dirnum} Image directory number like 101
 ${dirmonth} Image DCIM subdirectory month, like 01, date folder naming cameras only
 ${dirday} Image DCIM subdirectory day, like 01, date folder naming cameras only
 ]]
