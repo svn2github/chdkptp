@@ -881,7 +881,7 @@ function mc:delete_images_list_cam(lcon,imgs,opts)
 end
 
 function mc:delete_images_list(list,opts)
-	for id,imgs in ipairs(list) do
+	for id,imgs in pairs(list) do
 		local lcon = self:find_id(id)
 		if lcon then
 			self:delete_images_list_cam(lcon,imgs,opts)
@@ -969,7 +969,7 @@ function mc:download_images(opts)
 	subst.state.lts = ustime.new():float() -- local unix timestamp + microseconds
 	-- list all images
 	local list=self:imglist(opts)
-	for id,imgs in ipairs(list) do
+	for id,imgs in pairs(list) do
 		local lcon=self:find_id(id)
 		if not lcon then
 			warnf("missing connection %s\n",id)
