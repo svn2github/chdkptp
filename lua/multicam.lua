@@ -803,8 +803,10 @@ function mc:imglist_cam(lcon,opts)
 		fmatch='%a%a%a_%d%d%d%d%.%w%w%w',
 	},opts,{
 		keys={
-			'start_dirs',
-			'paths',
+			'lastimg',
+			'imgnum_min',
+			'imgnum_max',
+			'start_paths',
 			'fmatch',
 			'dmatch',
 			'rmatch',
@@ -1043,7 +1045,7 @@ commands
 	imglist: send a list of images using using find_files, terminated by a status message
 			must NOT be used directly with cmdwait
 			args should be a serialized lua table of options for find_files, optionally specifying
-			initial paths with start_dirs
+			initial paths with start_paths
 ]]
 local function init()
 	chdku.rlibs:register({
@@ -1230,6 +1232,19 @@ function ff_imglist_fn(self,opts)
 	if #self.rpath == 0 and self.cur.st.is_dir then
 		return true
 	end
+	if opts.imgnum_min or opts.imgnum_max then
+		local imgnum = string.match(self.cur.name,'%a%a%a_(%d%d%d%d)%.%w%w%w$')
+		if not imgnum then
+			return true
+		end
+		imgnum = tonumber(imgnum)
+		if opts.imgnum_min and imgnum < opts.imgnum_min then
+			return true
+		end
+		if opts.imgnum_max and imgnum > opts.imgnum_max then
+			return true
+		end
+	end
 	return self:ff_bwrite(self.cur)
 end
 
@@ -1238,10 +1253,26 @@ function cmds.imglist()
 	if not args then
 		write_status(false,'unserialize failed '..tostring(err))
 	end
-	if not args.start_dirs then
-		args.start_dirs={'A/DCIM'}
+	-- convert lastimg to imgnum range
+	-- doesn't handler wrap / folder reset
+	if args.lastimg then
+		if args.lastimg == true then
+			args.lastimg = 1
+		end
+		args.imgnum_max=get_exp_count()
+		if type(args.lastimg) == 'number' then
+			if args.lastimg < args.imgnum_max then
+				args.imgnum_min = args.imgnum_max - args.lastimg + 1
+			else
+				args.imgnum_min = 1
+			end
+		end
+		args.start_paths={get_image_dir()}
 	end
-	find_files(args.start_dirs,args,ff_imglist_fn)
+	if not args.start_paths then
+		args.start_paths={'A/DCIM'}
+	end
+	find_files(args.start_paths,args,ff_imglist_fn)
 	write_status(true,'done')
 end
 
