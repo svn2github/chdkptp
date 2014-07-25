@@ -1256,16 +1256,14 @@ function cmds.imglist()
 	-- convert lastimg to imgnum range
 	-- doesn't handler wrap / folder reset
 	if args.lastimg then
-		if args.lastimg == true then
+		if type(args.lastimg) ~= 'number' then
 			args.lastimg = 1
 		end
 		args.imgnum_max=get_exp_count()
-		if type(args.lastimg) == 'number' then
-			if args.lastimg < args.imgnum_max then
-				args.imgnum_min = args.imgnum_max - args.lastimg + 1
-			else
-				args.imgnum_min = 1
-			end
+		if args.lastimg < args.imgnum_max then
+			args.imgnum_min = args.imgnum_max - args.lastimg + 1
+		else
+			args.imgnum_min = 1
 		end
 		args.start_paths={get_image_dir()}
 	end
