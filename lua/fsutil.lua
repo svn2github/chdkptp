@@ -248,9 +248,10 @@ end
 
 --[[
 return final .chars or empty string
+.foo is not considered an extension
 ]]
 function fsutil.get_ext(path)
-	local ext=string.match(path,'(%.[^.'..fsutil.dir_sep_chars()..']*)$')
+	local ext=string.match(path,'[^.].*(%.[^.'..fsutil.dir_sep_chars()..']*)$')
 	if not ext then
 		return ''
 	end
