@@ -854,12 +854,170 @@ function mc:imglist(opts)
 	end
 	return r
 end
---[[
-]]
---[[
-function mc:download_images(opts)
+
+function mc:delete_images_list_cam(lcon,imgs,opts)
+	for i,f in ipairs(imgs) do
+		if opts.verbose then
+			printf('os.remove("%s")\n',f.full)
+		end
+		if not opts.pretend then
+			lcon:flushmsgs() -- prevent status from being confused by stale messages
+			-- TODO one at a time with status is slow, should batch in both directions
+			local status,err = lcon:write_msg_pcall(string.format('pcall return os.remove("%s")',f.full))
+			if not status then
+				warnf("%s send failed %s\n",lcon.mc_id,tostring(err))
+				return
+			end
+			local msg=lcon:wait_msg({
+					mtype='user',
+					msubtype='table',
+					munserialize=true,
+			})
+			if msg.status == false then
+				warnf("%s remove failed %s\n",lcon.mc_id,tostring(msg.err))
+			end
+		end
+	end
 end
+
+function mc:delete_images_list(list,opts)
+	for id,imgs in ipairs(list) do
+		local lcon = self:find_id(id)
+		if lcon then
+			self:delete_images_list_cam(lcon,imgs,opts)
+		else
+			warnf("missing connection %s\n",id)
+		end
+	end
+end
+--[[
+helper function to allow bailing out with return
 ]]
+function do_image_download(lcon,src,dst,opts)
+	if opts.verbose then
+		printf('%s->%s\n',src,dst)
+	end
+	local m = lfs.attributes(dst,'mode')
+	if m then
+		if opts.overwrite then
+			if opts.verbose then
+				warnf("overwrite: %s\n",dst)
+			end
+		else
+			warnf("skipping existing file: %s\n",dst)
+			return
+		end
+	end
+	if not opts.pretend then
+		fsutil.mkdir_parent(dst)
+		lcon:download(src,dst)
+	end
+end
+--
+--[[
+opts={
+	dst=string -- substitution pattern for downloaded files
+	delete=bool -- delete after download - not directories will not be deleted
+	overwrite=bool -- overwrite existing
+	pretend=bool -- print actions without doing anything
+	verbose=bool -- print actions
+	-- everything else passed to imagelist
+}
+substitution patterns
+${id,strfmt} camera ID, default format %02d
+${serial,strfmt} camera ID, default format %s
+${ldate,datefmt} PC clock date when download was started, os.date format, default %Y%m%d_%H%M%S
+${lts,strfmt} PC clock date as unix timestamp + microseconds when download was started, default format %f
+${mdate,datefmt} Camera file modified date, converted to PC time, os.date format, default %Y%m%d_%H%M%S
+${mts,strfmt}  Camera file modified date, as unix timestamp converted to PC time, default format %d
+${name} Image full name, like IMG_1234.JPG
+${basename} Image name without extension, like IMG_1234
+${ext} Image extension, like .JPG
+${subdir} Image DCIM subdirectory, like 100CANON or 100___01 or 100_0101
+${dirmonth} Image DCIM subdirectory month, like 01, date folder naming cameras only
+${dirday} Image DCIM subdirectory day, like 01, date folder naming cameras only
+]]
+function mc:download_images(opts)
+	opts=util.extend_table({
+		dst='${id}/${subdir}/${name}',
+	},opts)
+	if opts.pretend then
+		opts.verbose = true
+	end
+	local varsubst=require'varsubst'
+	local subst=varsubst.new{
+		id=varsubst.format_state_val('id','%02d'),
+		serial=varsubst.format_state_val('serial','%s'),
+		ldate=varsubst.format_state_date('ldate','%Y%m%d_%H%M%S'),
+		lts=varsubst.format_state_val('lts','%f'),
+		mdate=varsubst.format_state_date('mdate','%Y%m%d_%H%M%S'),
+		mts=varsubst.format_state_val('mts','%d'),
+		name=varsubst.format_state_val('name','%s'),
+		basename=varsubst.format_state_val('basename','%s'),
+		ext=varsubst.format_state_val('ext','%s'),
+		subdir=varsubst.format_state_val('subdir','%s'),
+		imgnum=varsubst.format_state_val('imgnum','%s'),
+		dirnum=varsubst.format_state_val('dirnum','%s'),
+		-- only set if camera uses date based folder names
+		dirmonth=varsubst.format_state_val('dirmonth','%s'),
+		-- only set if camera uses date based folder names, and daily folders enabled
+		dirday=varsubst.format_state_val('dirday','%s'),
+	}
+	subst.state.ldate = os.time() -- local time as a timestamp
+	subst.state.lts = ustime.new():float() -- local unix timestamp + microseconds
+	-- list all images
+	local list=self:imglist(opts)
+	for id,imgs in ipairs(list) do
+		local lcon=self:find_id(id)
+		if not lcon then
+			warnf("missing connection %s\n",id)
+			break
+		end
+		subst.state.id = id
+		subst.state.serial = lcon.ptpdev.serial_number
+		if not subst.state.serial then
+			subst.state.serial = ''
+		end
+		for i,f in ipairs(imgs) do
+			subst.state.mdate= chdku.ts_cam2pc(f.st.mtime)
+			subst.state.mts = chdku.ts_cam2pc(f.st.mtime)
+			subst.state.name = f.name
+			subst.state.basename,subst.state.ext = fsutil.split_ext(f.name)
+			subst.state.subdir = fsutil.basename_cam(fsutil.dirname_cam(f.full))
+			subst.state.imgnum = string.match(subst.state.basename,'(%d%d%d%d)$')
+			if not subst.state.imgnum then
+				subst.state.imgnum = ''
+			end
+			-- 100CANON or 100_xxxx
+			subst.state.dirnum = string.match(subst.state.subdir,'^(%d%d%d)')
+			if not subst.state.dirnum then
+				subst.state.dirnum = ''
+			end
+
+			-- try date folder, daily naming
+			local dirmonth,dirday string.match(subst.state.subdir,'_(%d%d)(%d%d)$')
+			if dirmonth then
+				subst.state.dirmonth = dirmonth
+				subst.state.dirday = dirday
+			else
+				-- try date folder, monthly naming
+				local dirmonth = string.match(subst.state.subdir,'_(%d%d)$')
+				if dirmonth then
+					subst.state.dirmonth = dirmonth
+					subst.state.dirday = ''
+				else
+					subst.state.dirmonth = ''
+					subst.state.dirday = ''
+				end
+			end
+			local dst = subst:run(opts.dst)
+			do_image_download(lcon,f.full,dst,opts)
+		end
+	end
+	if opts.delete then
+		self:delete_images_list(list,{pretend=opts.pretend,verbose=opts.verbose})
+	end
+end
 
 --[[
 remote script
