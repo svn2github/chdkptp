@@ -872,8 +872,11 @@ additional options
 start_paths    - list of initial paths/directories, default to A/DCIM
 imgnum_min=N   - lowest image number to return
 imgnum_max=N   - highest image number to return
+dirnum_min=N   - lowest image number to return
+dirnum_max=N   - highest image number to return
 lastimg=N|true - set imgnum_* to return the last N images based on get_exp_count().
                  Does not handle counter rollover or folder change
+TODO dirnum is inefficient, since it checks every file rather than at recurse time
 ]]
 {
 	depend={'find_files'},
@@ -896,6 +899,19 @@ function ff_imglist_fn(self,opts)
 			return true
 		end
 	end
+	if opts.dirnum_min or opts.dirnum_max then
+		local dirnum = string.match(self.cur.full,'/(%d%d%d)[^/]*/'..self.cur.name)
+		if not dirnum then
+			return true
+		end
+		dirnum = tonumber(dirnum)
+		if opts.dirnum_min and dirnum < opts.dirnum_min then
+			return true
+		end
+		if opts.dirnum_max and dirnum > opts.dirnum_max then
+			return true
+		end
+	end
 	return self:ff_bwrite(self.cur)
 end
 
@@ -912,6 +928,7 @@ function ff_imglist(opts)
 		end
 		opts.start_paths={get_image_dir()}
 	end
+
 	if not opts.start_paths then
 		opts.start_paths={'A/DCIM'}
 	end

@@ -260,11 +260,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	end
 	local files={}
 	if lopts.dbgmem then
-		files._dbg_fn=function(self,chunk) 
-			if chunk._dbg then
-				printf("dbg: %s\n",tostring(chunk._dbg))
-			end
-		end
+		files._dbg_fn=chdku.msg_unbatcher_dbgstr
 	end
 	local rstatus,rerr = self:execwait('return ff_mdownload('..serialize(srcpaths)..','..serialize(ropts)..')',
 										{libs={'ff_mdownload'},msgs=chdku.msg_unbatcher(files)})
@@ -415,12 +411,15 @@ chdku.imglist_remote_opts={
 	'lastimg',
 	'imgnum_min',
 	'imgnum_max',
+	'dirnum_min',
+	'dirnum_max',
 	'start_paths',
 	'fmatch',
 	'dmatch',
 	'rmatch',
 	'maxdepth',
 	'batchsize',
+	'dbgmem',
 }
 --[[
 get a list of image files with ff_imglist
@@ -432,7 +431,20 @@ function con_methods:imglist(opts)
 	},opts,{
 		keys=chdku.imglist_remote_opts,
 	})
+
+	-- coerce numeric options to numbers
+	for i,name in ipairs{'lastimg','imgnum_min','imgnum_max','dirnum_min','dirnum_max'} do
+		if type(ropts[name]) == 'string' then
+			ropts[name] = tonumber(ropts[name])
+		end
+	end
+
 	local files={}
+
+	if opts.dbgmem then
+		files._dbg_fn=chdku.msg_unbatcher_dbgstr
+	end
+
 	local rstatus,rerr = self:execwait('return ff_imglist('..serialize(ropts)..')',
 										{libs={'ff_imglist'},msgs=chdku.msg_unbatcher(files)})
 
@@ -448,6 +460,8 @@ download files returned by imglist, using varsubst to generate output names
 function con_methods:imglist_download(files,opts)
 	opts=util.extend_table({
 		dst='${subdir}/${name}',
+		dstdir=false,
+		mtime=true,
 		info_fn=util.printf,
 	},opts)
 	if opts.pretend then
@@ -459,10 +473,16 @@ function con_methods:imglist_download(files,opts)
 	for i,finfo in ipairs(files) do
 		chdku.imglist_set_subst_finfo_state(subst.state,finfo)
 		local dst = subst:run(opts.dst)
+		if opts.dstdir then
+			dst=fsutil.joinpath(opts.dstdir,dst)
+		end
 		self:download_file_ff(finfo,dst,opts)
 	end
 end
 
+--[[
+delete files from imglist
+]]
 function con_methods:imglist_delete(files,opts)
 	opts=util.extend_table({
 		info_fn=util.printf,
@@ -753,6 +773,11 @@ function con_methods:read_all_msgs(opts)
 	return true
 end
 
+function chdku.msg_unbatcher_dbgstr(self,chunk) 
+	if chunk._dbg then
+		printf("dbg: %s\n",tostring(chunk._dbg))
+	end
+end
 --[[
 return a closure to be used with as a chdku.exec msgs function, which unbatches messages msg_batcher into t
 ]]

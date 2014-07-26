@@ -957,6 +957,127 @@ cli:add_commands{
 		end,
 	},
 	{
+		names={'imdl'},
+		help='download images from the camera',
+		arghelp="[options] [src ...]",
+		args=argparser.create{
+			d='${subdir}/${name}',
+			ddir=false,
+			last=false,
+			imin=false,
+			imax=false,
+			dmin=false,
+			dmax=false,
+			fmatch='%a%a%a_%d%d%d%d%.%w%w%w',
+			rmatch=false,
+			maxdepth=2, -- dcim/subdir
+			pretend=false,
+			nomtime=false,
+			batchsize=20,
+			dbgmem=false,
+			overwrite='y',
+			quiet=false,
+			rm=false,
+		},
+		help_detail=[[
+ [src] source directories, default A/DCIM.
+  Specifying directories which do not follow normal image directory naming will
+  limit available substitution patterns.
+ options:
+   -d=<dest spec>    destination spec, using substitutions described below
+                     default ${subdir}/${name} which mirrors the DCIM image
+                     subdirectories into current working directory or ddir
+   -ddir=<path>      directory path to prepend to dest, default none
+   -last=n           download last N images based on file counter
+   -imin=n           download images number n or greater
+   -imax=n           download images number n or less
+   -dmin=n           download images from directory number n or greater
+   -dmax=n           download images from directory number n or less
+   -fmatch=<pattern> download only file with path/name matching <pattern>
+   -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
+   -maxdepth=n       only recurse into N levels of directory, default 2
+   -pretend          print actions instead of doing them
+   -nomtime          don't preserve modification time of remote files
+   -batchsize=n      lower = slower, less memory used
+   -dbgmem           print memory usage info
+   -overwrite=<str>  overwrite existing files (y|n|old), default y
+   -quiet            don't display actions
+   -rm               delete files after downloading
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+
+Substitutions
+${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${pid,strfmt}     camera platform ID, default format %x
+${ldate,datefmt}  PC clock date, os.date format, default %Y%m%d_%H%M%S
+${lts,strfmt}     PC clock date as unix timestamp + microseconds, default format %f
+${lms,strfmt}     PC clock milliseconds part, default format %03d
+${mdate,datefmt}  Camera file modified date, converted to PC time, os.date format, default %Y%m%d_%H%M%S
+${mts,strfmt}     Camera file modified date, as unix timestamp converted to PC time, default format %d
+${name}           Image full name, like IMG_1234.JPG
+${basename}       Image name without extension, like IMG_1234
+${ext}            Image extension, like .JPG
+${subdir}         Image DCIM subdirectory, like 100CANON or 100___01 or 100_0101
+${imgnum}         Image number like 1234
+${dirnum}         Image directory number like 101
+${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cameras only
+${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
+
+Unavailable values (e.g. ${dirday} without daily folders) result in an empty string
+PC clock times are set to the start of download, not per image
+
+]],
+
+		func=function(self,args) 
+			-- some names need translating
+			local opts={
+				dst=args.d,
+				dstdir=args.ddir,
+				lastimg=args.last,
+				imgnum_min=args.imin,
+				imgnum_max=args.imax,
+				dirnum_min=args.dmin,
+				dirnum_max=args.dmax,
+				fmatch=args.fmatch,
+				rmatch=args.rmatch,
+				maxdepth=tonumber(args.maxdepth),
+				pretend=args.pretend,
+				mtime=not args.nomtime,
+				batchsize=tonumber(args.batchsize),
+				dbgmem=args.dbgmem,
+				verbose=not args.quiet
+			}
+			if #args > 0 then
+				opts.start_paths={}
+				for i,v in ipairs(args) do
+					opts.start_paths[i]=fsutil.make_camera_path(v)
+				end
+			end
+
+			local overwrite_opts={
+				n=false,
+				y=true,
+				old=function(lcon,lopts,finfo,st,src,dst)
+					return chdku.ts_cam2pc(finfo.st.mtime) > st.modification
+				end,
+			}
+			if type(args.overwrite) == 'string' then
+				local ow = overwrite_opts[args.overwrite]
+				if ow == nil then
+					return false,'unrecognized overwrite option '..args.overwrite
+				end
+				opts.overwrite = ow
+			else
+				return false,'unrecognized overwrite option '..tostring(args.overwrite)
+			end
+			local files=con:imglist(opts)
+			con:imglist_download(files,opts)
+			if args.rm then
+				con:imglist_delete(files,opts)
+			end
+			return true
+		end,
+	},
+	{
 		names={'mdownload','mdl'},
 		help='download file/directories from the camera',
 		arghelp="[options] <remote, remote, ...> <target dir>",
