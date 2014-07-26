@@ -310,6 +310,139 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 end
 
 --[[
+standard imglist varsubst
+${serial,strfmt}  camera serial number, or '' if not available, default format %s
+${pid,strfmt}     camera platform ID, default format %x
+${ldate,datefmt}  PC clock date, os.date format, default %Y%m%d_%H%M%S
+${lts,strfmt}     PC clock date as unix timestamp + microseconds, default format %f
+${lms,strfmt}     PC clock milliseconds part, default format %03d
+${mdate,datefmt}  Camera file modified date, converted to PC time, os.date format, default %Y%m%d_%H%M%S
+${mts,strfmt}     Camera file modified date, as unix timestamp converted to PC time, default format %d
+${name}           Image full name, like IMG_1234.JPG
+${basename}       Image name without extension, like IMG_1234
+${ext}            Image extension, like .JPG
+${subdir}         Image DCIM subdirectory, like 100CANON or 100___01 or 100_0101
+${imgnum}         Image number like 1234
+${dirnum}         Image directory number like 101
+${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cameras only
+${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
+]]
+
+--[[
+default subst func
+]]
+chdku.imglist_subst_funcs={
+	serial=varsubst.format_state_val('serial','%s'),
+	pid=varsubst.format_state_val('pid','%x'),
+	ldate=varsubst.format_state_date('ldate','%Y%m%d_%H%M%S'),
+	lts=varsubst.format_state_val('lts','%f'),
+	lms=varsubst.format_state_val('lms','%03d'),
+	mdate=varsubst.format_state_date('mdate','%Y%m%d_%H%M%S'),
+	mts=varsubst.format_state_val('mts','%d'),
+	name=varsubst.format_state_val('name','%s'),
+	basename=varsubst.format_state_val('basename','%s'),
+	ext=varsubst.format_state_val('ext','%s'),
+	subdir=varsubst.format_state_val('subdir','%s'),
+	imgnum=varsubst.format_state_val('imgnum','%s'),
+	dirnum=varsubst.format_state_val('dirnum','%s'),
+	dirmonth=varsubst.format_state_val('dirmonth','%s'),
+	dirday=varsubst.format_state_val('dirday','%s'),
+}
+
+--[[
+per connection state
+]]
+function con_methods:imglist_set_subst_con_state(state)
+	if self.ptpdev.serial_number then
+		state.serial = self.ptpdev.serial_number
+	else
+		state.serial = ''
+	end
+	state.pid=self.condev.product_id
+end
+
+--[[
+local PC time related state
+callers may want this to apply to an entire batch, or each file
+]]
+function chdku.imglist_set_subst_time_state(state)
+	state.ldate = os.time() -- local time as a timestamp
+	local t=ustime.new()
+	state.lts = t:float() -- local unix timestamp + microseconds
+	state.lms = t.usec/1000 -- ms only
+end
+
+--[[
+per file state
+]]
+function chdku.imglist_set_subst_finfo_state(state,finfo)
+	state.mdate = chdku.ts_cam2pc(finfo.st.mtime)
+	state.mts = chdku.ts_cam2pc(finfo.st.mtime)
+	state.name = finfo.name
+	state.basename,state.ext = fsutil.split_ext(finfo.name)
+	state.subdir = fsutil.basename_cam(fsutil.dirname_cam(finfo.full))
+	state.imgnum = string.match(state.basename,'(%d%d%d%d)$')
+	if not state.imgnum then
+		state.imgnum = ''
+	end
+	-- 100CANON or 100_xxxx or 100___xx
+	state.dirnum = string.match(state.subdir,'^(%d%d%d)')
+	if not state.dirnum then
+		state.dirnum = ''
+	end
+
+	-- try date folder, daily naming
+	local dirmonth,dirday string.match(state.subdir,'_(%d%d)(%d%d)$')
+	if dirmonth then
+		state.dirmonth = dirmonth
+		state.dirday = dirday
+	else
+		-- try date folder, monthly naming
+		local dirmonth = string.match(state.subdir,'_(%d%d)$')
+		if dirmonth then
+			state.dirmonth = dirmonth
+			state.dirday = ''
+		else
+			state.dirmonth = ''
+			state.dirday = ''
+		end
+	end
+end
+--[[
+names of option to pass to remote code
+]]
+chdku.imglist_remote_opts={
+	'lastimg',
+	'imgnum_min',
+	'imgnum_max',
+	'start_paths',
+	'fmatch',
+	'dmatch',
+	'rmatch',
+	'maxdepth',
+	'batchsize',
+}
+--[[
+get a list of image files with ff_imglist
+]]
+function con_methods:imglist(opts)
+	local ropts=util.extend_table({
+		dirs=false,
+		fmatch='%a%a%a_%d%d%d%d%.%w%w%w',
+	},opts,{
+		keys=chdku.imglist_remote_opts,
+	})
+	local files={}
+	local rstatus,rerr = self:execwait('return ff_imglist('..serialize(ropts)..')',
+										{libs={'ff_imglist'},msgs=chdku.msg_unbatcher(files)})
+
+	if not rstatus then
+		errlib.throw{etype='remote',msg=rerr}
+	end
+	return files
+end
+
+--[[
 upload files and directories
 status[,err]=con:mupload(srcpaths,dstpath,opts)
 opts are as for find_files, plus

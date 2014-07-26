@@ -785,17 +785,7 @@ function mc:imglist_cam(lcon,opts)
 		dirs=false,
 		fmatch='%a%a%a_%d%d%d%d%.%w%w%w',
 	},opts,{
-		keys={
-			'lastimg',
-			'imgnum_min',
-			'imgnum_max',
-			'start_paths',
-			'fmatch',
-			'dmatch',
-			'rmatch',
-			'maxdepth',
-			'batchsize',
-		}
+		keys=chdku.imglist_remote_opts,
 	})
 	local sendcmd = string.format('imglist %s',util.serialize(ropts))
 	local status,err = lcon:write_msg_pcall(sendcmd)
@@ -885,21 +875,9 @@ opts={
 	verbose=bool -- print actions
 	-- everything else passed to imagelist, download_file_ff
 }
-substitution patterns
+multicam specific substitution variables
 ${id,strfmt} camera ID, default format %02d
-${serial,strfmt} camera ID, default format %s
-${ldate,datefmt} PC clock date when download was started, os.date format, default %Y%m%d_%H%M%S
-${lts,strfmt} PC clock date as unix timestamp + microseconds when download was started, default format %f
-${mdate,datefmt} Camera file modified date, converted to PC time, os.date format, default %Y%m%d_%H%M%S
-${mts,strfmt}  Camera file modified date, as unix timestamp converted to PC time, default format %d
-${name} Image full name, like IMG_1234.JPG
-${basename} Image name without extension, like IMG_1234
-${ext} Image extension, like .JPG
-${subdir} Image DCIM subdirectory, like 100CANON or 100___01 or 100_0101
-${imgnum} Image number like 1234
-${dirnum} Image directory number like 101
-${dirmonth} Image DCIM subdirectory month, like 01, date folder naming cameras only
-${dirday} Image DCIM subdirectory day, like 01, date folder naming cameras only
+see chdku imglist_subst_funcs for standard variables
 ]]
 function mc:download_images(opts)
 	opts=util.extend_table({
@@ -909,27 +887,10 @@ function mc:download_images(opts)
 	if opts.pretend then
 		opts.verbose = true
 	end
-	local varsubst=require'varsubst'
-	local subst=varsubst.new{
+	local subst=varsubst.new(util.extend_table({
 		id=varsubst.format_state_val('id','%02d'),
-		serial=varsubst.format_state_val('serial','%s'),
-		ldate=varsubst.format_state_date('ldate','%Y%m%d_%H%M%S'),
-		lts=varsubst.format_state_val('lts','%f'),
-		mdate=varsubst.format_state_date('mdate','%Y%m%d_%H%M%S'),
-		mts=varsubst.format_state_val('mts','%d'),
-		name=varsubst.format_state_val('name','%s'),
-		basename=varsubst.format_state_val('basename','%s'),
-		ext=varsubst.format_state_val('ext','%s'),
-		subdir=varsubst.format_state_val('subdir','%s'),
-		imgnum=varsubst.format_state_val('imgnum','%s'),
-		dirnum=varsubst.format_state_val('dirnum','%s'),
-		-- only set if camera uses date based folder names
-		dirmonth=varsubst.format_state_val('dirmonth','%s'),
-		-- only set if camera uses date based folder names, and daily folders enabled
-		dirday=varsubst.format_state_val('dirday','%s'),
-	}
-	subst.state.ldate = os.time() -- local time as a timestamp
-	subst.state.lts = ustime.new():float() -- local unix timestamp + microseconds
+	},chdku.imglist_subst_funcs))
+	chdku.imglist_set_subst_time_state(subst.state)
 	-- list all images
 	local list=self:imglist(opts)
 	for id,imgs in pairs(list) do
@@ -939,42 +900,9 @@ function mc:download_images(opts)
 			break
 		end
 		subst.state.id = id
-		subst.state.serial = lcon.ptpdev.serial_number
-		if not subst.state.serial then
-			subst.state.serial = ''
-		end
+		lcon:imglist_set_subst_con_state(subst.state)
 		for i,f in ipairs(imgs) do
-			subst.state.mdate= chdku.ts_cam2pc(f.st.mtime)
-			subst.state.mts = chdku.ts_cam2pc(f.st.mtime)
-			subst.state.name = f.name
-			subst.state.basename,subst.state.ext = fsutil.split_ext(f.name)
-			subst.state.subdir = fsutil.basename_cam(fsutil.dirname_cam(f.full))
-			subst.state.imgnum = string.match(subst.state.basename,'(%d%d%d%d)$')
-			if not subst.state.imgnum then
-				subst.state.imgnum = ''
-			end
-			-- 100CANON or 100_xxxx
-			subst.state.dirnum = string.match(subst.state.subdir,'^(%d%d%d)')
-			if not subst.state.dirnum then
-				subst.state.dirnum = ''
-			end
-
-			-- try date folder, daily naming
-			local dirmonth,dirday string.match(subst.state.subdir,'_(%d%d)(%d%d)$')
-			if dirmonth then
-				subst.state.dirmonth = dirmonth
-				subst.state.dirday = dirday
-			else
-				-- try date folder, monthly naming
-				local dirmonth = string.match(subst.state.subdir,'_(%d%d)$')
-				if dirmonth then
-					subst.state.dirmonth = dirmonth
-					subst.state.dirday = ''
-				else
-					subst.state.dirmonth = ''
-					subst.state.dirday = ''
-				end
-			end
+			chdku.imglist_set_subst_finfo_state(subst.state,f)
 			local dst = subst:run(opts.dst)
 			lcon:download_file_ff(f,dst,opts)
 		end

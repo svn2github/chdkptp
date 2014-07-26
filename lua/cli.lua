@@ -985,7 +985,7 @@ cli:add_commands{
    -nomtime          don't preserve modification time of remote files
    -batchsize=n      lower = slower, less memory used
    -dbgmem           print memory usage info
-   -overwrite=<str>  overwrite existing files (y|n|old)
+   -overwrite=<str>  overwrite existing files (y|n|old), default y
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 ]],
 
@@ -1571,7 +1571,6 @@ cli:add_commands{
 				return false,'incompatible api'
 			end
 
-			local varsubst=require'varsubst'
 			-- state for substitutions
 			local subst=varsubst.new({
 				frame=varsubst.format_state_val('frame','%06d'),
