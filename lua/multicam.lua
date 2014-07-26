@@ -875,30 +875,7 @@ function mc:delete_images_list(list,opts)
 		end
 	end
 end
---[[
-helper function to allow bailing out with return
-]]
-function do_image_download(lcon,src,dst,opts)
-	if opts.verbose then
-		printf('%s->%s\n',src,dst)
-	end
-	local m = lfs.attributes(dst,'mode')
-	if m then
-		if opts.overwrite then
-			if opts.verbose then
-				warnf("overwrite: %s\n",dst)
-			end
-		else
-			warnf("skipping existing file: %s\n",dst)
-			return
-		end
-	end
-	if not opts.pretend then
-		fsutil.mkdir_parent(dst)
-		lcon:download(src,dst)
-	end
-end
---
+
 --[[
 opts={
 	dst=string -- substitution pattern for downloaded files
@@ -906,7 +883,7 @@ opts={
 	overwrite=bool -- overwrite existing
 	pretend=bool -- print actions without doing anything
 	verbose=bool -- print actions
-	-- everything else passed to imagelist
+	-- everything else passed to imagelist, download_file_ff
 }
 substitution patterns
 ${id,strfmt} camera ID, default format %02d
@@ -927,6 +904,7 @@ ${dirday} Image DCIM subdirectory day, like 01, date folder naming cameras only
 function mc:download_images(opts)
 	opts=util.extend_table({
 		dst='${id}/${subdir}/${name}',
+		info_fn=util.printf,
 	},opts)
 	if opts.pretend then
 		opts.verbose = true
@@ -998,7 +976,7 @@ function mc:download_images(opts)
 				end
 			end
 			local dst = subst:run(opts.dst)
-			do_image_download(lcon,f.full,dst,opts)
+			lcon:download_file_ff(f,dst,opts)
 		end
 	end
 	if opts.delete then
