@@ -167,30 +167,48 @@ function con_methods:listdir(path,opts)
 	return results
 end
 
-local function mdownload_single(lcon,finfo,lopts,src,dst)
-	local st
-	-- if not always overwrite, check local
-	if lopts.overwrite ~= true then
-		st = lfs.attributes(dst)
+--[[
+download using a table returned by find_files
+]]
+function con_methods:download_file_ff(finfo,dst,opts)
+	local src=finfo.full
+
+	-- TODO info_fn should be a msgf function that accepts verbosity
+	if opts.verbose then
+		opts.info_fn('%s->%s\n',src,dst)
 	end
+
+	local st=lfs.attributes(dst)
+
 	if st then
 		local skip
-		if not lopts.overwrite then
+		if not opts.overwrite then
 			skip=true
-		elseif type(lopts.overwrite) == 'function' then
-			skip = not lopts.overwrite(lcon,lopts,finfo,st,src,dst)
+		elseif type(opts.overwrite) == 'function' then
+			skip = not opts.overwrite(self,opts,finfo,st,src,dst)
+		elseif opts.overwrite == true then
+			skip = false
 		else
-			error("unexpected overwrite option")
+			error("invalid overwrite option")
 		end
 		if skip then
-			-- TODO
-			printf('skip existing %s\n',dst)
-			return true
+			opts.info_fn("skip existing: %s\n",dst)
+			return
+		else
+			opts.info_fn("overwrite: %s\n",dst)
 		end
 	end
+
+	if opts.pretend then
+		return
+	end
+
+	-- ensure parent exists
+	fsutil.mkdir_parent(dst)
+
 	-- ptp download fails on zero byte files (zero size data phase, possibly other problems)
 	if finfo.st.size > 0 then
-		lcon:download(src,dst)
+		self:download(src,dst)
 	else
 		local f,err=io.open(dst,"wb")
 		if not f then
@@ -198,13 +216,12 @@ local function mdownload_single(lcon,finfo,lopts,src,dst)
 		end
 		f:close()
 	end
-	if lopts.mtime then
+	if opts.mtime then
 		status,err = lfs.touch(dst,chdku.ts_cam2pc(finfo.st.mtime));
 		if not status then
 			error(err)
 		end
 	end
-	return true
 end
 
 --[[
@@ -213,6 +230,9 @@ con:mdownload(srcpaths,dstpath,opts)
 opts:
 	mtime=bool -- keep (default) or discard remote mtime NOTE files only for now
 	overwrite=bool|function -- overwrite if existing found
+	info_fn=function -- printf like function to receive status messages
+	pretend=bool
+	verbose=bool
 other opts are passed to find_files
 throws on error
 ]]
@@ -220,7 +240,15 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	if not dstpath then
 		dstpath = '.'
 	end
-	local lopts=extend_table({mtime=true,overwrite=true},opts)
+	local lopts=extend_table({
+		mtime=true,
+		overwrite=true,
+		info_fn=util.printf,
+		verbose=true,
+	},opts)
+	if lopts.pretend then
+		lopts.verbose=true
+	end
 	local ropts=extend_table({},opts)
 	ropts.dirsfirst=true
 	-- unset options that don't apply to remote
@@ -250,21 +278,13 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 		return true
 	end
 
-	local mkdir, download
-	local function nop()
-		return true
-	end
-	if lopts.pretend then
-		mkdir=nop
-		download=nop
-	else
-		mkdir=fsutil.mkdir_m
-		download=mdownload_single
-	end
-
-
-	if not dstmode then
-		mkdir(dstpath)
+	local mkdir=function(path)
+		if lopts.verbose then
+			lopts.info_fn('mkdir %s\n',tostring(path))
+		end
+		if not lopts.pretend then
+			fsutil.mkdir_m(path)
+		end
 	end
 
 	for i,finfo in ipairs(files) do
@@ -284,13 +304,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 		if finfo.st.is_dir then
 			mkdir(dst)
 		else
-			local dst_dir = fsutil.dirname(dst)
-			if dst_dir ~= '.' then
-				mkdir(dst_dir)
-			end
-			-- TODO this should be optional
-			printf("%s->%s\n",src,dst);
-			download(self,finfo,lopts,src,dst)
+			self:download_file_ff(finfo,dst,lopts)
 		end
 	end
 end
