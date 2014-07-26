@@ -443,6 +443,49 @@ function con_methods:imglist(opts)
 end
 
 --[[
+download files returned by imglist, using varsubst to generate output names
+]]
+function con_methods:imglist_download(files,opts)
+	opts=util.extend_table({
+		dst='${subdir}/${name}',
+		info_fn=util.printf,
+	},opts)
+	if opts.pretend then
+		opts.verbose = true
+	end
+	local subst=varsubst.new(chdku.imglist_subst_funcs)
+	chdku.imglist_set_subst_time_state(subst.state)
+	self:imglist_set_subst_con_state(subst.state)
+	for i,finfo in ipairs(files) do
+		chdku.imglist_set_subst_finfo_state(subst.state,finfo)
+		local dst = subst:run(opts.dst)
+		self:download_file_ff(finfo,dst,opts)
+	end
+end
+
+function con_methods:imglist_delete(files,opts)
+	opts=util.extend_table({
+		info_fn=util.printf,
+	},opts)
+	if opts.pretend then
+		opts.verbose = true
+	end
+	for i,f in ipairs(files) do
+		if opts.verbose then
+			opts.info_fn('delete %s\n',f.full)
+		end
+		if not opts.pretend then
+			-- TODO would be much faster to send a bunch of names over at once
+			local status, err = self:remove(f.full)
+			-- TODO maybe this should abort with error?
+			if not status then
+				util.warnf("failed %s\n",tostring(err))
+			end
+		end
+	end
+end
+
+--[[
 upload files and directories
 status[,err]=con:mupload(srcpaths,dstpath,opts)
 opts are as for find_files, plus
