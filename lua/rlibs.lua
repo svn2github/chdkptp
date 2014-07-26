@@ -867,6 +867,59 @@ end
 ]],
 },
 --[[
+image directory list / download
+additional options
+start_paths    - list of initial paths/directories, default to A/DCIM
+imgnum_min=N   - lowest image number to return
+imgnum_max=N   - highest image number to return
+lastimg=N|true - set imgnum_* to return the last N images based on get_exp_count().
+                 Does not handle counter rollover or folder change
+]]
+{
+	depend={'find_files'},
+	name='ff_imglist',
+	code=[[
+function ff_imglist_fn(self,opts)
+	if #self.rpath == 0 and self.cur.st.is_dir then
+		return true
+	end
+	if opts.imgnum_min or opts.imgnum_max then
+		local imgnum = string.match(self.cur.name,'%a%a%a_(%d%d%d%d)%.%w%w%w$')
+		if not imgnum then
+			return true
+		end
+		imgnum = tonumber(imgnum)
+		if opts.imgnum_min and imgnum < opts.imgnum_min then
+			return true
+		end
+		if opts.imgnum_max and imgnum > opts.imgnum_max then
+			return true
+		end
+	end
+	return self:ff_bwrite(self.cur)
+end
+
+function ff_imglist(opts)
+	if opts.lastimg then
+		if type(opts.lastimg) ~= 'number' then
+			opts.lastimg = 1
+		end
+		opts.imgnum_max=get_exp_count()
+		if opts.lastimg < opts.imgnum_max then
+			opts.imgnum_min = opts.imgnum_max - opts.lastimg + 1
+		else
+			opts.imgnum_min = 1
+		end
+		opts.start_paths={get_image_dir()}
+	end
+	if not opts.start_paths then
+		opts.start_paths={'A/DCIM'}
+	end
+	return find_files(opts.start_paths,opts,ff_imglist_fn)
+end
+]],
+},
+--[[
 TODO rework this to a general iterate over directory function
 sends file listing as serialized tables with write_usb_msg
 returns true, or false,error message

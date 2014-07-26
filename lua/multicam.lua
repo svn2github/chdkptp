@@ -1033,7 +1033,7 @@ commands
 local function init()
 	chdku.rlibs:register({
 		name='multicam',
-		depend={'extend_table','serialize_msgs','unserialize','find_files'},
+		depend={'extend_table','serialize_msgs','unserialize','ff_imglist'},
 		code=[[
 mc={
 	mode_sw_timeout=1000,
@@ -1211,50 +1211,17 @@ function cmds.getlastimg()
 	write_status(true,string.format('%s/IMG_%04d.JPG',get_image_dir(),get_exp_count()))
 end
 
-function ff_imglist_fn(self,opts)
-	if #self.rpath == 0 and self.cur.st.is_dir then
-		return true
-	end
-	if opts.imgnum_min or opts.imgnum_max then
-		local imgnum = string.match(self.cur.name,'%a%a%a_(%d%d%d%d)%.%w%w%w$')
-		if not imgnum then
-			return true
-		end
-		imgnum = tonumber(imgnum)
-		if opts.imgnum_min and imgnum < opts.imgnum_min then
-			return true
-		end
-		if opts.imgnum_max and imgnum > opts.imgnum_max then
-			return true
-		end
-	end
-	return self:ff_bwrite(self.cur)
-end
-
 function cmds.imglist()
 	local args,err=unserialize(mc.args)
 	if not args then
 		write_status(false,'unserialize failed '..tostring(err))
 	end
-	-- convert lastimg to imgnum range
-	-- doesn't handler wrap / folder reset
-	if args.lastimg then
-		if type(args.lastimg) ~= 'number' then
-			args.lastimg = 1
-		end
-		args.imgnum_max=get_exp_count()
-		if args.lastimg < args.imgnum_max then
-			args.imgnum_min = args.imgnum_max - args.lastimg + 1
-		else
-			args.imgnum_min = 1
-		end
-		args.start_paths={get_image_dir()}
+	local status,err = ff_imglist(args)
+	if status then
+		write_status(true,'done')
+	else
+		write_status(false,tostring(err))
 	end
-	if not args.start_paths then
-		args.start_paths={'A/DCIM'}
-	end
-	find_files(args.start_paths,args,ff_imglist_fn)
-	write_status(true,'done')
 end
 
 function mc.idle()
