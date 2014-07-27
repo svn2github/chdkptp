@@ -394,6 +394,17 @@ t.flip_table = function()
 	assert(util.compare_values(t,{'d',a=1,b=2,bar='foo'}))
 end
 
+t.table_path = function()
+	local t={'foo','bar',sub={'one','two',subsub={x='y'},a='b'},one=1}
+	assert(util.table_path_get(t,'bogus') == nil)
+	assert(util.table_path_get(t,'bogus','subbogus') == nil)
+	assert(util.table_path_get(t,1) == 'foo')
+	assert(util.table_path_get(t,'sub',2) == 'two')
+	assert(util.table_path_get(t,'sub','subsub','x') == 'y')
+	assert(util.table_pathstr_get(t,'sub.subsub.x') == 'y')
+	assert(util.compare_values(util.table_path_get(t,'sub'),{'one','two',subsub={x='y'},a='b'}))
+end
+
 t.bit_util = function()
 	local b=util.bit_unpack(0)
 	assert(#b==31)

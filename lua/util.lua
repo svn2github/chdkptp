@@ -464,6 +464,36 @@ function util.flag_table(t)
 end
 
 --[[
+return a (sub)table value with path indicated by arrray, e.g. 
+table_path_get(t,'a','b','c') returns t.a.b.c
+missing subtables in path return nil, like a missing value
+]]
+function util.table_path_get(t,...)
+	local keys={...}
+	local sub=t
+	for i,key in ipairs(keys) do
+		local v = sub[key]
+		if i == #keys then
+			return v
+		end
+		-- missing subtables are treated as nil
+		if type(v) == 'nil' then
+			return v
+		end
+		if type(v) ~= 'table' then
+			error('expected table for '..table.concat(keys,'.',1,i))
+		end
+		sub = v
+	end
+end
+--[[
+return a (sub)table value indexed by a string like foo.bar
+note numbers will be treated as string indexes
+]]
+function util.table_pathstr_get(t,keystr)
+	return util.table_path_get(t,unpack(util.string_split(keystr,'.',{plain=true})))
+end
+--[[
 split str delimited by pattern pat, or plain text if opts.plain
 empty pat splits chars
 trailing delimiters generate empty strings
