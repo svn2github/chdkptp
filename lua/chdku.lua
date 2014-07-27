@@ -256,7 +256,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	ropts.overwrite=nil
 	local dstmode = lfs.attributes(dstpath,'mode')
 	if dstmode and dstmode ~= 'directory' then
-		errlib.throw{etype='badparm',msg='mdownload: dest must be a directory'}
+		errlib.throw{etype='bad_arg',msg='mdownload: dest must be a directory'}
 	end
 	local files={}
 	if lopts.dbgmem then

@@ -525,12 +525,12 @@ function cli.init_lvdumpimg_file_opts(which,args,subst)
 		ext='pam'
 		write_fn = chdku.live_dump_bm_pam
 	else
-		error('invalid type '..tostring(which))
+		errlib.throw{etype='bad_arg',msg='invalid type '..tostring(which)}
 	end
 	local filespec
 	if args[which] == true then
 		if args[pipeopt] then
-			error('must specify command with '..pipeopt)
+			errlib.throw{etype='bad_arg',msg='must specify command with '..tostring(pipeopt)}
 		end
 		filespec = which..'_${time,%014.3f}.'..ext
 	else
@@ -581,7 +581,7 @@ cli.download_overwrite_opts={
 				return false
 			end
 			if line == 'a' then
-				errlib.throw{etype='userabort',msg='aborted by user'}
+				errlib.throw{etype='user_abort',msg='aborted by user'}
 			end
 		end
 	end,
@@ -591,11 +591,11 @@ function cli.get_download_overwrite_opt(val)
 	if type(val) == 'string' then
 		local ow = cli.download_overwrite_opts[val]
 		if ow == nil then
-			errlib.throw{etype='badarg',msg='unrecognized overwrite option '..val}
+			errlib.throw{etype='bad_arg',msg='unrecognized overwrite option '..val}
 		end
 		return ow
 	else
-		errlib.throw{etype='badarg',msg='unrecognized overwrite option '..tostring(val)}
+		errlib.throw{etype='bad_arg',msg='unrecognized overwrite option '..tostring(val)}
 	end
 end
 -- TODO should have a system to split up command code

@@ -91,7 +91,7 @@ function mc:connect(opts)
 	opts=util.extend_table({
 	},opts)
 	if opts.list and (opts.match or opts.add) then
-		error('list may not be combined with match or add')
+		errlib.throw{etype='bad_arg',msg='list may not be combined with match or add'}
 	end
 	if not opts.match then
 		opts.match = {}
@@ -233,13 +233,13 @@ function mc:sel(what,range)
 				if lcon then
 					table.insert(new_sel,lcon)
 				else
-					error('attempted to select non-existent id '..tostring(v))
+					errlib.throw{etype='bad_arg',msg='attempted to select non-existent id '..tostring(v)}
 				end
 			end
 		end
 		self.selected = new_sel
 	else
-		error('invalid selection')
+		errlib.throw{etype='bad_arg',msg='invalid selection'}
 	end
 	-- sort by ID so operations happen in a consistent order
 	table.sort(self.selected, function(a,b) return a.mc_id < b.mc_id end)
@@ -387,14 +387,14 @@ function mc:set_id(old_id,new_id,conflicts)
 	end
 	local lcon=self:find_id(old_id)
 	if not lcon then
-		error('no matching id: '..tostring(old_id))
+		errlib.throw{etype='bad_arg',msg='no matching id: '..tostring(old_id)}
 	end
 	local conflict_con=self:find_id(new_id)
 	if conflict_con then
 		if conflicts == 'error' then
-			error('new id already exists: '..tostring(new_id))
+			errlib.throw{etype='bad_arg',msg='new id already exists: '..tostring(new_id)}
 		elseif conflicts ~= 'swap' then
-			error('invalid conflict option: '..tostring(conflicts))
+			errlib.throw{etype='bad_arg',msg='invalid conflict option: '..tostring(conflicts)}
 		end
 		-- otherwise, swap
 		self:set_id_cam(conflict_con,old_id)
