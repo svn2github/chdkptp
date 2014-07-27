@@ -1059,7 +1059,6 @@ ${dirday}         Image DCIM subdirectory day, like 01, date folder naming camer
 
 Unavailable values (e.g. ${dirday} without daily folders) result in an empty string
 PC clock times are set to the start of download, not per image
-
 ]],
 
 		func=function(self,args) 
@@ -1133,7 +1132,6 @@ PC clock times are set to the start of download, not per image
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 
  file selection options are equivalent to imdl
-
 ]],
 
 		func=function(self,args) 
@@ -1203,7 +1201,6 @@ PC clock times are set to the start of download, not per image
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 
  file selection options are equivalent to imdl
-
 ]],
 
 		func=function(self,args) 

@@ -161,6 +161,91 @@ download (d) [-nolua] <remote> [local]: - download a file from the camera
  -nolua   skip lua based checks on remote
    Allows download while running script
 
+imdl         [options] [src ...]: - download images from the camera
+ [src] source directories, default A/DCIM.
+  Specifying directories which do not follow normal image directory naming will
+  limit available substitution patterns.
+ options:
+   -d=<dest spec>    destination spec, using substitutions described below
+                     default ${subdir}/${name} which mirrors the DCIM image
+                     subdirectories into current working directory or ddir
+   -ddir=<path>      directory path to prepend to dest, default none
+   -last=n           download last N images based on file counter
+   -imin=n           download images number n or greater
+   -imax=n           download images number n or less
+   -dmin=n           download images from directory number n or greater
+   -dmax=n           download images from directory number n or less
+   -fmatch=<pattern> download only file with path/name matching <pattern>
+   -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
+   -maxdepth=n       only recurse into N levels of directory, default 2
+   -pretend          print actions instead of doing them
+   -nomtime          don't preserve modification time of remote files
+   -batchsize=n      lower = slower, less memory used
+   -dbgmem           print memory usage info
+   -overwrite=<str>  overwrite existing files (y|n|old|ask), default ask
+   -quiet            don't display actions
+   -rm               delete files after downloading
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+
+Substitutions
+${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${pid,strfmt}     camera platform ID, default format %x
+${ldate,datefmt}  PC clock date, os.date format, default %Y%m%d_%H%M%S
+${lts,strfmt}     PC clock date as unix timestamp + microseconds, default format %f
+${lms,strfmt}     PC clock milliseconds part, default format %03d
+${mdate,datefmt}  Camera file modified date, converted to PC time, os.date format, default %Y%m%d_%H%M%S
+${mts,strfmt}     Camera file modified date, as unix timestamp converted to PC time, default format %d
+${name}           Image full name, like IMG_1234.JPG
+${basename}       Image name without extension, like IMG_1234
+${ext}            Image extension, like .JPG
+${subdir}         Image DCIM subdirectory, like 100CANON or 100___01 or 100_0101
+${imgnum}         Image number like 1234
+${dirnum}         Image directory number like 101
+${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cameras only
+${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
+
+Unavailable values (e.g. ${dirday} without daily folders) result in an empty string
+PC clock times are set to the start of download, not per image
+
+imrm         [options] [path ...]: - delete images from the camera
+ [path] directories to delete from, default A/DCIM.
+ options:
+   -last=n           delete last N images based on file counter
+   -imin=n           delete images number n or greater
+   -imax=n           delete images number n or less
+   -dmin=n           delete images from directory number n or greater
+   -dmax=n           delete images from directory number n or less
+   -fmatch=<pattern> delete only file with path/name matching <pattern>
+   -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
+   -maxdepth=n       only recurse into N levels of directory, default 2
+   -pretend          print actions instead of doing them
+   -batchsize=n      lower = slower, less memory used
+   -dbgmem           print memory usage info
+   -quiet            don't display actions
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+
+ file selection options are equivalent to imdl
+
+imls         [options] [path ...]: - list images on the camera
+ [path] directories to list from, default A/DCIM.
+ options:
+   -last=n           list last N images based on file counter
+   -imin=n           list images number n or greater
+   -imax=n           list images number n or less
+   -dmin=n           list images from directory number n or greater
+   -dmax=n           list images from directory number n or less
+   -fmatch=<pattern> list only files with path/name matching <pattern>
+   -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
+   -maxdepth=n       only recurse into N levels of directory, default 2
+   -sort=order       where order is one of 'path','name','date','size' default 'path'
+   -r                sort descending instead of ascending
+   -batchsize=n      lower = slower, less memory used
+   -dbgmem           print memory usage info
+   -quiet            don't display actions
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+
+ file selection options are equivalent to imdl
+
 mdownload (mdl) [options] <remote, remote, ...> <target dir>: - download file/directories from the camera
  <remote...> files/directories to download
  <target dir> directory to download into
@@ -174,7 +259,7 @@ mdownload (mdl) [options] <remote, remote, ...> <target dir>: - download file/di
    -nomtime          don't preserve modification time of remote files
    -batchsize=n      lower = slower, less memory used
    -dbgmem           print memory usage info
-   -overwrite=<str>  overwrite existing files (y|n|old)
+   -overwrite=<str>  overwrite existing files (y|n|old|ask), default ask
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 
 mupload (mup) [options] <local, local, ...> <target dir>: - upload file/directories to the camera
@@ -475,6 +560,16 @@ download A/CHDK/CCHDK.CFG to BACKUP.CFG in the current directory
 connect to the device with name containing D10 on bus "bus-0", 
  chdkptp -c"D10 -b=bus%-0" -i
 note connect -b takes a lua pattern by default, so % is used to escape the -
+
+download all images from the DCIM directory to a corresponding tree in c:/images
+con> imdl -ddir=c:/images
+
+download all images from the DCIM directory to c:/images/, into directories
+organized by date
+con> imdl -d=c:/images/${mdate,%Y/%m/%d}/${name}
+
+download and delete images with numbers between 3060 and 3070 from DCIM/100CANON
+con> imdl -imin=3070 -imax=3080 -rm DCIM/100CANON
 
 download some jpeg images (in 100CANON etc folders)
 con> mdl -fmatch=%.JPG$ DCIM C:\temp
