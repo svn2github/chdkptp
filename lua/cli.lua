@@ -1078,6 +1078,166 @@ PC clock times are set to the start of download, not per image
 		end,
 	},
 	{
+		names={'imrm'},
+		help='delete images from the camera',
+		arghelp="[options] [path ...]",
+		args=argparser.create{
+			last=false,
+			imin=false,
+			imax=false,
+			dmin=false,
+			dmax=false,
+			fmatch='%a%a%a_%d%d%d%d%.%w%w%w',
+			rmatch=false,
+			maxdepth=2, -- dcim/subdir
+			pretend=false,
+			batchsize=20,
+			dbgmem=false,
+			quiet=false,
+		},
+		help_detail=[[
+ [path] directories to delete from, default A/DCIM.
+ options:
+   -last=n           delete last N images based on file counter
+   -imin=n           delete images number n or greater
+   -imax=n           delete images number n or less
+   -dmin=n           delete images from directory number n or greater
+   -dmax=n           delete images from directory number n or less
+   -fmatch=<pattern> delete only file with path/name matching <pattern>
+   -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
+   -maxdepth=n       only recurse into N levels of directory, default 2
+   -pretend          print actions instead of doing them
+   -batchsize=n      lower = slower, less memory used
+   -dbgmem           print memory usage info
+   -quiet            don't display actions
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+
+ file selection options are equivalent to imdl
+
+]],
+
+		func=function(self,args) 
+			-- some names need translating
+			local opts={
+				lastimg=args.last,
+				imgnum_min=args.imin,
+				imgnum_max=args.imax,
+				dirnum_min=args.dmin,
+				dirnum_max=args.dmax,
+				fmatch=args.fmatch,
+				rmatch=args.rmatch,
+				maxdepth=tonumber(args.maxdepth),
+				pretend=args.pretend,
+				mtime=not args.nomtime,
+				batchsize=tonumber(args.batchsize),
+				dbgmem=args.dbgmem,
+				verbose=not args.quiet
+			}
+			if #args > 0 then
+				opts.start_paths={}
+				for i,v in ipairs(args) do
+					opts.start_paths[i]=fsutil.make_camera_path(v)
+				end
+			end
+
+			local files=con:imglist(opts)
+			con:imglist_delete(files,opts)
+			return true
+		end,
+	},
+	{
+		names={'imls'},
+		help='list images on the camera',
+		arghelp="[options] [path ...]",
+		args=argparser.create{
+			last=false,
+			imin=false,
+			imax=false,
+			dmin=false,
+			dmax=false,
+			fmatch='%a%a%a_%d%d%d%d%.%w%w%w',
+			rmatch=false,
+			maxdepth=2, -- dcim/subdir
+			sort='path',
+			r=false,
+			batchsize=20,
+			dbgmem=false,
+			quiet=false,
+		},
+		help_detail=[[
+ [path] directories to list from, default A/DCIM.
+ options:
+   -last=n           list last N images based on file counter
+   -imin=n           list images number n or greater
+   -imax=n           list images number n or less
+   -dmin=n           list images from directory number n or greater
+   -dmax=n           list images from directory number n or less
+   -fmatch=<pattern> list only files with path/name matching <pattern>
+   -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
+   -maxdepth=n       only recurse into N levels of directory, default 2
+   -sort=order       where order is one of 'path','name','date','size' default 'path'
+   -r                sort descending instead of ascending
+   -batchsize=n      lower = slower, less memory used
+   -dbgmem           print memory usage info
+   -quiet            don't display actions
+ note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+
+ file selection options are equivalent to imdl
+
+]],
+
+		func=function(self,args) 
+			-- some names need translating
+			local opts={
+				lastimg=args.last,
+				imgnum_min=args.imin,
+				imgnum_max=args.imax,
+				dirnum_min=args.dmin,
+				dirnum_max=args.dmax,
+				fmatch=args.fmatch,
+				rmatch=args.rmatch,
+				maxdepth=tonumber(args.maxdepth),
+				pretend=args.pretend,
+				mtime=not args.nomtime,
+				batchsize=tonumber(args.batchsize),
+				dbgmem=args.dbgmem,
+				verbose=not args.quiet
+			}
+			local sortopts={
+				path={'full'},
+				name={'name'},
+				date={'st','mtime'},
+				size={'st','size'},
+			}
+			local sortpath = sortopts[args.sort]
+			if not sortpath then
+				return false,'invalid sort '..tostring(args.sort)
+			end
+			if #args > 0 then
+				opts.start_paths={}
+				for i,v in ipairs(args) do
+					opts.start_paths[i]=fsutil.make_camera_path(v)
+				end
+			end
+
+			local files=con:imglist(opts)
+			if args.r then
+				util.table_path_sort(files,sortpath,'des')
+			else
+				util.table_path_sort(files,sortpath,'asc')
+			end
+			local r=''
+			for i,finfo in ipairs(files) do
+					local size = finfo.st.size
+					r = r .. string.format("%s %10s %s\n",
+							os.date('%c',chdku.ts_cam2pc(finfo.st.mtime)),
+							tostring(finfo.st.size),
+							finfo.full)
+			end
+			return true, r
+		end,
+	},
+	{
 		names={'mdownload','mdl'},
 		help='download file/directories from the camera',
 		arghelp="[options] <remote, remote, ...> <target dir>",
