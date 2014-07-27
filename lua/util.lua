@@ -469,7 +469,9 @@ table_path_get(t,'a','b','c') returns t.a.b.c
 missing subtables in path return nil, like a missing value
 ]]
 function util.table_path_get(t,...)
-	local keys={...}
+	return util.table_pathtable_get(t,{...})
+end
+function util.table_pathtable_get(t,keys)
 	local sub=t
 	for i,key in ipairs(keys) do
 		local v = sub[key]
@@ -491,7 +493,21 @@ return a (sub)table value indexed by a string like foo.bar
 note numbers will be treated as string indexes
 ]]
 function util.table_pathstr_get(t,keystr)
-	return util.table_path_get(t,unpack(util.string_split(keystr,'.',{plain=true})))
+	return util.table_pathtable_get(t,util.string_split(keystr,'.',{plain=true}))
+end
+
+--[[
+sort a table by nested subtable values
+]]
+function util.table_path_sort(t,path,cmp)
+	if not cmp then
+		cmp = function(a,b)
+			return a < b
+		end
+	end
+	table.sort(t,function(a,b)
+		return cmp(util.table_pathtable_get(a,path),util.table_pathtable_get(b,path))
+	end)
 end
 --[[
 split str delimited by pattern pat, or plain text if opts.plain

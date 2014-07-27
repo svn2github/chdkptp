@@ -403,6 +403,9 @@ t.table_path = function()
 	assert(util.table_path_get(t,'sub','subsub','x') == 'y')
 	assert(util.table_pathstr_get(t,'sub.subsub.x') == 'y')
 	assert(util.compare_values(util.table_path_get(t,'sub'),{'one','two',subsub={x='y'},a='b'}))
+	local t={{k='b'},{k='a'},{k='c'}}
+	util.table_sort_path(t,{'k'})	
+	assert(util.compare_values(t,{{k='a'},{k='b'},{k='c'}}))
 end
 
 t.bit_util = function()
