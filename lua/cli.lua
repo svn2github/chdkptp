@@ -563,6 +563,41 @@ function cli.init_lvdumpimg_file_opts(which,args,subst)
 	return opts
 end
 
+cli.download_overwrite_opts={
+	n=false,
+	y=true,
+	old=function(lcon,lopts,finfo,st,src,dst)
+		return chdku.ts_cam2pc(finfo.st.mtime) > st.modification
+	end,
+	ask=function(lcon,lopts,finfo,st,src,dst)
+		while true do
+			printf("existing: %s %d bytes modified %s\n",dst,st.size,os.date('%c',st.modification))
+			printf("new: %s %d bytes modified %s\n",src,finfo.st.size,os.date('%c',chdku.ts_cam2pc(finfo.st.mtime)))
+			local line = cli.readline('overwrite y / n / a (abort)? ')
+			if line == 'y' then
+				return true
+			end
+			if line == 'n' then
+				return false
+			end
+			if line == 'a' then
+				errlib.throw{etype='userabort',msg='aborted by user'}
+			end
+		end
+	end,
+}
+
+function cli.get_download_overwrite_opt(val)
+	if type(val) == 'string' then
+		local ow = cli.download_overwrite_opts[val]
+		if ow == nil then
+			errlib.throw{etype='badarg',msg='unrecognized overwrite option '..val}
+		end
+		return ow
+	else
+		errlib.throw{etype='badarg',msg='unrecognized overwrite option '..tostring(val)}
+	end
+end
 -- TODO should have a system to split up command code
 local rsint=require'rsint'
 rsint.register_rlib()
@@ -975,7 +1010,7 @@ cli:add_commands{
 			nomtime=false,
 			batchsize=20,
 			dbgmem=false,
-			overwrite='y',
+			overwrite='ask',
 			quiet=false,
 			rm=false,
 		},
@@ -1000,7 +1035,7 @@ cli:add_commands{
    -nomtime          don't preserve modification time of remote files
    -batchsize=n      lower = slower, less memory used
    -dbgmem           print memory usage info
-   -overwrite=<str>  overwrite existing files (y|n|old), default y
+   -overwrite=<str>  overwrite existing files (y|n|old|ask), default ask
    -quiet            don't display actions
    -rm               delete files after downloading
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
@@ -1044,7 +1079,8 @@ PC clock times are set to the start of download, not per image
 				mtime=not args.nomtime,
 				batchsize=tonumber(args.batchsize),
 				dbgmem=args.dbgmem,
-				verbose=not args.quiet
+				verbose=not args.quiet,
+				overwrite=cli.get_download_overwrite_opt(args.overwrite),
 			}
 			if #args > 0 then
 				opts.start_paths={}
@@ -1053,22 +1089,6 @@ PC clock times are set to the start of download, not per image
 				end
 			end
 
-			local overwrite_opts={
-				n=false,
-				y=true,
-				old=function(lcon,lopts,finfo,st,src,dst)
-					return chdku.ts_cam2pc(finfo.st.mtime) > st.modification
-				end,
-			}
-			if type(args.overwrite) == 'string' then
-				local ow = overwrite_opts[args.overwrite]
-				if ow == nil then
-					return false,'unrecognized overwrite option '..args.overwrite
-				end
-				opts.overwrite = ow
-			else
-				return false,'unrecognized overwrite option '..tostring(args.overwrite)
-			end
 			local files=con:imglist(opts)
 			con:imglist_download(files,opts)
 			if args.rm then
@@ -1251,7 +1271,7 @@ PC clock times are set to the start of download, not per image
 			nomtime=false,
 			batchsize=20,
 			dbgmem=false,
-			overwrite='y',
+			overwrite='ask',
 		},
 		help_detail=[[
  <remote...> files/directories to download
@@ -1266,7 +1286,7 @@ PC clock times are set to the start of download, not per image
    -nomtime          don't preserve modification time of remote files
    -batchsize=n      lower = slower, less memory used
    -dbgmem           print memory usage info
-   -overwrite=<str>  overwrite existing files (y|n|old), default y
+   -overwrite=<str>  overwrite existing files (y|n|old|ask), default ask
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 ]],
 
@@ -1290,26 +1310,8 @@ PC clock times are set to the start of download, not per image
 				mtime=not args.nomtime,
 				batchsize=tonumber(args.batchsize),
 				dbgmem=args.dbgmem,
+				overwrite=cli.get_download_overwrite_opt(args.overwrite),
 			}
-
-			local overwrite_opts={
-				n=false,
-				y=true,
-				old=function(lcon,lopts,finfo,st,src,dst)
---					local tr = chdku.ts_cam2pc(finfo.st.mtime)
---					printf("remote %s local %s\n",os.date('%c',tr),os.date('%c',st.modification))
-					return chdku.ts_cam2pc(finfo.st.mtime) > st.modification
-				end,
-			}
-			if type(args.overwrite) == 'string' then
-				local ow = overwrite_opts[args.overwrite]
-				if ow == nil then
-					return false,'unrecognized overwrite option '..args.overwrite
-				end
-				opts.overwrite = ow
-			else
-				return false,'unrecognized overwrite option '..tostring(args.overwrite)
-			end
 			con:mdownload(srcs,dst,opts)
 			return true
 		end,
