@@ -498,11 +498,17 @@ end
 
 --[[
 sort a table by nested subtable values
+cmp is a function, or one of 'asc', 'des' or nil (=asc)
 ]]
 function util.table_path_sort(t,path,cmp)
-	if not cmp then
+	-- default, low to high like lua default
+	if not cmp or cmp == 'asc' then
 		cmp = function(a,b)
 			return a < b
+		end
+	elseif cmp == 'des' then
+		cmp = function(a,b)
+			return a > b
 		end
 	end
 	table.sort(t,function(a,b)
