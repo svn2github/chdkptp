@@ -122,6 +122,9 @@ m.rsint_once = function(args,opts,rcopts)
 				return true
 			end
 		end
+		if cmd == 'q' and not opts.cont then
+			return true 
+		end
 	end
 	return false
 end
@@ -130,6 +133,10 @@ m.cli_cmd_func = function(self,args)
 	local opts,err = cli:get_shoot_common_opts(args)
 	if not opts then
 		return false,err
+	end
+
+	if args.cont then
+		opts.cont=1
 	end
 
 	util.extend_table(opts,{
@@ -253,11 +260,10 @@ function wait_shooting(state, timeout)
 end
 
 function rsint_init(opts)
-	if type(hook_shoot) ~= 'table' then
+	if opts.cont and type(hook_shoot) ~= 'table' then
 		return false, 'build does not support shoot hook'
 	end
 
-	opts.cont=1
 	return rs_init(opts)
 end
 
@@ -296,16 +302,7 @@ cmds={
 	end,
 }
 
-function rsint_run(opts)
-	rlib_shoot_init_exp(opts)
-
-	press('shoot_half')
-
-	status, err = wait_shooting(true)
-	if not status then
-		return false, err
-	end
-
+function rsint_run_cont(opts)
 	local errmsg
 
 	hook_shoot.set(opts.shoot_hook_timeout)
@@ -354,7 +351,65 @@ function rsint_run(opts)
 	if errmsg then
 		return false, errmsg
 	end
-	return true
+end
+
+function rsint_run_single(opts)
+	local errmsg
+
+	local last_msg=get_tick_count()
+	while true do
+		local next_shot
+		local msg=read_usb_msg(10)
+
+		if type(get_usb_capture_target) == 'function' and get_usb_capture_target() == 0 then
+			errmsg = 'remote capture cancelled'
+			break
+		end
+
+		local cmd=nil
+		if msg then
+			cmd = string.match(msg,'^%w+')
+			last_msg=get_tick_count()
+		end
+		if cmd == 's' or cmd == 'l' then
+			click('shoot_full_only')
+			if cmd == 'l' then
+				break
+			end
+		elseif cmd == 'q' then
+			break
+		elseif msg then
+			if type(cmds[cmd]) == 'function' then
+				cmds[cmd](msg)
+			else
+				write_usb_msg('unknown command '..tostring(cmd))
+			end
+		end
+		if get_tick_count() - last_msg > opts.shoot_hook_timeout then
+			errmsg = 'timeout waiting for command'
+		end
+	end
+	release('shoot_half')
+	if errmsg then
+		return false, errmsg
+	end
+end
+
+function rsint_run(opts)
+	rlib_shoot_init_exp(opts)
+
+	press('shoot_half')
+
+	local status, err = wait_shooting(true)
+	if not status then
+		return false, err
+	end
+
+	if opts.cont then
+		return rsint_run_cont(opts)
+	else
+		return rsint_run_single(opts)
+	end
 end
 ]]}
 end

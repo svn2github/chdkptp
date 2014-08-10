@@ -2246,7 +2246,7 @@ PC clock times are set to the start of download, not per image
 	},
 	{
 		names={'rsint'},
-		help='shoot and download in continuous mode with interactive control',
+		help='shoot and download with interactive control',
 		arghelp="[local] [options]",
 		args=cli.argparser.create{
 			u='s',
@@ -2264,7 +2264,8 @@ PC clock times are set to the start of download, not per image
 			s=false,
 			c=false,
 			badpix=false,
-			cmdwait=60
+			cmdwait=60,
+			cont=false,
 		},
 		help_detail=[[
  [local]       local destination directory or filename (w/o extension!)
@@ -2288,6 +2289,21 @@ PC clock times are set to the start of download, not per image
    -c=<count>   number of lines for subimage
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
    -cmdwait=n   wait n seconds for command, default 60
+   -cont        use continuous mode
+
+
+ The following commands are available at the rsint> prompt
+  s    shoot
+  l    shoot and then quit rsint
+  q    quit (not available in continuous mode, use l)
+  exec <lua code>   execute code on the camera
+  pcall <lua code>  execute code on the camera in pcall
+  path[=path] change download destination, equivalent to [local] in the initial command
+
+ In -cont mode, the following restrictions apply:
+ The camera must be set to continuous mode in the Canon UI
+ CHDK 1.3 shoot hooks must be available
+ The l command must be used to exit
 ]],
 		func=rsint.cli_cmd_func,
 	},
