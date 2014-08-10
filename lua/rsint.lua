@@ -77,19 +77,26 @@ m.rsint_once = function(args,opts,rcopts)
 		-- TODO maybe this should just be done
 		error('cli.readline failed / eof')
 	end
-	status = con:script_status()
+	local status = con:script_status()
+	local returned
 	if status.msg then
 		con:read_all_msgs({
 			['return']=function(msg,opts)
 				printf("script return %s\n",tostring(msg.value))
+				returned = true
 			end,
 			user=function(msg,opts)
 				printf("script msg %s\n",tostring(msg.value))
 			end,
 			error=function(msg,opts)
-				return false,msg.value
+				printf("script error %s\n",tostring(msg.value))
+				returned = true
 			end,
 		})
+	end
+	-- script ended with return, bail out
+	if returned then
+		return true
 	end
 	if not status.run then 
 		error('script not running\n')
