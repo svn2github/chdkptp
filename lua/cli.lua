@@ -2065,6 +2065,7 @@ PC clock times are set to the start of download, not per image
 			cont=false,
 			quick=false,
 			shots=false,
+			int=false,
 			badpix=false,
 		},
 		help_detail=[[
@@ -2090,6 +2091,7 @@ PC clock times are set to the start of download, not per image
    -cont[=n]    shoot in continuous mode, optionally specifying number of shots
    -quick[=n]   shoot by holding halfshoot and repeatedly clicking full
    -shots=<n>   shoot n shots
+   -int=<n.m>   interval for multiple shots, in seconds
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
 ]],
 		func=function(self,args)
@@ -2177,6 +2179,11 @@ PC clock times are set to the start of download, not per image
 				elseif not opts.shots then
 					opts.shots = 1
 				end
+			end
+
+			-- convert to integer ms
+			if args.int then
+				opts.int = util.round(tonumber(args.int)*1000)
 			end
 
 			local opts_s = serialize(opts)

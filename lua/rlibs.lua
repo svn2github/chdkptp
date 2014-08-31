@@ -1153,6 +1153,9 @@ function rs_init(opts)
 		if get_prop(require'propcase'.DRIVE_MODE) ~= 1 then
 			return false, 'not in continuous mode'
 		end
+		if opts.int and opts.int > 0 and type(hook_shoot) ~= 'table' then
+			return false, 'cont with interval requires hook_shoot support'
+		end
 	end
 	if opts.shots and opts.shots <= 0 then
 		return false, 'invalid shot count'
@@ -1168,10 +1171,20 @@ end
 	code=[[
 function rs_shoot_full(opts)
 	local shot=0
+	local m
 	repeat
+		local tnext=get_tick_count() + opts.int
 		shoot()
 		shot = shot + 1
-	until shot >= opts.shots or read_usb_msg() == 'quit'
+		if shot >= opts.shots then
+			return
+		end
+		local tsleep=tnext - get_tick_count()
+		if tsleep < 0 then
+			tsleep = 0
+		end
+		m=read_usb_msg(tsleep)
+	until m == 'quit'
 end
 function rs_shoot_multi_init()
 	local state={
@@ -1195,25 +1208,65 @@ function rs_shoot_multi_wait(state,opts)
 	while true do
 		m=read_usb_msg(10)
 		if m == 'quit' then
-			print("quit")
 			return false
 		end
 		local exp_count = get_exp_count()
 		if state.last_exp_count ~= exp_count then
 			state.shots = state.shots + 1
 			state.last_exp_count = exp_count
-			print("shot inc")
 			return true
 		end
 		if get_tick_count() - t0 > opts.exp_count_timeout then
-			print("timout")
 			return false
 		end
 		if type(get_usb_capture_target) == 'function' and get_usb_capture_target() == 0 then
-			print("remotecap reset")
 			return false
 		end
 	end
+end
+
+function rs_shoot_wait_hook(opts)
+	local t0=get_tick_count()
+	repeat
+		if read_usb_msg(10) == 'quit' then
+			return false
+		end
+		if get_tick_count() - t0 > opts.exp_count_timeout then
+			return false
+		end
+	until hook_shoot.is_ready()
+	return true
+end
+
+function rs_shoot_cont_hook(opts)
+	hook_shoot.set(opts.shoot_hook_timeout)
+	local state = rs_shoot_multi_init()
+	if not state then
+		return
+	end
+	local last_shot_tick
+	press('shoot_full')
+	local m
+	repeat
+		if not rs_shoot_wait_hook(opts) then
+			break
+		end
+		if last_shot_tick then
+			local tsleep = last_shot_tick + opts.int - get_tick_count()
+			if tsleep > 0 then
+				if read_usb_msg(tsleep) == 'quit' then
+					break
+				end
+			end
+		end
+		last_shot_tick = get_tick_count()
+		hook_shoot.continue()
+		if not rs_shoot_multi_wait(state,opts) then
+			break
+		end
+	until state.shots >= opts.shots
+	hook_shoot.set(0)
+	release('shoot_full')
 end
 
 function rs_shoot_cont(opts)
@@ -1235,29 +1288,48 @@ function rs_shoot_quick(opts)
 	if not state then
 		return
 	end
-	local status
-	repeat
+	while true do
+		local t_next=get_tick_count() + opts.int
 		press('shoot_full_only')
-		status = rs_shoot_multi_wait(state,opts)
+		local status = rs_shoot_multi_wait(state,opts)
 		release('shoot_full_only')
-	until state.shots >= opts.shots or not status
-	if not status then
-		print("bad status!")
+		if state.shots >= opts.shots or not status then
+			break
+		end
+		local tsleep=t_next - get_tick_count()
+		if tsleep > 0 then
+			if read_usb_msg(tsleep) == 'quit' then
+				break
+			end
+		end
 	end
 	release('shoot_half')
 end
 
 function rs_shoot(opts)
+	if not opts.int then
+		opts.int=0
+	end
 	if not opts.shots then
 		opts.shots=1
 	end
 	if not opts.exp_count_timeout then
 		opts.exp_count_timeout = 5000
 	end
+	if not opts.shoot_hook_timeout then
+		opts.shoot_hook_timeout=10000
+	end
+	if opts.shoot_hook_timeout <= opts.int then
+		opts.shoot_hook_timeout=opts.int + 100
+	end
 
 	rlib_shoot_init_exp(opts)
 	if opts.cont then
-		rs_shoot_cont(opts)
+		if opts.int > 0 then
+			rs_shoot_cont_hook(opts)
+		else
+			rs_shoot_cont(opts)
+		end
 	elseif opts.quick then
 		rs_shoot_quick(opts)
 	else
