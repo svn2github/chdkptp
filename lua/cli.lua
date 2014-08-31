@@ -2089,7 +2089,7 @@ PC clock times are set to the start of download, not per image
    -c=<count>   number of lines for subimage
    -cont[=n]    shoot in continuous mode, optionally specifying number of shots
    -quick[=n]   shoot by holding halfshoot and repeatedly clicking full
-   -shots=<n>   shoot num shots
+   -shots=<n>   shoot n shots
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
 ]],
 		func=function(self,args)
@@ -2164,10 +2164,8 @@ PC clock times are set to the start of download, not per image
 				opts.cont = true
 			end
 			if args.quick then
-				printf("quick\n");
 				if type(args.quick) == 'string' then
 					opts.shots = tonumber(args.quick)
-					printf("quick shots %d\n",opts.shots);
 				end
 				opts.quick = true
 			end
@@ -2180,7 +2178,6 @@ PC clock times are set to the start of download, not per image
 					opts.shots = 1
 				end
 			end
-			printf("shots %d\n",opts.shots);
 
 			local opts_s = serialize(opts)
 			cli.dbgmsg('rs_init\n')
