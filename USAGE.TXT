@@ -397,10 +397,12 @@ remoteshoot (rs) [local] [options]: - shoot and download without saving to SD (r
    -dnghdr      save DNG header to a separate file, ignored with -dng
    -s=<start>   first line of for subimage raw
    -c=<count>   number of lines for subimage
-   -cont=<num>  shoot num shots in continuous mode
+   -cont[=n]    shoot in continuous mode, optionally specifying number of shots
+   -quick[=n]   shoot by holding halfshoot and repeatedly clicking full
+   -shots=<n>   shoot num shots
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
 
-rsint        [local] [options]: - shoot and download in continuous mode with interactive control
+rsint        [local] [options]: - shoot and download with interactive control
  [local]       local destination directory or filename (w/o extension!)
  options:
    -u=<s|a|96>
@@ -422,6 +424,21 @@ rsint        [local] [options]: - shoot and download in continuous mode with int
    -c=<count>   number of lines for subimage
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
    -cmdwait=n   wait n seconds for command, default 60
+   -cont        use continuous mode
+
+
+ The following commands are available at the rsint> prompt
+  s    shoot
+  l    shoot and then quit rsint
+  q    quit (not available in continuous mode, use l)
+  exec <lua code>   execute code on the camera
+  pcall <lua code>  execute code on the camera in pcall
+  path[=path] change download destination, equivalent to [local] in the initial command
+
+ In -cont mode, the following restrictions apply:
+ The camera must be set to continuous mode in the Canon UI
+ CHDK 1.3 shoot hooks must be available
+ The l command must be used to exit
 
 rec                      : - switch camera to shooting mode
 play                     : - switch camera to playback mode

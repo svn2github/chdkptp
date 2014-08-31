@@ -1153,9 +1153,9 @@ function rs_init(opts)
 		if get_prop(require'propcase'.DRIVE_MODE) ~= 1 then
 			return false, 'not in continuous mode'
 		end
-		if opts.cont <= 0 then
-			return false, 'invalid shot count'
-		end
+	end
+	if opts.shots and opts.shots <= 0 then
+		return false, 'invalid shot count'
 	end
 	return true
 end
@@ -1166,41 +1166,102 @@ end
 	depend={'rlib_shoot_common'},
 -- TODO should use shoot hook count for chdk 1.3, exp count may have issues in some ports
 	code=[[
-function rs_shoot_single()
-	shoot()
+function rs_shoot_full(opts)
+	local shot=0
+	repeat
+		shoot()
+		shot = shot + 1
+	until shot >= opts.shots or read_usb_msg() == 'quit'
 end
-function rs_shoot_cont(opts)
-	local last_exp_count = get_exp_count()
+function rs_shoot_multi_init()
+	local state={
+		last_exp_count = get_exp_count(),
+		shots = 0,
+	}
 	press('shoot_half')
 	repeat
 		m=read_usb_msg(10)
 	until get_shooting() or m == 'stop'
 	if m == 'stop' then
 		release('shoot_half')
-		return
+		return false
 	end
 	sleep(20)
-	press('shoot_full')
-	local shots = 0
-	repeat
+	return state
+end
+
+function rs_shoot_multi_wait(state,opts)
+	local t0 = get_tick_count()
+	while true do
 		m=read_usb_msg(10)
+		if m == 'quit' then
+			print("quit")
+			return false
+		end
 		local exp_count = get_exp_count()
-		if last_exp_count ~= exp_count then
-			shots = shots + 1
-			last_exp_count = exp_count
+		if state.last_exp_count ~= exp_count then
+			state.shots = state.shots + 1
+			state.last_exp_count = exp_count
+			print("shot inc")
+			return true
+		end
+		if get_tick_count() - t0 > opts.exp_count_timeout then
+			print("timout")
+			return false
 		end
 		if type(get_usb_capture_target) == 'function' and get_usb_capture_target() == 0 then
+			print("remotecap reset")
+			return false
+		end
+	end
+end
+
+function rs_shoot_cont(opts)
+	local state = rs_shoot_multi_init()
+	if not state then
+		return
+	end
+	press('shoot_full')
+	repeat
+		if not rs_shoot_multi_wait(state,opts) then
 			break
 		end
-	until shots >= opts.cont or m == 'stop'
+	until state.shots >= opts.shots
 	release('shoot_full')
 end
+
+function rs_shoot_quick(opts)
+	local state = rs_shoot_multi_init()
+	if not state then
+		return
+	end
+	local status
+	repeat
+		press('shoot_full_only')
+		status = rs_shoot_multi_wait(state,opts)
+		release('shoot_full_only')
+	until state.shots >= opts.shots or not status
+	if not status then
+		print("bad status!")
+	end
+	release('shoot_half')
+end
+
 function rs_shoot(opts)
+	if not opts.shots then
+		opts.shots=1
+	end
+	if not opts.exp_count_timeout then
+		opts.exp_count_timeout = 5000
+	end
+
 	rlib_shoot_init_exp(opts)
 	if opts.cont then
 		rs_shoot_cont(opts)
+	elseif opts.quick then
+		rs_shoot_quick(opts)
 	else
-		rs_shoot_single()
+		rs_shoot_full(opts)
 	end
 end
 ]],

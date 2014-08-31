@@ -2063,6 +2063,8 @@ PC clock times are set to the start of download, not per image
 			s=false,
 			c=false,
 			cont=false,
+			quick=false,
+			shots=false,
 			badpix=false,
 		},
 		help_detail=[[
@@ -2085,7 +2087,9 @@ PC clock times are set to the start of download, not per image
    -dnghdr      save DNG header to a separate file, ignored with -dng
    -s=<start>   first line of for subimage raw
    -c=<count>   number of lines for subimage
-   -cont=<num>  shoot num shots in continuous mode
+   -cont[=n]    shoot in continuous mode, optionally specifying number of shots
+   -quick[=n]   shoot by holding halfshoot and repeatedly clicking full
+   -shots=<n>   shoot num shots
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
 ]],
 		func=function(self,args)
@@ -2154,8 +2158,30 @@ PC clock times are set to the start of download, not per image
 				end
 			end
 			if args.cont then
-				opts.cont = tonumber(args.cont)
+				if type(args.cont) == 'string' then
+					opts.shots = tonumber(args.cont)
+				end
+				opts.cont = true
 			end
+			if args.quick then
+				printf("quick\n");
+				if type(args.quick) == 'string' then
+					opts.shots = tonumber(args.quick)
+					printf("quick shots %d\n",opts.shots);
+				end
+				opts.quick = true
+			end
+			if opts.shots and args.shots then
+				util.warnf("shot count specified with -quick or -cont, ignoring -shots")
+			else
+				if args.shots then
+					opts.shots = tonumber(args.shots)
+				elseif not opts.shots then
+					opts.shots = 1
+				end
+			end
+			printf("shots %d\n",opts.shots);
+
 			local opts_s = serialize(opts)
 			cli.dbgmsg('rs_init\n')
 			local rstatus,rerr = con:execwait('return rs_init('..opts_s..')',{libs={'rs_shoot_init'}})
@@ -2191,13 +2217,6 @@ PC clock times are set to the start of download, not per image
 				end
 			end
 
-			local nshots
-			-- TOOO add options for repeated shots not in cont mode
-			if opts.cont then
-				shot_count = opts.cont
-			else
-				shot_count = 1
-			end
 			local status,err
 			local shot = 1
 			repeat 
@@ -2205,14 +2224,12 @@ PC clock times are set to the start of download, not per image
 				status,err = con:capture_get_data_pcall(rcopts)
 				if not status then
 					warnf('capture_get_data error %s\n',tostring(err))
+					cli.dbgmsg('sending stop message\n')
+					con:write_msg_pcall('stop')
 					break
 				end
 				shot = shot + 1
-			until shot > shot_count or not status
-			if opts.cont and not status then
-				cli.dbgmsg('sending stop message\n')
-				con:write_msg('stop')
-			end
+			until shot > opts.shots
 
 			local t0=ustime.new()
 			-- wait for shot script to end or timeout
@@ -2222,8 +2239,25 @@ PC clock times are set to the start of download, not per image
 			}
 			if not wpstatus then
 				warnf('error waiting for shot script %s\n',tostring(werr))
-			elseif wstatus.timeout then
-				warnf('timed out waiting for shot script\n')
+			else
+				if wstatus.timeout then
+					warnf('timed out waiting for shot script\n')
+				end
+				-- TODO should allow passing a message handler to capture_get_data
+				-- stop immediately on script error
+				if wstatus.msg then
+					con:read_all_msgs({
+						['return']=function(msg,opts)
+							warnf("unexpected script return %s\n",tostring(msg.value))
+						end,
+						user=function(msg,opts)
+							warnf("unexpected script msg %s\n",tostring(msg.value))
+						end,
+						error=function(msg,opts)
+							warnf("script error %s\n",tostring(msg.value))
+						end,
+					})
+				end
 			end
 			cli.dbgmsg("script wait time %.4f\n",ustime.diff(t0)/1000000)
 
