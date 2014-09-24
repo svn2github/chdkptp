@@ -109,7 +109,11 @@ m.rsint_once = function(args,opts,rcopts)
 			rest = nil
 		end
 		args[1] = rest
-		rcopts,err = init_handlers(args,opts)
+		local new_rcopts = init_handlers(args,opts)
+		-- TODO need to keep updated opts in same table, unset any unneeded
+		for i,k in pairs({'jpg','dng_hdr','raw'}) do
+			rcopts[k]=new_rcopts[k]
+		end
 		-- TODO handle error, should send l to script
 	else
 		-- remaining commands assumed to be cam side
