@@ -39,9 +39,9 @@ function init_handlers(args,opts)
 			dst = nil
 		end
 	end
-	local rcopts={}
+	m.rcopts={}
 	if args.jpg then
-		rcopts.jpg=chdku.rc_handler_file(dst_dir,dst)
+		m.rcopts.jpg=chdku.rc_handler_file(dst_dir,dst)
 	end
 	if args.dng then
 		local badpix = args.badpix
@@ -53,17 +53,16 @@ function init_handlers(args,opts)
 			lcount=opts.lcount,
 			badpix=badpix,
 		}
-		rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
-		rcopts.raw = chdku.rc_handler_raw_dng_file(dst_dir,dst,'dng',dng_info)
+		m.rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
+		m.rcopts.raw = chdku.rc_handler_raw_dng_file(dst_dir,dst,'dng',dng_info)
 	else
 		if args.raw then
-			rcopts.raw=chdku.rc_handler_file(dst_dir,dst)
+			m.rcopts.raw=chdku.rc_handler_file(dst_dir,dst)
 		end
 		if args.dnghdr then
-			rcopts.dng_hdr=chdku.rc_handler_file(dst_dir,dst)
+			m.rcopts.dng_hdr=chdku.rc_handler_file(dst_dir,dst)
 		end
 	end
-	return rcopts
 end
 
 --[[
@@ -71,7 +70,7 @@ do a single iteration of rsint
 returns true if done
 errors are thrown
 ]]
-m.rsint_once = function(args,opts,rcopts)
+m.rsint_once = function(args,opts)
 	local line = cli.readline('rsint> ')
 	if not line then
 		-- TODO maybe this should just be done
@@ -109,19 +108,15 @@ m.rsint_once = function(args,opts,rcopts)
 			rest = nil
 		end
 		args[1] = rest
-		local new_rcopts = init_handlers(args,opts)
-		-- TODO need to keep updated opts in same table, unset any unneeded
-		for i,k in pairs({'jpg','dng_hdr','raw'}) do
-			rcopts[k]=new_rcopts[k]
-		end
-		-- TODO handle error, should send l to script
+		-- TODO could catch errors, send l to script
+		init_handlers(args,opts)
 	else
 		-- remaining commands assumed to be cam side
 		-- TODO could check if remotecap has timed out here
 		con:write_msg(cmd..' '..rest)
 		if cmd == 's' or cmd == 'l' then
 			-- throws on error
-			con:capture_get_data(rcopts)
+			con:capture_get_data(m.rcopts)
 			if cmd == 'l' then
 				return true
 			end
@@ -185,11 +180,7 @@ m.cli_cmd_func = function(self,args)
 		end
 	end
 
-	local rcopts
-	rcopts,err = init_handlers(args,opts)
-	if not rcopts then
-		return false, err
-	end
+	init_handlers(args,opts)
 
 	-- wait time for remotecap
 	opts.cap_timeout=30000
@@ -209,7 +200,7 @@ m.cli_cmd_func = function(self,args)
 	local status
 	repeat
 		local r
-		status,r = xpcall(m.rsint_once,errutil.format,args,opts,rcopts)
+		status,r = xpcall(m.rsint_once,errutil.format,args,opts)
 		if not status then
 			warnf("%s",tostring(r))
 		end
