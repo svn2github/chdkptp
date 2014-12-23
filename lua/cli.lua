@@ -152,6 +152,34 @@ function argparser.create(defs)
 	return util.mt_inherit(r,argparser)
 end
 
+argparser_text=util.extend_table({},argparser)
+
+-- overrides
+function argparser_text.create(defs)
+	local r={ defs=defs }
+	return util.mt_inherit(r,argparser_text)
+end
+
+--[[
+Get a freeform text arg for lua code etc
+if first non-whitespace is <, read from file, otherwise pass as is
+--]]
+function argparser_text:parse(arg)
+	local s, e = string.find(arg,'^[%c%s]*<')
+	if not s then
+		return {text=arg}
+	end
+	local fn = string.sub(arg,e+1) 
+	local words,errmsg=self:parse_words(fn)
+	if not words then
+		return false,errmsg
+	end
+	if #words ~= 1 then
+		return false,'expected exactly one filename'
+	end
+	return {input=words[1]}
+end
+
 cli.cmd_proto = {
 	get_help = function(self)
 		local namestr = self.names[1]
@@ -477,6 +505,19 @@ function cli:get_shoot_common_opts(args)
 	return opts
 end
 
+function cli:get_luatext_arg(arg)
+	if not arg.input then
+		return arg.text
+	end
+	local fh,err = io.open(arg.input,'rb')
+	if not fh then
+		errlib.throw{etype='io',msg='failed to open input: '..tostring(err)}
+	end
+	local r=fh:read("*a")
+	fh:close()
+	return r
+end
+
 --[[
 return a single character status,formatted text listing for a single device specified by desc, or throw an error
 
@@ -640,14 +681,19 @@ cli:add_commands{
 	{
 		names={'exec','!'},
 		help='execute local lua',
-		arghelp='<lua code>',
+		arghelp='<lua code> | < <filename>',
+		args=argparser_text.create{ },
 		help_detail=[[
  Execute lua in chdkptp. 
  The global variable con accesses the current CLI connection.
  Return values are printed in the console.
 ]],
 		func=function(self,args) 
-			local f,r = loadstring(args)
+			local chunkname
+			if args.input then
+				chunkname = args.input
+			end
+			local f,r = loadstring(cli:get_luatext_arg(args),chunkname)
 			if not f then
 				return false, string.format("compile failed:%s\n",r)
 			end
@@ -727,14 +773,15 @@ cli:add_commands{
 	{
 		names={'lua','.'},
 		help='execute remote lua',
-		arghelp='<lua code>',
+		arghelp='<lua code> | < <filename>',
+		args=argparser_text.create{ },
 		help_detail=[[
  Execute Lua code on the camera.
  Returns immediately after the script is started.
  Return values or error messages can be retrieved with getm after the script is completed.
 ]],
 		func=function(self,args) 
-			con:exec(args)
+			con:exec(cli:get_luatext_arg(args))
 			return true
 		end,
 	},
@@ -765,7 +812,8 @@ cli:add_commands{
 	{
 		names={'luar','='},
 		help='execute remote lua, wait for result',
-		arghelp='<lua code>',
+		arghelp='<lua code> | < <filename>',
+		args=argparser_text.create{ },
 		help_detail=[[
  Execute Lua code on the camera, waiting for the script to end.
  Return values or error messages are printed after the script completes.
@@ -773,7 +821,7 @@ cli:add_commands{
 		func=function(self,args) 
 			local rets={}
 			local msgs={}
-			con:execwait(args,{rets=rets,msgs=msgs})
+			con:execwait(cli:get_luatext_arg(args),{rets=rets,msgs=msgs})
 			local r=''
 			for i=1,#msgs do
 				r=r .. chdku.format_script_msg(msgs[i]) .. '\n'

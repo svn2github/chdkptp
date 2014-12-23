@@ -77,9 +77,14 @@ CLI commands are available from the console, GUI and the command line
 Many CLI commands have full descriptive name and a short name. The short 
 is listed in parenthesis in the command reference below.
 
-==CLI parsing==
-The cli commands lua, luar, exec and putm all accept a single line of free-form
-text and pass it unmodified to the underlying function.
+==CLI syntax==
+The cli commands lua, luar, exec all accept either a single line of free-form
+text or an input file. If the first non-whitespace character is < the
+remaining text is treated as a filename, using the same quoting rules described
+for "word" arguments below. Otherwise, the input is treated treated as Lua
+code and passed unmodified to the chdkptp or camera Lua interpreter.
+
+putm accepts a single line of free-form text.
 
 Most other commands parse the remaining input into switches and arguments
 Switches are in the for -switchname and may take values with -switch=value
@@ -96,7 +101,7 @@ help (h)     [cmd]|[-v]  : - help on [cmd] or all commands
  help -v gives full help on all commands, otherwise as summary is printed
 
 #                        : - comment
-exec (!)     <lua code>  : - execute local lua
+exec (!)     <lua code> | < <filename>: - execute local lua
  Execute lua in chdkptp.
  The global variable con accesses the current CLI connection.
  Return values are printed in the console.
@@ -108,14 +113,14 @@ set          [-v|-c] [option[=value]]: - show or set option
 
 quit (q)                 : - quit program
 source       <file>      : - execute cli commands from file
-lua (.)      <lua code>  : - execute remote lua
+lua (.)      <lua code> | < <filename>: - execute remote lua
  Execute Lua code on the camera.
  Returns immediately after the script is started.
  Return values or error messages can be retrieved with getm after the script is completed.
 
 getm                     : - get messages
 putm         <msg string>: - send message
-luar (=)     <lua code>  : - execute remote lua, wait for result
+luar (=)     <lua code> | < <filename>: - execute remote lua, wait for result
  Execute Lua code on the camera, waiting for the script to end.
  Return values or error messages are printed after the script completes.
 
