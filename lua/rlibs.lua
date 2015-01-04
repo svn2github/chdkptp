@@ -597,6 +597,7 @@ opts={
 	callback=function(self)
 	end_callback=function(self,status,msg)
 	listall=bool -- pass to os.listdir; currently broken, stat on . or .. fails
+	use_idir=bool -- use os.idir if available, avoids out of memory / timeouts on large dirs, but may have recursion limits
 	-- users may add their own methods or members
 })
 self in callbacks is the fs_iter object, merged with opts
@@ -666,14 +667,23 @@ end
 
 function fs_iter:singledir()
 	local cur_dir = self.cur.full
-	local t,err=os.listdir(cur_dir,self.listall)
-	if not t then
-		return false,err
-	end
-	for i,name in ipairs(t) do
-		local status, err = self:singleitem(joinpath(cur_dir,name))
-		if not status then
+	if self.use_idir and os.idir then
+		for name in os.idir(cur_dir,self.listall) do
+			local status, err = self:singleitem(joinpath(cur_dir,name))
+			if not status then
+				return false,err
+			end
+		end
+	else
+		local t,err=os.listdir(cur_dir,self.listall)
+		if not t then
 			return false,err
+		end
+		for i,name in ipairs(t) do
+			local status, err = self:singleitem(joinpath(cur_dir,name))
+			if not status then
+				return false,err
+			end
 		end
 	end
 	return true
@@ -711,6 +721,7 @@ opts={
 	maxdepth=100, -- maxium depth of directories to recurse into, 0=just process paths passed in, don't recurse
 	martians=bool, -- process non-file, not directory items (vol label,???) default false
 	batchsize=20, -- passed to msg_batcher, if used
+	use_idir, -- use  passed to fs_iter
 }
 func defaults to batching the full path of each file
 unless dirsfirst is set, directories will be recursed into before calling func on the containing directory
@@ -742,6 +753,7 @@ function find_files(paths,opts,func)
 	},opts)
 
 	return fs_iter.run(paths,{
+		use_idir=opts.use_idir,
 		ff_check_match=function(self,opts)
 			if self.cur.st.is_file then
 				return not opts.fmatch or string.match(self.cur.full,opts.fmatch)
@@ -959,7 +971,7 @@ msglimit
 match
 	pattern, file names matching with string.match will be returned
 listall 
-	passed as second arg to os.listdir
+	passed as second arg to os.listdir / idir
 dirsonly
     only list directories, error if path is a file
 

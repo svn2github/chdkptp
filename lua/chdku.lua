@@ -426,6 +426,7 @@ get a list of image files with ff_imglist
 ]]
 function con_methods:imglist(opts)
 	local ropts=util.extend_table({
+		use_idir=true,
 		dirs=false,
 		fmatch='%a%a%a_%d%d%d%d%.%w%w%w',
 	},opts,{
