@@ -963,6 +963,7 @@ listall
 dirsonly
     only list directories, error if path is a file
 
+Prior to CHDK 1.3 may run out of memory or cause PTP timeouts with large dirs
 may run out of memory on very large directories,
 msglimit can help but os.listdir itself could use all memory
 TODO message timeout is not checked
@@ -971,6 +972,30 @@ TODO message timeout is not checked
 	name='ls',
 	depend={'msg_batcher','joinpath'},
 	code=[[
+function ls_single(opts,b,path,v)
+	if not opts.match or string.match(v,opts.match) then
+		if opts.stat then
+			local st,msg=os.stat(joinpath(path,v))
+			if not st then
+				return false,msg
+			end
+			if opts.stat == '/' then
+				if st.is_dir then
+					b:write(v .. '/')
+				else 
+					b:write(v)
+				end
+			elseif opts.stat == '*' then
+				st.name=v
+				b:write(st)
+			end
+		else
+			b:write(v)
+		end
+	end
+	return true
+end
+
 function ls(path,opts_in)
 	local opts={
 		msglimit=50,
@@ -1006,29 +1031,22 @@ function ls(path,opts_in)
 		return true
 	end
 
-	local t,msg=os.listdir(path,opts.listall)
-	if not t then
-		return false,msg
-	end
-	for i,v in ipairs(t) do
-		if not opts.match or string.match(v,opts.match) then
-			if opts.stat then
-				local st,msg=os.stat(joinpath(path,v))
-				if not st then
-					return false,msg
-				end
-				if opts.stat == '/' then
-					if st.is_dir then
-						b:write(v .. '/')
-					else 
-						b:write(v)
-					end
-				elseif opts.stat == '*' then
-					st.name=v
-					b:write(st)
-				end
-			else
-				b:write(v)
+	if os.idir then
+		for v in os.idir(path,opts.listall) do
+			local status,err=ls_single(opts,b,path,v)
+			if not status then
+				return false, err
+			end
+		end
+	else
+		local t,msg=os.listdir(path,opts.listall)
+		if not t then
+			return false,msg
+		end
+		for i,v in ipairs(t) do
+			local status,err=ls_single(opts,b,path,v)
+			if not status then
+				return false, err
 			end
 		end
 	end
