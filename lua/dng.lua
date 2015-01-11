@@ -389,9 +389,10 @@ function m.bind_ifds(d,ifd_off,ifd_list,parent)
 				ifd.byname[e:tagname()] = e
 			end
 		end
+		ifd.size = n_entries * 12 + 2
 		util.extend_table(ifd,ifd_methods)
 		table.insert(ifd_list,ifd)
-		ifd_off = d._lb:get_u32(ifd_off + n_entries * 12 + 2)
+		ifd_off = d._lb:get_u32(ifd_off + ifd.size)
 	until ifd_off == 0
 	return ifd_list
 end
@@ -420,7 +421,7 @@ function dng_methods.print_ifd(self,ifd,opts)
 		p = p.parent
 	end
 
-	printf('%sifd%s offset=0x%x entries=%d\n',indent,pathstr,ifd.off,ifd.n_entries)
+	printf('%sifd%s offset=0x%x entries=%d size=%d\n',indent,pathstr,ifd.off,ifd.n_entries,ifd.size)
 	for j, e in ipairs(ifd.entries) do
 		printf('%s %s\n',indent,e:describe())
 		-- TODO undefined we know about should be sub-classed in a way that allows displaying
@@ -605,6 +606,25 @@ function dng_methods.dump_image(self,dst,opts)
 	end
 	outlb:fwrite(fh)
 	fh:close()
+	return true
+end
+
+function dng_methods.dump_thumb(self,dst,opts)
+	opts=util.extend_table({},opts)
+	if not opts.ppm then
+		self.main_ifd:write_image_data(dst)
+	else
+		-- TODO should check that it's actually an RGB8 thumb
+		local fh, err = io.open(dst,'wb')
+		if not fh then
+			return false, 'open failed '..tostring(err)
+		end
+		fh:write(string.format('P6\n%d\n%d\n%d\n',
+			self.main_ifd.byname.ImageWidth:getel(),
+			self.main_ifd.byname.ImageLength:getel(),255))
+		self.main_ifd:write_image_data(fh)
+		fh:close()
+	end
 	return true
 end
 

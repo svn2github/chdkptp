@@ -122,21 +122,7 @@ local function do_dump_thumb(d,args)
 		printf("dump thumb: %s\n",tostring(filename))
 		return true
 	end
-	if not args.tfmt then
-		d.main_ifd:write_image_data(filename)
-	elseif args.tfmt == 'ppm' then
-		-- TODO should check that it's actually an RGB8 thumb
-		local fh, err = io.open(filename,'wb')
-		if not fh then
-			return false,err
-		end
-		fh:write(string.format('P6\n%d\n%d\n%d\n',
-			d.main_ifd.byname.ImageWidth:getel(),
-			d.main_ifd.byname.ImageLength:getel(),255))
-		d.main_ifd:write_image_data(fh)
-		fh:close()
-	end
-	return true
+	return d:dump_thumb(filename,{ppm = (args.tfmt == 'ppm')})
 end
 
 local function do_dump_raw(d,args)
