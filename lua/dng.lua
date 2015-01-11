@@ -777,7 +777,8 @@ function m.bind_header(lb)
 	return d
 end
 
-function m.load(filename)
+function m.load(filename, opts)
+	opts = util.extend_table({},opts)
 	local lb,err=lbu.loadfile(filename)
 	if not lb then
 		return false, err
@@ -787,11 +788,13 @@ function m.load(filename)
 		return false, err
 	end
 	d.filename = filename
-	-- TODO this will fail loading dngs that aren't in a format supported by rawimg
-	-- TODO also will prevent loading standalone headers
-	local status, err = d:set_data()
-	if not status then
-		return false, err
+	-- optionally don't load data, for header-only files or unsupported formats
+	-- TODO some functions will be broken
+	if not opts.nodata then
+		local status, err = d:set_data()
+		if not status then
+			return false, err
+		end
 	end
 	return d
 end
