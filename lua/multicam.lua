@@ -705,7 +705,7 @@ function mc:cmd(cmd,opts)
 	end
 
 	-- to match remote command name
-	local cmdname=string.match(cmd,'^(%w+)')
+	local cmdname=string.match(cmd,'^([%w_]+)')
 
 	return self:wait_status_msg(cmdname,opts)
 end
