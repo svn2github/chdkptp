@@ -415,7 +415,7 @@ start the script on all cameras
 ]]
 function mc:start(opts)
 	for lcon in self:icams() do
-		local status, err=xpcall(self.start_single,errutil.format,self,lcon,opts)
+		local status, err=xpcall(function() return self:start_single(lcon,opts) end ,errutil.format)
 		if not status then
 			warnf('%s: failed %s\n',lcon.mc_id,err)
 		end
