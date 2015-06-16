@@ -971,7 +971,7 @@ function wait_timeout(func,value,wait,timeout,msg)
 	while func() ~= value do
 		sleep(wait)
 		timeout = timeout - wait
-		if wait <= 0 then
+		if timeout <= 0 then
 			write_status(false,msg)
 			return false
 		end
