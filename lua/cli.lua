@@ -2319,7 +2319,7 @@ PC clock times are set to the start of download, not per image
 				uerr = 'uninit '..tostring(uerr)
 				status = false
 				if err then
-					err = err .. ' ' .. uerr
+					err = tostring(err) .. ' ' .. uerr
 				else 
 					err = uerr
 				end
