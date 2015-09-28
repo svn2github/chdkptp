@@ -600,6 +600,12 @@ con> mdl -fmatch=%.JPG$ DCIM C:\temp
 delete some raw images
 con> rm -nodirs -fmatch=%.CRW$ DCIM
 
+Update CHDK on the camera.
+Download and unzip the build.
+con> mup c:\path\to\build A/
+
+NOTE: This will not work on multi-partition setups.
+
 upload some scripts
 con> mup c:\CHDK\SCRIPTS CHDK/SCRIPTS
 
