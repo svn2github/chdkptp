@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2012-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2012-2015 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -578,6 +578,19 @@ function mc:init_sync(count)
 	printf('minimum sync delay %d\n',self.min_sync_delay)
 end
 
+--[[
+fill in status table r for a single camera
+status table is in the form
+{
+ done=bool -- state to track all cameras that have returned a status
+ failed=bool -- true if there were local or communication arrors
+ status={ -- camera side status table
+  cmd=string -- command  name
+  status=value -- camera side status value, may be any serializable type
+  msg=string -- camera side message, usually an error 
+ }
+}
+]]
 function mc:get_single_status(lcon,cmd,r)
 	local status,err = lcon:script_status_pcall()
 	if not status then
@@ -673,10 +686,10 @@ end
 send command
 opts {
 	wait=bool - expect / wait for status message
-	arg=string
 	flushmsgs=bool - flush any pending messages
 	syncat=<ms> -- number of ms after now command should execute (TODO accept a ustime)
-	cons={} -- explicit table of connections
+	args=string -- additional arugments after synctime (if set)
+	printcmd=bool|'once' -- print commands to each cam as sent, or once before sent to any
 }
 if syncat is set, sends a synchronized command
 to execute at approximately local issue time + syncat
@@ -684,18 +697,33 @@ command must accept a camera tick time as it's argument (e.g. shoot)
 ]]
 function mc:cmd(cmd,opts)
 	local tstart = ustime.new()
-	opts=util.extend_table({flushmsgs=true},opts)
+	opts=util.extend_table({flushmsgs=true,printcmd='once'},opts)
 	if opts.flushmsgs then
 		self:flushmsgs()
 	end
 	local sendcmd = cmd
+	if opts.printcmd == 'once' then
+		local s=cmd
+		if opts.syncat then
+			s=string.format('%s [sync +%d]',s,opts.syncat)
+		end
+		if opts.args then
+			s=s..' '..opts.args
+		end
+		printf('%s\n',s)
+	end
 	for lcon in self:icams() do
 		local status,err
 		if opts.syncat then
 			sendcmd = string.format('%s %d',cmd,self:get_sync_tick(lcon,tstart,opts.syncat))
 		end
+		if opts.args then
+			sendcmd = sendcmd..' '..opts.args
+		end
 		local status,err = lcon:write_msg_pcall(sendcmd)
-		printf('%s:%s\n',lcon.mc_id,sendcmd)
+		if opts.printcmd == true then
+			printf('%s:%s\n',lcon.mc_id,sendcmd)
+		end
 		if not status then
 			warnf('%s: send %s cmd failed: %s\n',lcon.mc_id,tostring(sendcmd),tostring(err))
 		end
@@ -728,6 +756,82 @@ function mc:print_cmd_status(status,results)
 		end
 	end
 end
+function mc:print_cmd_status_short(status,results)
+	if status then
+		printf("ok\n")
+	else
+		printf("errors\n")
+	end
+	if results then
+		for lcon in mc:icams() do
+			local v=results[lcon.mc_id]
+			if v.failed or not v.status.status then
+				printf('%s: %s\n',lcon.mc_id,tostring(util.serialize(v,{pretty=true})))
+			end
+		end
+	end
+end
+--[[
+take one ore more shots
+opts:{
+	tv=number -- APEX*96 shutter speed
+	sv=number -- APEX*96 "real" ISO
+	av=number -- APEX*96 aperture
+	nd=number -- nd filter state 0=canon fw, 1=in 2=out
+	synctime=number -- number of milliseconds in the future to shoot, must be >= min_sync_deley
+	shots=number -- number of shots, default 1
+	interval=number -- number of milliseconds between shots, default 2000
+--]]
+function mc:shoot(opts) 
+	opts = util.extend_table({
+	},opts)
+	if not self.min_sync_delay then
+		warnf('sync not initialized\n')
+		return
+	end
+	self:flushmsgs()
+	if not opts.synctime then
+		opts.synctime=self.min_sync_delay + 50
+	elseif opts.synctime < self.min_sync_delay then
+		warnf("synctime %d < min_sync_delay %d, adjusted\n",opts.synctime,self.min_sync_delay)
+		opts.synctime = self.min_sync_delay + 50
+	end
+	local init_cmds = {}
+	local init_cmd
+	if opts.tv then
+		table.insert(init_cmds,string.format('set_tv96_direct(%d)',opts.tv))
+	end
+	if opts.sv then
+		table.insert(init_cmds,string.format('set_sv96(%d)',opts.sv))
+	end
+	if opts.av then
+		table.insert(init_cmds,string.format('set_av96_direct(%d)',opts.av))
+	end
+	if opts.nd then
+		table.insert(init_cmds,string.format('set_nd_filter(%d)',tostring(opts.nd)))
+	end
+	if #init_cmds > 0 then
+		init_cmd = 'call '..table.concat(init_cmds,';')
+	end
+	if init_cmd then
+		self:print_cmd_status_short(self:cmdwait(init_cmd))
+	end
+	self:print_cmd_status_short(self:cmdwait('preshoot'))
+	self:print_cmd_status_short(self:cmdwait('shoot_burst',{
+		syncat=opts.synctime,
+		args=util.serialize{shots=opts.shots,interval=opts.interval}
+	}))
+	self:print_cmd_status_short(self:cmdwait('call release"shoot_half"'))
+end
+--[[
+take one ore more shots, printing timestamps on the screen to allow rough sync comparison
+opts:{
+	tv:number -- APEX*96 shutter speed
+	sv:number -- APEX*96 "real" ISO
+	shoot_cmd:string -- shoot type, either shoot or shoot_hook_sync
+	synctime:number -- number of milliseconds in the future to shoot, must be >= min_sync_deley
+	defexp:boolean -- use tv=1/256 sv=400
+--]]
 function mc:testshots(opts) 
 	opts = util.extend_table({ 
 		nshots=1,
@@ -926,8 +1030,10 @@ commands
 	play: switch to playback
 	preshoot: press shoot half and wait for get_shooting
 	shoot [ms]: wait [ms], press shoot full, wait for get_shooting
-	shoot_hook_sync [ms]: as above, except using chdk 1.3 shoot hook
+	shoot_hook_sync [ms]: as above, except using chdk >= 1.3 shoot hook
+	shoot_burst <ms> <options>: shoot multiple shots using shoot hook
 	tick: return the value of get_tick_count
+	synctick [ms]: wait [ms], return get_tick_count after wait
 	exit: end script
 	id: toggle id display
 	lastimg: return full path of last shot image
@@ -935,14 +1041,21 @@ commands
 			must NOT be used directly with cmdwait
 			args should be a serialized lua table of options for find_files, optionally specifying
 			initial paths with start_paths
+	call <lua code>: run given lua code, return any results with write_status
+	pcall <lua code>: run given lua code in pcall, return any results with write_status
 ]]
 local function init()
 	chdku.rlibs:register({
 		name='multicam',
 		depend={'extend_table','serialize_msgs','unserialize','ff_imglist'},
 		code=[[
+props=require'propcase'
+if type(hook_shoot) == 'table' then
+	require'hookutil'
+end
+
 mc={
-	mode_sw_timeout=1000,
+	mode_sw_timeout=2500,
 	preshoot_timeout=5000,
 	shoot_complete_timeout=5000,
 	msg_timeout=100,
@@ -963,8 +1076,8 @@ color={
 
 cmds={}
 
--- wait, sleeping <wait> ms until <func> returns <value> or timeout hit
-function wait_timeout(func,value,wait,timeout,msg)
+-- wait, sleeping <wait> ms until <func> returns <value> or timeout hit, write status message
+function wait_timeout_write_status(func,value,wait,timeout,msg)
 	if not msg then
 		msg = 'timeout'
 	end
@@ -1026,21 +1139,20 @@ function cmds.rec()
 	if not get_mode() then
 		switch_mode_usb(1)
 	end
-	return wait_timeout(get_mode,true,100,mc.mode_sw_timeout)
+	wait_timeout_write_status(get_mode,true,100,mc.mode_sw_timeout)
 end
 function cmds.play()
 	if get_mode() then
 		switch_mode_usb(0)
 	end
-	return wait_timeout(get_mode,false,100,mc.mode_sw_timeout)
+	wait_timeout_write_status(get_mode,false,100,mc.mode_sw_timeout)
 end
 function cmds.preshoot()
 	press('shoot_half')
-	local status=wait_timeout(get_shooting,true,10,mc.preshoot_timeout)
+	local status=wait_timeout_write_status(get_shooting,true,10,mc.preshoot_timeout)
 	if not status then
 		release('shoot_half')
 	end
-	return status,msg
 end
 
 function cmds.shoot()
@@ -1048,7 +1160,7 @@ function cmds.shoot()
 	press('shoot_full')
 	sleep(mc.shoot_hold)
 	release('shoot_full')
-	return wait_timeout(get_shooting,false,100,mc.shoot_complete_timeout,'get_shooting timeout')
+	wait_timeout_write_status(get_shooting,false,100,mc.shoot_complete_timeout,'get_shooting timeout')
 end
 
 function cmds.shoot_hook_sync()
@@ -1074,7 +1186,48 @@ function cmds.shoot_hook_sync()
 	sleep(mc.shoot_hold)
 	release('shoot_full')
 	hook_shoot.set(0)
-	return wait_timeout(get_shooting,false,100,mc.shoot_complete_timeout,'get_shooting timeout')
+	wait_timeout_write_status(get_shooting,false,100,mc.shoot_complete_timeout,'get_shooting timeout')
+end
+
+function cmds.shoot_burst()
+	if type(hook_shoot) ~= 'table' then
+		write_status(false, 'build does not support shoot hook')
+		return
+	end
+	local synctick,rest=string.match(mc.args,'^([%w_]+)%s*(.*)')
+	synctick=tonumber(synctick)
+	local opts,err
+	if string.len(rest) > 0 then
+		opts,err=unserialize(rest)
+		if not opts then
+			write_status(false,'unserialize failed '..tostring(err))
+			return
+		end
+	end
+	opts=extend_table({
+		shots=1,
+		interval=2000,
+		shoot_hook_timeout=mc.shoot_hook_timeout,
+		shoot_hook_ready_timeout=mc.shoot_hook_ready_timeout,
+	},opts)
+	hook_shoot.set(opts.shoot_hook_timeout)
+	for i=1,opts.shots do
+		press('shoot_full_only')
+		local wait_time = 0
+		if not hook_shoot.wait_ready({timeout=opts.shoot_hook_ready_timeout,timeout_error=false}) then
+			release('shoot_full_only')
+			write_status(false, 'hook_shoot ready timeout')
+			return
+		end
+		wait_tick(synctick)
+		hook_shoot.continue()
+		synctick=synctick+opts.interval
+		release('shoot_full_only')
+		-- ensure shoot_full released for some noticable time. TODO could use raw hook
+		sleep(opts.interval/2)
+	end
+	hook_shoot.set(0)
+	write_status(true)
 end
 
 function cmds.tick()
@@ -1104,10 +1257,11 @@ function cmds.pcall()
 	local f,err=loadstring(mc.args)
 	if f then 
 		local r={pcall(f)}
-		if not r[1] then
+		local status=table.remove(r,1)
+		if not status then
 			write_status(false,r)
 		else
-			write_status(r)
+			write_status(true,r)
 		end
 	else
 		write_status(false,err)
@@ -1121,6 +1275,7 @@ function cmds.imglist()
 	local args,err=unserialize(mc.args)
 	if not args then
 		write_status(false,'unserialize failed '..tostring(err))
+		return
 	end
 	local status,err = ff_imglist(args)
 	if status then
