@@ -1127,10 +1127,14 @@ function rlib_shoot(opts)
 	shoot()
 	local r
 	if opts.info then
+		local raw_state = get_raw() -- hack for 1.3 compat
+		if type(raw_state) == 'number' then
+			raw_state = (raw_state == 1)
+		end
 		r = {
 			dir=get_image_dir(),
 			exp=get_exp_count(),
-			raw=(get_raw() == 1),
+			raw=raw_state,
 		}
 		if r.raw then
 			r.raw_in_dir = (get_config_value(35) == 1)
@@ -1144,7 +1148,7 @@ function rlib_shoot(opts)
 	else
 		r=true
 	end
-	if save_raw then
+	if save_raw ~= nil then
 		set_raw(save_raw)
 	end
 	if save_dng then
