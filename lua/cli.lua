@@ -2054,10 +2054,20 @@ PC clock times are set to the start of download, not per image
 				local raw_dir
 				local raw_ext
 				local raw_pfx
-				if info.raw_in_dir then
+				-- in directory with jpeg
+				if info.raw_dir_opt == 1 then
 					raw_dir = info.dir
+				-- A/RAW/...
+				elseif info.raw_dir_opt == 2 then
+					raw_dir = string.gsub(info.dir,'^A/DCIM','A/RAW')
 				else
-					raw_dir = 'A/DCIM/100CANON'
+					-- TODO hack for date naming cams, will use A/DCIM/101___01 if raw in dir not set in CHDK >= 1.3
+					-- cameras dir will be either nnn___MM or nnn_MMDD
+					if string.match(info.dir,'^A/DCIM/[0-9][0-9][0-9]_') then
+						raw_dir = 'A/DCIM/101___01'
+					else
+						raw_dir = 'A/DCIM/100CANON'
+					end
 				end
 				if info.dng and info.use_dng_ext then
 					raw_ext = 'DNG'

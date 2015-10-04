@@ -1137,7 +1137,7 @@ function rlib_shoot(opts)
 			raw=raw_state,
 		}
 		if r.raw then
-			r.raw_in_dir = (get_config_value(35) == 1)
+			r.raw_dir_opt = get_config_value(35)
 			r.raw_pfx = get_config_value(36)
 			r.raw_ext = get_config_value(37)
 			r.dng = (get_config_value(226) == 1)
