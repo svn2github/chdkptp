@@ -392,7 +392,7 @@ basename_cam from fsutil
 {
 	name='basename',
 	code=[[
-function basename(path)
+function basename(path,sfx)
 	if not path then
 		return nil
 	end
@@ -427,7 +427,7 @@ function dirname(path)
 		return path
 	end
 	-- remove trailing blah/?
-	dn=string.gsub(path,'[^/]+/*$','')
+	local dn=string.gsub(path,'[^/]+/*$','')
 	-- invalid, 
 	if dn == '' then
 		return nil

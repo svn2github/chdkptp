@@ -157,7 +157,7 @@ function fsutil.dirname_cam(path)
 		return path
 	end
 	-- remove trailing blah/?
-	dn=string.gsub(path,'[^/]+/*$','')
+	local dn=string.gsub(path,'[^/]+/*$','')
 	-- invalid, 
 	if dn == '' then
 		return nil
