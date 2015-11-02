@@ -146,7 +146,7 @@ end
 --[[
 dirname variant for camera paths
 note, A/ is ambiguous if used on relative paths, treated specially
-has trailing directory removed, except for A/ (camera functions trailing / on A/ and reject on subdirs) 
+has trailing directory removed, except for A/ (camera functions require trailing / on A/ and reject on subdirs) 
 A/ must be uppercase (as required by dryos)
 ]]
 function fsutil.dirname_cam(path)
@@ -215,7 +215,7 @@ end
 
 --[[
 split a path into an array of components
-the leading component will may have a /, drive or .
+the leading component will have a /, drive or .
 ]]
 function fsutil.splitpath(path)
 	local parts={}
