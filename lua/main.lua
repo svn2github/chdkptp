@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2015 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -147,7 +147,16 @@ function get_chdkptp_home(def_path)
 	local path=sys.getenv('CHDKPTP_HOME')
 	if not path then
 		path=sys.getenv('HOME')
-		if not path then
+		if sys.ostype() == 'Windows' then
+			path=sys.getenv('USERPROFILE')
+		end
+		if path then
+			if sys.ostype() == 'Windows' then
+				path=path..'/_chdkptp'
+			else
+				path=path..'/.chdkptp'
+			end
+		else
 			return def_path
 		end
 	end
@@ -163,11 +172,6 @@ function do_rc_file(name)
 		path=get_chdkptp_home()
 		if not path then
 			return
-		end
-		-- fix . to _ on windows
-		-- TODO check for both ?
-		if sys.ostype() == 'Windows' and string.sub(name,1,1) == '.' then
-			name = '_'..string.sub(name,2,-1)
 		end
 		path=fsutil.joinpath(path,name)
 	else
@@ -223,7 +227,7 @@ function do_gui_startup()
 	printf('starting gui...\n')
 	if guisys.init() then
 		gui=require('gui')
-		do_rc_file('.chdkptpguirc')
+		do_rc_file('user_gui.chdkptp')
 		check_versions()
 		return gui:run()
 	else
@@ -233,7 +237,7 @@ function do_gui_startup()
 end
 
 local function do_no_gui_startup()
-	do_rc_file('.chdkptprc')
+	do_rc_file('user.chdkptp')
 	check_versions()
 	do_connect_option()
 	do_execute_option()

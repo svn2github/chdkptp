@@ -57,19 +57,22 @@ include spaces, they must be quoted.
 Startup files can be used to automatically execute CLI commands at startup.
 Using the exec command, you may also execute arbitrary lua.
 
+Startup files are processed before any -e or -c options
+
 If the -r command line option is used, it is treated as the full name of the
 file, and the default files are ignored. If -r is given without a filename,
 no startup file is used. 
 
 If -r is not used, CHDKPTP checks for startup files using the CHDKPTP_HOME
-environment variable, or if that is not set, the HOME environment variable.
+environment variable, or if that is not set, <home>/.chdkptp on
+Linux or <home>/_chdkptp on Windows. On Linux, <home> is the value of the 
+HOME environment variable. On windows, it's the value of HOME, or 
+USERPROFILE is used if HOME is not set.
 
-.chdkptprc (linux) / _chdkptprc (windows) is the default startup file in CLI
-or batch mode.
+user.chdkptp is the default startup file in CLI or batch mode.
 
-.chdkptpguirc (linux) / _chdkptpguirc (windows) is the default startup file
-in GUI mode. This is run after the gui module is loaded, but before the GUI
-is started.
+user_gui.chdkptp is the default startup file in GUI mode. This is run after
+the gui module is loaded, but before the GUI is started.
 
 =CLI=
 CLI commands are available from the console, GUI and the command line
@@ -108,7 +111,7 @@ exec (!)     <lua code> | < <filename>: - execute local lua
 
 set          [-v|-c] [option[=value]]: - show or set option
  Use set with no options to see a list
-  -v show desciption when showing value
+  -v show description when showing value
   -c output as set command
 
 quit (q)                 : - quit program
