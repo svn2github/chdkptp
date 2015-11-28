@@ -160,7 +160,7 @@ function get_chdkptp_home(def_path)
 			return def_path
 		end
 	end
-	return path
+	return fsutil.normalize_dir_sep(path)
 end
 
 function do_rc_file(name)

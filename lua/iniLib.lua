@@ -1,9 +1,10 @@
 --[[
 ********************************
-Version: 1.0
+Version: 1.1
 
 (C)2013 rudi, original for CHDK
 (C)2014 msl, adaption for chdkptp
+(C)2015 reyalp, use CHDKPTP home for files
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -23,13 +24,13 @@ INI FILE LIBRARY
 usage:
     read ini file to table and write table to ini file
     useable types of data are boolean, number and string
-    a simple "filename" without directory and extension is stored to "<chdkptp path>/data/filename.ini"
+    a simple "filename" without directory and extension is stored to "<chdkptp home>/filename.ini"
     for other location use a full path and filename
 
 bind library
     iniLib = require("iniLib")
 
-get ini table and blank ini table flag for initialization from "<chdkptp path>/data/filename.ini"
+get ini table and blank ini table flag for initialization from "<chdkptp home>/filename.ini"
     ini, newini = iniLib.read("filename")
 
 add section, keys and values
@@ -46,27 +47,25 @@ special: clean ini file
 
 local iniLib = {}
 
-iniLib.version = "1.0"
+iniLib.version = "1.1"
 
 -- begin: LIBRARY INTERNAL FUNCTIONS
 -- check and format ini filename
 local function inifile(name)
-    local maindir = string.gsub(lfs.currentdir(), "\\", "/").."/"
-    local subdir = "data"
-    if lfs.attributes(maindir..subdir,"mode") ~= "directory" then
-        lfs.mkdir(subdir)
-    end
-    local _filename
     if type(name) == "string" and #name > 0 then
-        if (name:find("/") ~= nil) or (name:find("%.") ~= nil) then
-            local namedir, namefile = name:match("^"..maindir.."([%w+_/]*/)([%w_]+)%.ini$")
-            if namedir and namefile and #namedir > 1 then _filename = ("%s%s%s.ini"):format(maindir, namedir, namefile) end
-        else
-            _filename = ("%s%s/%s.ini"):format(maindir, subdir, name)
+        -- if name doesn't include directory sep, use chdkptp home path
+        if (name:find('['..fsutil.dir_sep_chars()..']') == nil) then
+            local dir = get_chdkptp_home(lfs.currentdir())
+            name = fsutil.joinpath(dir,name)
         end
+        -- add .ini extension
+        name = name .. '.ini'
+    else
+        error('invalid name')
     end
-    assert(_filename, "invalid ini filename")
-    return _filename
+    -- ensure containing path exists
+    fsutil.mkdir_parent(name)
+    return name
 end
 
 -- read ini file

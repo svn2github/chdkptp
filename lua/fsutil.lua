@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2015 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -42,6 +42,13 @@ function fsutil.is_dir_sep(c)
 	return false
 end
 
+-- switch all slashes to / on windows
+function fsutil.normalize_dir_sep(path)
+	if fsutil.ostype() ~= 'Windows' then
+		return string.gsub(path, "\\", "/")
+	end
+	return path
+end
 --[[
 remove suffix from a path if found
 opts {
