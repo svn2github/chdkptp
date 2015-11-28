@@ -723,7 +723,7 @@ cli:add_commands{
 
 		help_detail=[[
  Use set with no options to see a list
-  -v show desciption when showing value
+  -v show description when showing value
   -c output as set command
 ]],
 		func=function(self,args) 
