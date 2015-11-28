@@ -3,7 +3,7 @@
  * based on ptpcam.c
  * Copyright (C) 2001-2005 Mariusz Woloszyn <emsi@ipartners.pl>
  * additions
- * Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ * Copyright (C) 2010-2015 <reyalp (at) gmail dot com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -113,7 +113,7 @@ void *_GdipFontFamilyCachedGenericSerif;
 
 /* CHDK additions */
 #define CHDKPTP_VERSION_MAJOR 0
-#define CHDKPTP_VERSION_MINOR 5
+#define CHDKPTP_VERSION_MINOR 6
 
 /* lua registry indexes */
 /* meta table for connection objects */
@@ -2012,6 +2012,8 @@ global copies of argc, argv for lua
 static int g_argc;
 static char **g_argv;
 
+// default exit value
+static int sys_exit_value;
 /*
 get argv[0]
 */
@@ -2046,6 +2048,15 @@ static int syslib_getenv(lua_State *L) {
 	return 0;
 }
 
+/*
+sys.set_exit_value(number)
+*/
+static int syslib_set_exit_value(lua_State *L) {
+	sys_exit_value = luaL_checknumber(L,1);
+	return 0;
+}
+
+
 static int corevar_set_verbose(lua_State *L) {
 	verbose = luaL_checknumber(L,1);
 	return 0;
@@ -2062,6 +2073,7 @@ static const luaL_Reg lua_syslib[] = {
   {"getcmd",syslib_getcmd},
   {"getargs",syslib_getargs},
   {"getenv",syslib_getenv},
+  {"set_exit_value",syslib_set_exit_value},
   {NULL, NULL}
 };
 #ifdef CHDKPTP_READLINE
@@ -2236,7 +2248,7 @@ int main(int argc, char ** argv)
 	luaopen_lbuf(L);
 	luaopen_rawimg(L);	
 	chdkptp_registerlibs(L);
-	exec_lua_string(L,"require('main')");
+	int r=exec_lua_string(L,"require('main')");
 	uninit_gui_libs(L);
 	lua_close(L);
 	// gc takes care of any open connections
@@ -2244,6 +2256,9 @@ int main(int argc, char ** argv)
 #ifdef CHDKPTP_PTPIP
 	sockutil_cleanup();
 #endif
-	return 0;
+	// running main failed, return 1 if sys_exit_value would be success
+	if(!r && !sys_exit_value) {
+		return 1;
+	}
+	return sys_exit_value;
 }
-

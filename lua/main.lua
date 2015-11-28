@@ -217,7 +217,7 @@ local function check_versions()
 		util.warnf("Lua 5.1 is deprecated\n")
 	end
 	local v=chdk.program_version()
-	if v.MAJOR ~= 0 or v.MINOR ~= 5 then
+	if v.MAJOR ~= 0 or v.MINOR ~= 6 then
 		error("incompatible chdkptp binary version")
 	end
 	-- TODO could check IUP and CD, but need to be initialized
@@ -283,4 +283,9 @@ elseif guisys.caps().IUP then
 else
 	options.i=true
 	do_no_gui_startup()
+end
+-- set exit status if last CLI command failed
+-- TODO may want different codes for different kinds of errors, combine with existing value?
+if not cli.last_status then
+	sys.set_exit_value(1)
 end

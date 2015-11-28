@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2015 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -20,6 +20,7 @@ local cli = {
 	names={},
 	finished = false,
 	source_level = 0, -- number of nested execfile calls
+	last_status = true, -- success or failure of last execute() call
 }
 --[[
 info printf - message to be printed at normal verbosity
@@ -260,6 +261,8 @@ function cli:execute(line)
 			local status,msg
 			args,msg = self.names[cmd].args:parse(args)
 			if not args then
+				-- parse failed
+				self.last_status = false
 				return false,msg
 			end
 			local cstatus
@@ -293,19 +296,27 @@ function cli:execute(line)
 				printf("r %d %s/s w %d %s/s\n",xferstats.read,rbps,xferstats.write,wbps)
 			end
 			if not cstatus then
+				-- lua error() running command
+				self.last_status = false
 				return false,status
 			end
 			if not status and not msg then
 				msg=cmd .. " failed"
 			end
+			-- last_status from command return status, unless flagged to skip (for quit, comments etc)
+			if not self.names[cmd].no_status then
+				self.last_status = status
+			end
 			return status,msg
 		else 
+			self.last_status = false
 			return false,string.format("unknown command '%s'\n",cmd)
 		end
 	elseif string.find(line,'[^%c%s]') then
+		self.last_status = false
 		return false, string.format("bad input '%s'\n",line)
 	end
-	-- blank input is OK
+	-- blank input is OK, last_status unchanged
 	return true,""
 end
 
@@ -674,6 +685,7 @@ cli:add_commands{
 	{
 		names={'#'},
 		help='comment',
+		no_status=true,
 		func=function(self,args) 
 			return true
 		end,
@@ -756,6 +768,7 @@ cli:add_commands{
 	{
 		names={'quit','q'},
 		help='quit program',
+		no_status=true,
 		func=function() 
 			cli.finished = true
 			return true
