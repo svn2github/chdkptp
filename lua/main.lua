@@ -30,7 +30,7 @@ dngcli=require'dngcli'
 --[[
 Command line arguments
 --]]
-function bool_opt(rest)
+local function bool_opt(rest)
 	if rest == '-' then
 		return true,false
 	elseif rest ~= '' then
@@ -93,7 +93,7 @@ cmd_opts = {
 	},
 }
 
-function print_help()
+local function print_help()
 	printf(
 [[
 CHDK PTP control utility
