@@ -104,6 +104,14 @@ m.rsint_once = function(cmd,args,opts)
 		error('script not running\n')
 	end
 	local s,e,cmdname = string.find(cmd,'^[%c%s]*([%w_]+)[%c%s]*')
+	if not s then
+		-- all blanks ignored, warn on others
+		if string.find(cmd,'[^%cs%s]') then
+			warnf('invalid command %s\n',cmd)
+		end
+		return false
+	end
+
 	local rest = string.sub(cmd,e+1)
 	-- printf("cmdname [%s] rest [%s]\n",cmdname,rest);
 	if cmdname == 'path' then
