@@ -67,7 +67,7 @@ If -r is not used, CHDKPTP checks for startup files using the CHDKPTP_HOME
 environment variable, or if that is not set, <home>/.chdkptp on
 Linux or <home>/_chdkptp on Windows. On Linux, <home> is the value of the 
 HOME environment variable. On windows, it's the value of HOME, or 
-USERPROFILE is used if HOME is not set.
+USERPROFILE if HOME is not set.
 
 user.chdkptp is the default startup file in CLI or batch mode.
 
@@ -297,7 +297,7 @@ delete (rm)  [options] <target, target,...>: - delete file/directories from the 
    -fmatch=<pattern> upload only file with names matching <pattern>
    -dmatch=<pattern> only delete directories with names matching <pattern>
    -rmatch=<pattern> only recurse into directories with names matching <pattern>
-   -nodirs           don't delete drictories recursed into, only files
+   -nodirs           don't delete directories recursed into, only files
    -maxdepth=n       only recurse into N levels of directory
    -pretend          print actions instead of doing them
    -ignore_errors    don't abort if delete fails, continue to next item
@@ -624,7 +624,7 @@ con> mup c:\CHDK\SCRIPTS CHDK/SCRIPTS
 ad hoc scripting on PC side - download some files
 con> !t=con:listdir('A/DCIM/100CANON',{match="%.JPG$"})
 con> !for i,n in ipairs(t) do con:download("A/DCIM/100CANON/"..n,"C:/TEMP/"..n) end
-NOTE the mdownload cli command above is probably more convenient
+NOTE the mdownload or imdl cli commands above are probably more convenient
 
 list devices and connect to a specific camera
 ___> list
@@ -658,8 +658,8 @@ note be able to gracefully terminate the script without physically pressing the
 shutter button.
 
 If you want to have a script that runs for a long time on the camera, but still
-be able to control it over ptp, you will probably need to write your own script
-using the ptp message interface. Some examples of this in the chdkptp lua code
+be able to control it over PTP, you will probably need to write your own script
+using the PTP message interface. Some examples of this in the chdkptp lua code
 lua/rlibs.lua msg_shell and lua/multicam.lua
 
 ==Grabbing images from the camera display==

@@ -1446,7 +1446,7 @@ PC clock times are set to the start of download, not per image
    -fmatch=<pattern> upload only file with names matching <pattern>
    -dmatch=<pattern> only delete directories with names matching <pattern>
    -rmatch=<pattern> only recurse into directories with names matching <pattern>
-   -nodirs           don't delete drictories recursed into, only files
+   -nodirs           don't delete directories recursed into, only files
    -maxdepth=n       only recurse into N levels of directory
    -pretend          print actions instead of doing them
    -ignore_errors    don't abort if delete fails, continue to next item
