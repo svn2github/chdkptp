@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2013-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2013-2015 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -64,18 +64,21 @@ function init_handlers(args,opts)
 		end
 	end
 end
+function m.read_cmd_stdin()
+	local line = cli.readline('rsint> ')
+	if not line then
+		-- TODO maybe this should just be done
+		error('cli.readline failed / eof')
+	end
+	return line
+end
 
 --[[
 do a single iteration of rsint
 returns true if done
 errors are thrown
 ]]
-m.rsint_once = function(args,opts)
-	local line = cli.readline('rsint> ')
-	if not line then
-		-- TODO maybe this should just be done
-		error('cli.readline failed / eof')
-	end
+m.rsint_once = function(cmd,args,opts)
 	local status = con:script_status()
 	local returned
 	if status.msg then
@@ -100,10 +103,10 @@ m.rsint_once = function(args,opts)
 	if not status.run then 
 		error('script not running\n')
 	end
-	local s,e,cmd = string.find(line,'^[%c%s]*([%w_]+)[%c%s]*')
-	local rest = string.sub(line,e+1)
-	-- printf("cmd [%s] rest [%s]\n",cmd,rest);
-	if cmd == 'path' then
+	local s,e,cmdname = string.find(cmd,'^[%c%s]*([%w_]+)[%c%s]*')
+	local rest = string.sub(cmd,e+1)
+	-- printf("cmdname [%s] rest [%s]\n",cmdname,rest);
+	if cmdname == 'path' then
 		if rest == '' then
 			rest = nil
 		end
@@ -113,15 +116,15 @@ m.rsint_once = function(args,opts)
 	else
 		-- remaining commands assumed to be cam side
 		-- TODO could check if remotecap has timed out here
-		con:write_msg(cmd..' '..rest)
-		if cmd == 's' or cmd == 'l' then
+		con:write_msg(cmdname..' '..rest)
+		if cmdname == 's' or cmdname == 'l' then
 			-- throws on error
 			con:capture_get_data(m.rcopts)
-			if cmd == 'l' then
+			if cmdname == 'l' then
 				return true
 			end
 		end
-		if cmd == 'q' and not opts.cont then
+		if cmdname == 'q' and not opts.cont then
 			return true 
 		end
 	end
@@ -157,7 +160,7 @@ m.cli_cmd_func = function(self,args)
 			opts.fformat = opts.fformat + 4
 		end
 	end
-	-- default to jpeg TODO won't be supported on cams without raw hook
+	-- default to jpeg TODO won't be supported on cams without filewrite hook
 	if opts.fformat == 0 then
 		opts.fformat = 1
 		args.jpg = true
@@ -200,7 +203,8 @@ m.cli_cmd_func = function(self,args)
 	local status
 	repeat
 		local r
-		status,r = xpcall(m.rsint_once,errutil.format,args,opts)
+		local cmd=m.read_cmd_stdin() -- TODO, allow override
+		status,r = xpcall(m.rsint_once,errutil.format,cmd,args,opts)
 		if not status then
 			warnf("%s",tostring(r))
 		end
