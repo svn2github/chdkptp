@@ -2056,6 +2056,16 @@ static int syslib_set_exit_value(lua_State *L) {
 	return 0;
 }
 
+/*
+n=sys.get_exit_value()
+*/
+static int syslib_get_exit_value(lua_State *L) {
+	lua_pushnumber(L,sys_exit_value);
+	return 1;
+}
+
+
+
 
 static int corevar_set_verbose(lua_State *L) {
 	verbose = luaL_checknumber(L,1);
@@ -2074,6 +2084,7 @@ static const luaL_Reg lua_syslib[] = {
   {"getargs",syslib_getargs},
   {"getenv",syslib_getenv},
   {"set_exit_value",syslib_set_exit_value},
+  {"get_exit_value",syslib_get_exit_value},
   {NULL, NULL}
 };
 #ifdef CHDKPTP_READLINE
