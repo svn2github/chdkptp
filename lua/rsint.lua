@@ -135,7 +135,12 @@ m.rsint_once = function(cmd,args,opts)
 	return false
 end
 
-m.cli_cmd_func = function(self,args)
+--[[
+args should be as provided by the rsint cli command
+args.input_func may be used to provide a command source.
+It should return one line at a time and block until a command is ready
+]]
+m.run = function(args)
 	local opts,err = cli:get_shoot_common_opts(args)
 	if not opts then
 		return false,err
@@ -145,6 +150,30 @@ m.cli_cmd_func = function(self,args)
 		opts.cont=1
 	end
 
+	local input_func
+	local inpipe
+	if args.input_func then
+		input_func=args.input_func
+	end
+	if args.pipe then
+		if input_func then
+			return false, 'both input_func and pipe specified'
+		end
+		inpipe,err=fsutil.popen(args.pipe,'rb')
+		if not inpipe then
+			return false, err
+		end
+		input_func=function()
+			return inpipe:read()
+		end
+	else
+		-- dummy to allow inpipe:close() without checking
+		inpipe={close=function() end}
+	end
+	-- default - read from with cli.readline
+	if not input_func then
+		input_func=m.read_cmd_stdin
+	end
 	util.extend_table(opts,{
 		fformat=0,
 		lstart=0,
@@ -198,6 +227,7 @@ m.cli_cmd_func = function(self,args)
 	cli.dbgmsg('rs_init\n')
 	local rstatus,rerr = con:execwait('return rsint_init('..opts_s..')',{libs={'rsint'}})
 	if not rstatus then
+		inpipe:close()
 		return false,rerr
 	end
 
@@ -207,7 +237,7 @@ m.cli_cmd_func = function(self,args)
 	local status
 	repeat
 		local r
-		local cmd=m.read_cmd_stdin() -- TODO, allow override
+		local cmd=input_func()
 		-- EOF etc, try to end gracefully 
 		if not cmd then
 			if opts.cont then
@@ -249,6 +279,7 @@ m.cli_cmd_func = function(self,args)
 			err = uerr
 		end
 	end
+	inpipe:close()
 	return status, err
 end
 

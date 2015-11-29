@@ -442,6 +442,7 @@ rsint        [local] [options]: - shoot and download with interactive control
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
    -cmdwait=n   wait n seconds for command, default 60
    -cont        use continuous mode
+   -pipe=<program> read commands from standard output of <program> instead of stdin
 
 
  The following commands are available at the rsint> prompt

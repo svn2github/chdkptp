@@ -2378,6 +2378,7 @@ PC clock times are set to the start of download, not per image
 			badpix=false,
 			cmdwait=60,
 			cont=false,
+			pipe=false,
 		},
 		help_detail=[[
  [local]       local destination directory or filename (w/o extension!)
@@ -2402,6 +2403,7 @@ PC clock times are set to the start of download, not per image
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
    -cmdwait=n   wait n seconds for command, default 60
    -cont        use continuous mode
+   -pipe=<program> read commands from standard output of <program> instead of stdin
 
 
  The following commands are available at the rsint> prompt
@@ -2417,7 +2419,9 @@ PC clock times are set to the start of download, not per image
  CHDK 1.3 shoot hooks must be available
  The l command must be used to exit
 ]],
-		func=rsint.cli_cmd_func,
+		func=function(self,args)
+			return rsint.run(args)
+		end,
 	},
 	{
 		names={'rec'},
