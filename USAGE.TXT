@@ -74,6 +74,14 @@ user.chdkptp is the default startup file in CLI or batch mode.
 user_gui.chdkptp is the default startup file in GUI mode. This is run after
 the gui module is loaded, but before the GUI is started.
 
+==Exit value==
+chdkptp returns 1 if initialization fails or if the last executed CLI command
+failed. CLI commands triggered by the -c, -e etc affect this status. Blank
+lines, comments and the quit command do not.
+
+Setting cli_error_exit=1 causes chdkptp to exit immediately if a CLI command
+from the input prompt or -e command fails.
+
 =CLI=
 CLI commands are available from the console, GUI and the command line
 
@@ -542,6 +550,7 @@ cli_time=false       - boolean: show cli execution times
 cli_xferstats=false  - boolean: show cli data transfer stats
 cli_verbose=1        - number: control verbosity of cli
 cli_source_max=10    - number: max nested source calls
+cli_error_exit=false - boolean: exit on cli command error
 warn_deprecated=true - boolean: warn on deprecated libraries
 core_verbose=0       - number: ptp core verbosity
 err_trace=critical   - string: stack trace on error, values: 'always', 'critical', 'never'

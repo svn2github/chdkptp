@@ -387,7 +387,10 @@ function cli:run()
 		if line:len() > 0 then
 			cli.add_history(line)
 		end
-		self:print_status(self:execute(line))
+		local status=self:print_status(self:execute(line))
+		if prefs.cli_error_exit and not status then
+			self.finished = true
+		end
 		if self.finished then
 			break
 		end
@@ -2469,4 +2472,5 @@ prefs._add('cli_time','boolean','show cli execution times')
 prefs._add('cli_xferstats','boolean','show cli data transfer stats')
 prefs._add('cli_verbose','number','control verbosity of cli',1)
 prefs._add('cli_source_max','number','max nested source calls',10)
+prefs._add('cli_error_exit','boolean','exit on cli command error')
 return cli

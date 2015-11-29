@@ -200,14 +200,18 @@ function do_connect_option()
 		if type(options.c) == 'string' then
 			cmd = cmd .. ' ' .. options.c
 		end
-		cli:print_status(cli:execute(cmd));
+		cli:print_status(cli:execute(cmd))
 	end
 end
 
 function do_execute_option()
 	if options.e then
 		for i=1,#options.e do
-			cli:print_status(cli:execute(options.e[i]))
+			local status=cli:print_status(cli:execute(options.e[i]))
+			-- TODO os.exit here is ugly, but no simple way to break out
+			if not status and prefs.cli_error_exit then
+				os.exit(1)
+			end
 		end
 	end
 end
