@@ -17,6 +17,7 @@
 interactive remote shoot
 --]]
 local m={}
+m.prompt='rsint> '
 
 --[[
 initializer remotecap handlers and path
@@ -65,12 +66,7 @@ function init_handlers(args,opts)
 	end
 end
 function m.read_cmd_stdin()
-	local line = cli.readline('rsint> ')
-	if not line then
-		-- TODO maybe this should just be done
-		error('cli.readline failed / eof')
-	end
-	return line
+	return cli.readline(m.prompt)
 end
 
 --[[
@@ -212,6 +208,15 @@ m.cli_cmd_func = function(self,args)
 	repeat
 		local r
 		local cmd=m.read_cmd_stdin() -- TODO, allow override
+		-- EOF etc, try to end gracefully 
+		if not cmd then
+			if opts.cont then
+				cmd='l'
+			else
+				cmd='q'
+			end
+		end
+			
 		status,r = xpcall(m.rsint_once,errutil.format,cmd,args,opts)
 		if not status then
 			warnf("%s",tostring(r))
