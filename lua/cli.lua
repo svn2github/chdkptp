@@ -119,7 +119,7 @@ function argparser:parse(str)
 		-- look for -name
 		local s,e,swname=string.find(w,'^-(%a[%w_-]*)')
 		-- found a switch
-		if s then		
+		if s then
 			if type(self.defs[swname]) == 'nil' then
 				return false,'unknown switch '..swname
 			end
@@ -170,7 +170,7 @@ function argparser_text:parse(arg)
 	if not s then
 		return {text=arg}
 	end
-	local fn = string.sub(arg,e+1) 
+	local fn = string.sub(arg,e+1)
 	local words,errmsg=self:parse_words(fn)
 	if not words then
 		return false,errmsg
@@ -308,7 +308,7 @@ function cli:execute(line)
 				self.last_status = status
 			end
 			return status,msg
-		else 
+		else
 			self.last_status = false
 			return false,string.format("unknown command '%s'\n",cmd)
 		end
@@ -320,13 +320,13 @@ function cli:execute(line)
 	return true,""
 end
 
-function cli:execfile(filename) 
+function cli:execfile(filename)
 	if cli.source_level == prefs.cli_source_max then
 		return false, 'too many nested source calls'
 	end
 	cli.source_level = cli.source_level + 1
 	local fh, err = io.open(filename,'rb')
-	if not fh then 
+	if not fh then
 		return false, 'failed to open file: '..tostring(err)
 	end
 	-- empty file is OK
@@ -350,7 +350,7 @@ function cli:execfile(filename)
 	return true
 end
 
-function cli:print_status(status,msg) 
+function cli:print_status(status,msg)
 	if not status then
 		errf("%s\n",tostring(msg))
 	elseif msg then
@@ -666,7 +666,7 @@ cli:add_commands{
 		help_detail=[[
  help -v gives full help on all commands, otherwise as summary is printed
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			cmd = args[1]
 			if cmd and cli.names[cmd] then
 				return true, cli.names[cmd]:get_help_detail()
@@ -689,7 +689,7 @@ cli:add_commands{
 		names={'#'},
 		help='comment',
 		no_status=true,
-		func=function(self,args) 
+		func=function(self,args)
 			return true
 		end,
 	},
@@ -699,11 +699,11 @@ cli:add_commands{
 		arghelp='<lua code> | < <filename>',
 		args=argparser_text.create{ },
 		help_detail=[[
- Execute lua in chdkptp. 
+ Execute lua in chdkptp.
  The global variable con accesses the current CLI connection.
  Return values are printed in the console.
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local chunkname
 			if args.input then
 				chunkname = args.input
@@ -713,7 +713,7 @@ cli:add_commands{
 				return false, string.format("compile failed:%s\n",r)
 			end
 			r={xpcall(f,errutil.format)} -- TODO would be nice to be able to force backtrace or not per call
-			if not r[1] then 
+			if not r[1] then
 				return false, string.format("call failed:%s\n",r[2])
 			end
 			local s
@@ -741,7 +741,7 @@ cli:add_commands{
   -v show description when showing value
   -c output as set command
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local mode
 			if args.v then
 				mode='full'
@@ -749,7 +749,7 @@ cli:add_commands{
 			if args.c then
 				mode='cmd'
 			end
-			if #args == 0 then	
+			if #args == 0 then
 				local r={}
 				for name,pref in prefs._each() do
 					local status, desc = prefs._describe(name,mode)
@@ -772,7 +772,7 @@ cli:add_commands{
 		names={'quit','q'},
 		help='quit program',
 		no_status=true,
-		func=function() 
+		func=function()
 			cli.finished = true
 			return true
 		end,
@@ -782,7 +782,7 @@ cli:add_commands{
 		help='execute cli commands from file',
 		arghelp='<file>',
 		args=argparser.create{ },
-		func=function(self,args) 
+		func=function(self,args)
 			return cli:execfile(args[1])
 		end,
 	},
@@ -796,7 +796,7 @@ cli:add_commands{
  Returns immediately after the script is started.
  Return values or error messages can be retrieved with getm after the script is completed.
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			con:exec(cli:get_luatext_arg(args))
 			return true
 		end,
@@ -804,7 +804,7 @@ cli:add_commands{
 	{
 		names={'getm'},
 		help='get messages',
-		func=function(self,args) 
+		func=function(self,args)
 			local msgs=''
 			local msg,err
 			while true do
@@ -820,7 +820,7 @@ cli:add_commands{
 		names={'putm'},
 		help='send message',
 		arghelp='<msg string>',
-		func=function(self,args) 
+		func=function(self,args)
 			con:write_msg(args)
 			return true
 		end,
@@ -834,7 +834,7 @@ cli:add_commands{
  Execute Lua code on the camera, waiting for the script to end.
  Return values or error messages are printed after the script completes.
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local rets={}
 			local msgs={}
 			con:execwait(cli:get_luatext_arg(args),{rets=rets,msgs=msgs})
@@ -861,7 +861,7 @@ cli:add_commands{
    -noflush: don't discard script messages
    -force: force kill even if camera does not support (crash / memory leaks likely!)
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			if not con:is_ver_compatible(2,6) then
 				if not args.force then
 					return false,'camera does not support clean kill, use -force if you are sure'
@@ -890,7 +890,7 @@ cli:add_commands{
   -i32 display as 32 bit words rather than byte oriented hex dump
   -i32=<fmt> use printf format string fmt to display
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local addr = tonumber(args[1])
 			local count = tonumber(args[2])
 			if not addr then
@@ -932,7 +932,7 @@ cli:add_commands{
   ! error querying status
  serial numbers are not available from all models, nil will be shown if not available
 ]],
-		func=function() 
+		func=function()
 			local msg = ''
 			-- TODO usb only, will not show connected PTP/IP
 			local devs = chdk.list_usb_devices()
@@ -964,7 +964,7 @@ cli:add_commands{
  Some cameras have problems with paths > 32 characters
  Dryos cameras do not handle non 8.3 filenames well
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local src = args[1]
 			if not src then
 				return false, "missing source"
@@ -1015,7 +1015,7 @@ cli:add_commands{
 		args=argparser.create{nolua=false},
 		help_detail=[[
  <remote> file to download
- 	A/ is prepended if not present
+   A/ is prepended if not present
  [local]  destination
    If not specified, the file will be downloaded to the current directory
    If a directory, the file will be downloaded into it
@@ -1023,7 +1023,7 @@ cli:add_commands{
    Allows download while running script
 ]],
 
-		func=function(self,args) 
+		func=function(self,args)
 			local src = args[1]
 			if not src then
 				return false, "missing source"
@@ -1102,7 +1102,10 @@ cli:add_commands{
    -overwrite=<str>  overwrite existing files (y|n|old|ask), default ask
    -quiet            don't display actions
    -rm               delete files after downloading
- note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+
+ NOTE
+  <pattern> is a lua pattern, not a filesystem glob like *.JPG
+  if -rm is specified, file will be deleted even if not downloaded due to overwrite options.
 
 Substitutions
 ${serial,strfmt}  camera serial number, or empty if not available, default format %s
@@ -1125,7 +1128,7 @@ Unavailable values (e.g. ${dirday} without daily folders) result in an empty str
 PC clock times are set to the start of download, not per image
 ]],
 
-		func=function(self,args) 
+		func=function(self,args)
 			-- some names need translating
 			local opts={
 				dst=args.d,
@@ -1198,7 +1201,7 @@ PC clock times are set to the start of download, not per image
  file selection options are equivalent to imdl
 ]],
 
-		func=function(self,args) 
+		func=function(self,args)
 			-- some names need translating
 			local opts={
 				lastimg=args.last,
@@ -1267,7 +1270,7 @@ PC clock times are set to the start of download, not per image
  file selection options are equivalent to imdl
 ]],
 
-		func=function(self,args) 
+		func=function(self,args)
 			-- some names need translating
 			local opts={
 				lastimg=args.last,
@@ -1341,7 +1344,7 @@ PC clock times are set to the start of download, not per image
    -fmatch=<pattern> download only file with path/name matching <pattern>
    -dmatch=<pattern> only create directories with path/name matching <pattern>
    -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
-   -nodirs           only create directories needed to download file  
+   -nodirs           only create directories needed to download file
    -maxdepth=n       only recurse into N levels of directory
    -pretend          print actions instead of doing them
    -nomtime          don't preserve modification time of remote files
@@ -1351,7 +1354,7 @@ PC clock times are set to the start of download, not per image
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 ]],
 
-		func=function(self,args) 
+		func=function(self,args)
 			if #args < 2 then
 				return false,'expected source(s) and destination'
 			end
@@ -1397,14 +1400,14 @@ PC clock times are set to the start of download, not per image
    -fmatch=<pattern> upload only file with path/name matching <pattern>
    -dmatch=<pattern> only create directories with path/name matching <pattern>
    -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
-   -nodirs           only create directories needed to upload file 
+   -nodirs           only create directories needed to upload file
    -maxdepth=n       only recurse into N levels of directory
    -pretend          print actions instead of doing them
    -nomtime          don't preserve local modification time
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 ]],
 
-		func=function(self,args) 
+		func=function(self,args)
 			if #args < 2 then
 				return false,'expected source(s) and destination'
 			end
@@ -1454,7 +1457,7 @@ PC clock times are set to the start of download, not per image
  note <pattern> is a lua pattern, not a filesystem glob like *.JPG
 ]],
 
-		func=function(self,args) 
+		func=function(self,args)
 			if #args < 1 then
 				return false,'expected at least one target'
 			end
@@ -1510,7 +1513,7 @@ PC clock times are set to the start of download, not per image
 	{
 		names={'version','ver'},
 		help='print API and program versions',
-		args=argparser.create{ 
+		args=argparser.create{
 			p=false,
 			l=false,
 		},
@@ -1519,7 +1522,7 @@ PC clock times are set to the start of download, not per image
  -p print program version
  -l print library versions
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local host_ver = string.format("host:%d.%d cam:",chdku.apiver.MAJOR,chdku.apiver.MINOR)
 			local status = true
 			local r
@@ -1531,7 +1534,7 @@ PC clock times are set to the start of download, not per image
 				else
 					status = false
 					r =  host_ver .. string.format("error %s",cam_minor)
-				end 
+				end
 			else
 				r = host_ver .. "not connected"
 			end
@@ -1566,15 +1569,15 @@ PC clock times are set to the start of download, not per image
 			nodis=false,
 			nopat=false,
 		},
-		
+
 		help_detail=[[
  If no options are given, connects to the first available USB device.
  USB dev spec:
   -b=<bus>
-  -d=<dev> 
+  -d=<dev>
   -p=<pid>
-  -s=<serial> 
-  model 
+  -s=<serial>
+  model
  <pid> is the USB product ID, as a decimal or hexadecimal number.
  All other values are treated as a Lua pattern, unless -nopat is given.
  If the serial or model are specified, a temporary connection will be made to each device
@@ -1584,7 +1587,7 @@ PC clock times are set to the start of download, not per image
   -nodis do not close current connection
   -nopat use plain substring matches instead of patterns
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local match = {}
 			local opt_map = {
 				b='bus',
@@ -1660,7 +1663,7 @@ PC clock times are set to the start of download, not per image
 					end
 					status = true
 				end
-			else 
+			else
 				status = false
 				err = "no matching devices found"
 			end
@@ -1673,7 +1676,7 @@ PC clock times are set to the start of download, not per image
 		help='reconnect to current device',
 		-- NOTE camera may connect to a different device,
 		-- will detect and fail if serial, model or pid don't match
-		func=function(self,args) 
+		func=function(self,args)
 			con:reconnect()
 			cli:connection_status_change()
 			return true
@@ -1682,7 +1685,7 @@ PC clock times are set to the start of download, not per image
 	{
 		names={'disconnect','dis'},
 		help='disconnect from device',
-		func=function(self,args) 
+		func=function(self,args)
 			con:disconnect()
 			cli:connection_status_change()
 			return true
@@ -1693,7 +1696,7 @@ PC clock times are set to the start of download, not per image
 		help='list files/directories on camera',
 		args=argparser.create{l=false},
 		arghelp="[-l] [path]",
-		func=function(self,args) 
+		func=function(self,args)
 			local listops
 			local path=args[1]
 			path = fsutil.make_camera_path(path)
@@ -1745,7 +1748,7 @@ PC clock times are set to the start of download, not per image
    -norecon  don't try to reconnect
    -wait=<N> wait N ms before attempting to reconnect, default 3500
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local bootfile=args[1]
 			if bootfile then
 				bootfile = fsutil.make_camera_path(bootfile)
@@ -1778,7 +1781,7 @@ PC clock times are set to the start of download, not per image
 		}),
 		help_detail=[[
  file:
- 	optional output file name, defaults to chdk_<pid>_<date>_<time>.lvdump
+   optional output file name, defaults to chdk_<pid>_<date>_<time>.lvdump
  options:
    -count=<N> number of frames to dump
    -wait=<N>  wait N ms between frames
@@ -1787,7 +1790,7 @@ PC clock times are set to the start of download, not per image
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local dumpfile=args[1]
 			local what = 0
 			if not args.novp then
@@ -1879,7 +1882,7 @@ PC clock times are set to the start of download, not per image
    default vp_${time,%014.3f}.ppm bm_${time,%014.3f}.pam for viewfinder and ui respectively
    if piping with oneproc, time will be the start of the first frame and frame will be 1
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local what = 0
 			if args.vp then
 				what = 1
@@ -2009,7 +2012,7 @@ PC clock times are set to the start of download, not per image
    -rm        remove file after shooting
   Any exposure parameters not set use camera defaults
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local opts,err = cli:get_shoot_common_opts(args)
 			if not opts then
 				return false,err
@@ -2297,7 +2300,7 @@ PC clock times are set to the start of download, not per image
 
 			local status,err
 			local shot = 1
-			repeat 
+			repeat
 				cli.dbgmsg('get data %d\n',shot)
 				status,err = con:capture_get_data_pcall(rcopts)
 				if not status then
@@ -2346,7 +2349,7 @@ PC clock times are set to the start of download, not per image
 				status = false
 				if err then
 					err = tostring(err) .. ' ' .. uerr
-				else 
+				else
 					err = uerr
 				end
 			end
@@ -2426,7 +2429,7 @@ PC clock times are set to the start of download, not per image
 	{
 		names={'rec'},
 		help='switch camera to shooting mode',
-		func=function(self,args) 
+		func=function(self,args)
 			local rstatus,rerr = con:execwait([[
 if not get_mode() then
 	switch_mode_usb(1)
@@ -2449,7 +2452,7 @@ return false,'already in rec'
 	{
 		names={'play'},
 		help='switch camera to playback mode',
-		func=function(self,args) 
+		func=function(self,args)
 			local rstatus,rerr = con:execwait([[
 if get_mode() then
 	switch_mode_usb(0)

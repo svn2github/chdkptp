@@ -186,7 +186,7 @@ local function dngbatch_docmd(cmd,dargs)
 			end
 		end
 	end
-	
+
 	-- TODO based on cli.execute
 	local cstatus,status,msg = xpcall(
 		function()
@@ -226,7 +226,7 @@ local function dngbatch_callback(self,opts)
 	else
 		d,err = dng.load(src)
 		-- TODO warn and continue?
-		if not d then 
+		if not d then
 			errlib.throw{etype='dng',msg=tostring(err)}
 		end
 	end
@@ -342,12 +342,12 @@ m.init_cli = function()
  options
    -nosel  do not automatically select loaded file
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			if not args[1] then
 				return false,'expected filename'
 			end
 			local d,err = dng.load(args[1])
-			if not d then 
+			if not d then
 				return false,err
 			end
 			if not args.nosel then
@@ -373,7 +373,7 @@ m.init_cli = function()
    -over     overwrite existing files
    -keepmtime preserve existing modification time
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local filename
 			local narg
 			-- TODO this will prevent you from saving a file named '1' without explicit image number
@@ -424,7 +424,7 @@ m.init_cli = function()
 		help='unload dng file',
 		arghelp="[image num]",
 		args=cli.argparser.create({}),
-		func=function(self,args) 
+		func=function(self,args)
 			if #args > 0 then
 				narg = table.remove(args,1)
 			end
@@ -457,12 +457,12 @@ m.init_cli = function()
    -s   summary info, default if no other options given
    -h   tiff header
    -ifd[=<ifd>]
-   	 raw, exif, main, or 0, 0.0 etc. default 0
+     raw, exif, main, or 0, 0.0 etc. default 0
    -r   recurse into sub-ifds
    -vals[=N]
      display up to N values for each IFD entry, default 20
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local d = m.get_sel_batch(args[1])
 			if not d then
 				return false, 'no file selected'
@@ -531,22 +531,22 @@ m.init_cli = function()
 		-- TODO arbitrary rect
 		-- text or netpbm file output
 		--[[
-  -out=<file> 
+  -out=<file>
   	<file> is name of output file
 	]]
-		
+
 		help_detail=[[
  options:
   -min=N   list pixels with value >= N
   -max=N   list pixels with value <= N
   -reg=<active|all>
-  	region of image to search, either active area (default) or all
+    region of image to search, either active area (default) or all
   -bin=<n>
     number of values in histogram bin
   -fmt=<count|%>
     format for output
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local d = m.get_sel_batch(args[1])
 			if not d then
 				return false, 'no file selected'
@@ -554,7 +554,7 @@ m.init_cli = function()
 
 			local ifd=d.raw_ifd
 
-			local vmin = 0 
+			local vmin = 0
 			local vmax = ifd.byname.WhiteLevel:getel()
 
 			if args.min then
@@ -585,7 +585,7 @@ m.init_cli = function()
 
 			local h = d:build_histogram({top=top,left=left,bottom=bottom,right=right})
 			local binsize = tonumber(args.bin)
-			
+
 			local fmt_range
 			local fmt_count
 			if args.fmt == '%' then
@@ -645,17 +645,17 @@ m.init_cli = function()
  options:
   -min=N   list pixels with value >= N
   -max=N   list pixels with value <= N
-  -out=<file> 
-  	<file> is name of output file
+  -out=<file>
+    <file> is name of output file
   -fmt=<chdk|rt|dcraw|count>
-  	format badpixel list for chdk badpixel.txt, raw therapee, dcraw, or just count them
+    format badpixel list for chdk badpixel.txt, raw therapee, dcraw, or just count them
   -reg=<active|all>
-  	region of image to search, either active area (default) or all
+    region of image to search, either active area (default) or all
   -coords=<abs|rel>
     output coordinates relative to region, or absolute
     use rel for raw therapee and dcraw
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local d = m.get_sel_batch(args[1])
 			if not d then
 				return false, 'no file selected'
@@ -747,7 +747,7 @@ m.init_cli = function()
 	{
 		names={'dnglist'},
 		help='list loaded dng files',
-		func=function(self,args) 
+		func=function(self,args)
 			local r=''
 			for i, d in ipairs(m.list) do
 				if d == m.selected then
@@ -771,7 +771,7 @@ m.init_cli = function()
  number:
    dng number from dnglist to select
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local n = tonumber(args[1])
 			if m.list[n] then
 				m.selected = m.list[n]
@@ -793,7 +793,7 @@ m.init_cli = function()
  options:
    -patch[=n]   interpolate over pixels with value less than n (default 0)
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local d = m.get_sel_batch(args[1])
 			if not d then
 				return false, 'no file selected'
@@ -829,12 +829,12 @@ m.init_cli = function()
    -over         overwrite existing file
    -rfmt=fmt raw format (default: unmodified from DNG)
      format is <bpp>[endian][pgm], e.g. 8pgm or 12l
-	 pgm is only valid for 8 and 16 bpp
-	 endian is l or b and defaults to little, except for 16 bit pgm
+     pgm is only valid for 8 and 16 bpp
+     endian is l or b and defaults to little, except for 16 bit pgm
    -tfmt=fmt thumb format (default, unmodified rgb)
      ppm   8 bit rgb ppm
 ]],
-		func=function(self,args) 
+		func=function(self,args)
 			local d = m.get_sel_batch(args[1])
 			if not d then
 				return false, 'no file selected'

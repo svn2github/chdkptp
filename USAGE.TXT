@@ -108,6 +108,7 @@ character.
 
 ==Command reference==
 output of help -v
+
 help (h)     [cmd]|[-v]  : - help on [cmd] or all commands
  help -v gives full help on all commands, otherwise as summary is printed
 
@@ -170,7 +171,7 @@ upload (u)   [-nolua] <local> [remote]: - upload a file to the camera
 
 download (d) [-nolua] <remote> [local]: - download a file from the camera
  <remote> file to download
-        A/ is prepended if not present
+   A/ is prepended if not present
  [local]  destination
    If not specified, the file will be downloaded to the current directory
    If a directory, the file will be downloaded into it
@@ -201,7 +202,10 @@ imdl         [options] [src ...]: - download images from the camera
    -overwrite=<str>  overwrite existing files (y|n|old|ask), default ask
    -quiet            don't display actions
    -rm               delete files after downloading
- note <pattern> is a lua pattern, not a filesystem glob like *.JPG
+
+ NOTE
+  <pattern> is a lua pattern, not a filesystem glob like *.JPG
+  if -rm is specified, file will be deleted even if not downloaded due to overwrite options.
 
 Substitutions
 ${serial,strfmt}  camera serial number, or empty if not available, default format %s
@@ -342,7 +346,7 @@ reboot       [options] [file]: - reboot the camera
 
 lvdump (dumpframes) [options] [file]: - dump camera display frames to file
  file:
-        optional output file name, defaults to chdk_<pid>_<date>_<time>.lvdump
+   optional output file name, defaults to chdk_<pid>_<date>_<time>.lvdump
  options:
    -count=<N> number of frames to dump
    -wait=<N>  wait N ms between frames
@@ -479,7 +483,7 @@ dnginfo      [options] [image num]: - display information about a dng
    -s   summary info, default if no other options given
    -h   tiff header
    -ifd[=<ifd>]
-         raw, exif, main, or 0, 0.0 etc. default 0
+     raw, exif, main, or 0, 0.0 etc. default 0
    -r   recurse into sub-ifds
    -vals[=N]
      display up to N values for each IFD entry, default 20
@@ -489,7 +493,7 @@ dnghist      [options] [image num]: - generate a histogram
   -min=N   list pixels with value >= N
   -max=N   list pixels with value <= N
   -reg=<active|all>
-        region of image to search, either active area (default) or all
+    region of image to search, either active area (default) or all
   -bin=<n>
     number of values in histogram bin
   -fmt=<count|%>
@@ -500,11 +504,11 @@ dnglistpixels [options] [image num]: - generate a list of pixel coordinates
   -min=N   list pixels with value >= N
   -max=N   list pixels with value <= N
   -out=<file>
-        <file> is name of output file
+    <file> is name of output file
   -fmt=<chdk|rt|dcraw|count>
-        format badpixel list for chdk badpixel.txt, raw therapee, dcraw, or just count them
+    format badpixel list for chdk badpixel.txt, raw therapee, dcraw, or just count them
   -reg=<active|all>
-        region of image to search, either active area (default) or all
+    region of image to search, either active area (default) or all
   -coords=<abs|rel>
     output coordinates relative to region, or absolute
     use rel for raw therapee and dcraw
@@ -525,8 +529,8 @@ dngdump      [options] [image num]: - extract data from dng
    -over         overwrite existing file
    -rfmt=fmt raw format (default: unmodified from DNG)
      format is <bpp>[endian][pgm], e.g. 8pgm or 12l
-         pgm is only valid for 8 and 16 bpp
-         endian is l or b and defaults to little, except for 16 bit pgm
+     pgm is only valid for 8 and 16 bpp
+     endian is l or b and defaults to little, except for 16 bit pgm
    -tfmt=fmt thumb format (default, unmodified rgb)
      ppm   8 bit rgb ppm
 

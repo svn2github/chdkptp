@@ -976,7 +976,6 @@ dirsonly
     only list directories, error if path is a file
 
 Prior to CHDK 1.3 may run out of memory or cause PTP timeouts with large dirs
-may run out of memory on very large directories,
 msglimit can help but os.listdir itself could use all memory
 TODO message timeout is not checked
 ]]
