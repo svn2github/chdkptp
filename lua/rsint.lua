@@ -347,12 +347,12 @@ cmds={
 
 function rsint_run_cont(opts)
 	local errmsg
+	local next_shot
 
 	hook_shoot.set(opts.shoot_hook_timeout)
 	local shoot_count = hook_shoot.count()
 	press('shoot_full')
 	while true do
-		local next_shot
 		local msg=read_usb_msg(10)
 
 		if type(get_usb_capture_target) == 'function' and get_usb_capture_target() == 0 then
@@ -401,7 +401,6 @@ function rsint_run_single(opts)
 
 	local last_msg=get_tick_count()
 	while true do
-		local next_shot
 		local msg=read_usb_msg(10)
 
 		if type(get_usb_capture_target) == 'function' and get_usb_capture_target() == 0 then
