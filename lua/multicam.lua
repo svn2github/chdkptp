@@ -715,7 +715,7 @@ function mc:cmd(cmd,opts)
 		local sendcmd = cmd
 		local status,err
 		if opts.syncat then
-			sendcmd = string.format('%s %d',cmd,self:get_sync_tick(lcon,tstart,opts.syncat))
+			sendcmd = string.format('%s %d',sendcmd,self:get_sync_tick(lcon,tstart,opts.syncat))
 		end
 		if opts.args then
 			sendcmd = sendcmd..' '..opts.args
