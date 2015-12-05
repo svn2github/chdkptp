@@ -701,7 +701,6 @@ function mc:cmd(cmd,opts)
 	if opts.flushmsgs then
 		self:flushmsgs()
 	end
-	local sendcmd = cmd
 	if opts.printcmd == 'once' then
 		local s=cmd
 		if opts.syncat then
@@ -713,6 +712,7 @@ function mc:cmd(cmd,opts)
 		printf('%s\n',s)
 	end
 	for lcon in self:icams() do
+		local sendcmd = cmd
 		local status,err
 		if opts.syncat then
 			sendcmd = string.format('%s %d',cmd,self:get_sync_tick(lcon,tstart,opts.syncat))
