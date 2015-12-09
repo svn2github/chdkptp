@@ -108,7 +108,7 @@ end
 function gui.update_mode_list()
 	gui.mode_list = nil
 	gui.mode_map = nil
-	local modes,cur = con:execwait([[
+	local status,modes,cur = con:execwait_pcall([[
 capmode=require'capmode'
 local l={}
 local i=1
@@ -120,6 +120,11 @@ for id,name in ipairs(capmode.mode_to_name) do
 end
 return l,capmode.get()
 ]])
+	if not status then 
+		gui.infomsg('update_mode_list failed %s\n',tostring(modes))
+		clear_mode_list()
+		return
+	end
 	-- TODO need to do something about play,
 	-- would be good to select the current mode in rec mode
 	gui.mode_list = modes
