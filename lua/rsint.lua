@@ -64,6 +64,15 @@ function init_handlers(args,opts)
 			m.rcopts.dng_hdr=chdku.rc_handler_file(dst_dir,dst)
 		end
 	end
+	if args.shotwait then
+		m.rcopts.timeout=tonumber(args.shotwait)
+	elseif opts.tv then -- opts.tv is normalized to a tv96 value
+		-- 2x to allow for dark frame if enabled
+		m.rcopts.timeout=10000 + 2*exp.tv96_to_shutter(opts.tv)*1000
+	else
+		m.rcopts.timeout=20000
+	end
+
 end
 function m.read_cmd_stdin()
 	return cli.readline(m.prompt)

@@ -2144,6 +2144,7 @@ PC clock times are set to the start of download, not per image
 			shots=false,
 			int=false,
 			badpix=false,
+			shotwait=false,
 		},
 		help_detail=[[
  [local]       local destination directory or filename (w/o extension!)
@@ -2170,6 +2171,7 @@ PC clock times are set to the start of download, not per image
    -shots=<n>   shoot n shots
    -int=<n.m>   interval for multiple shots, in seconds
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
+   -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
 ]],
 		func=function(self,args)
 			local dst = args[1]
@@ -2298,6 +2300,15 @@ PC clock times are set to the start of download, not per image
 				end
 			end
 
+			if args.shotwait then
+				rcopts.timeout=tonumber(args.shotwait)
+			elseif opts.tv then -- opts.tv is normalized to a tv96 value
+				-- 2x to allow for dark frame if enabled
+				rcopts.timeout=10000 + 2*exp.tv96_to_shutter(opts.tv)*1000
+			else
+				rcopts.timeout=20000
+			end
+
 			local status,err
 			local shot = 1
 			repeat
@@ -2382,6 +2393,7 @@ PC clock times are set to the start of download, not per image
 			cmdwait=60,
 			cont=false,
 			pipe=false,
+			shotwait=false,
 		},
 		help_detail=[[
  [local]       local destination directory or filename (w/o extension!)
@@ -2406,6 +2418,7 @@ PC clock times are set to the start of download, not per image
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
    -cmdwait=n   wait n seconds for command, default 60
    -cont        use continuous mode
+   -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
    -pipe=<program> read commands from standard output of <program> instead of stdin
 
 

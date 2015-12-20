@@ -422,6 +422,7 @@ remoteshoot (rs) [local] [options]: - shoot and download without saving to SD (r
    -shots=<n>   shoot n shots
    -int=<n.m>   interval for multiple shots, in seconds
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
+   -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
 
 rsint        [local] [options]: - shoot and download with interactive control
  [local]       local destination directory or filename (w/o extension!)
@@ -446,6 +447,7 @@ rsint        [local] [options]: - shoot and download with interactive control
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
    -cmdwait=n   wait n seconds for command, default 60
    -cont        use continuous mode
+   -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
    -pipe=<program> read commands from standard output of <program> instead of stdin
 
 
