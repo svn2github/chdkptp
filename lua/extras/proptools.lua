@@ -61,6 +61,16 @@ function m.print(props)
 		printf("%s\n",m.fmt(i,v))
 	end
 end
+function m.write(props,filename)
+	local fh,err=io.open(filename,'wb')
+	if not fh then
+		error(err)
+	end
+	for i,v in ipairs(props) do
+		fh:write(string.format("%s\n",m.fmt(i,v)))
+	end
+	fh:close()
+end
 -- compare arrays returned by get
 function m.comp(old,new)
 	for i,v in ipairs(new) do
