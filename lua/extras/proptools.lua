@@ -18,47 +18,57 @@ simple module for propcase testing
 
 example
 !pt=require'extras/proptools'
-!p1=pt.get(0,300)
-=press'shoot_half' repeat sleep(10) until get_shooting()
-!p2=pt.get(0,300)
-!pt.comp(p1,p2)
+!p1=pt.get(0,600)
+!pt.comp(p1,pt.get(0,600,"press'shoot_half' sleep(500)"))
 ]]
 local m={}
 --[[
-get a range of propcase values (as shorts with get_prop)
-returns an array (index starts at 1) so use i-1 for propcase number
+get a range of propcase values, as shorts from get_prop
+returns a table indexed by prop id. Use _min, _max to iterate, not ipairs!
 ]]
-function m.get(start,count)
+function m.get(start,count,init_code)
 	if not start then
 		start=0
 	end
 	if not count then
 		count=1
 	end
-	local props={}
+	if not init_code then
+		init_code=''
+	end
+	local max=start+count
+	local code = init
+	local t={}
 	con:execwait(string.format([[
+%s
 local min=%d
 local max=%s
-]],start,start+count)..[[
+]],init_code,start,max)..[[
 local b=msg_batcher()
 
 for i=min,max do
 	b:write(get_prop(i))
 end
 b:flush()
-]],{libs='msg_batcher',msgs=chdku.msg_unbatcher(props)})
+]],{libs='msg_batcher',msgs=chdku.msg_unbatcher(t)})
+	local props={_min=start,_max=max}
+	-- remap to prop IDs
+	for i,v in ipairs(t) do
+		props[start+i-1]=v
+	end
 	return props
 end
 
-function m.fmt(i,v)
+function m.fmt(props,i)
 	-- bit32.extract to handle negatives, otherwise error with %x
-	return string.format("%4d %04x %6d",i-1,bit32.extract(v,0,16),v)
+	local v=props[i];
+	return string.format("%4d %04x %6d",i,bit32.extract(v,0,16),v)
 end
 
 -- print an array returned by get
 function m.print(props)
-	for i,v in ipairs(props) do
-		printf("%s\n",m.fmt(i,v))
+	for i=props._min,props._max do
+		printf("%s\n",m.fmt(props,i))
 	end
 end
 function m.write(props,filename)
@@ -66,21 +76,21 @@ function m.write(props,filename)
 	if not fh then
 		error(err)
 	end
-	for i,v in ipairs(props) do
-		fh:write(string.format("%s\n",m.fmt(i,v)))
+	for i=props._min,props._max do
+		fh:write(string.format("%s\n",m.fmt(props,i)))
 	end
 	fh:close()
 end
 -- compare arrays returned by get
 function m.comp(old,new)
-	for i,v in ipairs(new) do
-		if v ~= old[i] then
+	for i=new._min,new._max do
+		if new[i] ~= old[i] then
 			if old[i] then
-				printf("< %s\n",m.fmt(i,old[i]))
+				printf("< %s\n",m.fmt(old,i))
 			else
 				printf("< (missing)\n")
 			end
-			printf("> %s\n",m.fmt(i,v))
+			printf("> %s\n",m.fmt(new,i))
 		end
 	end
 end
