@@ -883,12 +883,16 @@ cli:add_commands{
 	{
 		names={'rmem'},
 		help='read memory',
-		args=argparser.create{i32=false}, -- word
-		arghelp='<address> [count] [-i32[=fmt]]',
+		args=argparser.create{
+				i32=false, -- word
+				f=false,
+		},
+		arghelp='<address> [count] [-i32[=fmt] | -f=<filename>]',
 		help_detail=[[
  Dump <count> bytes or words starting at <address>
-  -i32 display as 32 bit words rather than byte oriented hex dump
-  -i32=<fmt> use printf format string fmt to display
+  -i32 count as 32 bit words, display as ints instead of byte oriented hex dump
+  -i32=<fmt> use printf format string fmt to display, default 0x%08x
+  -f=<filename> write binary data to file instead of displaying
 ]],
 		func=function(self,args)
 			local addr = tonumber(args[1])
@@ -905,7 +909,15 @@ cli:add_commands{
 
 			local r = con:getmem(addr,count)
 
-			if args.i32 then
+			if args.f then
+				local fh,err=io.open(args.f,"wb")
+				if not fh then
+					return false, err
+				end
+				fh:write(r)
+				fh:close()
+				return true, string.format("0x%08x %u %s\n",addr,count,args.f)
+			elseif args.i32 then
 				local fmt
 				if type(args.i32) == 'string' then
 					fmt = args.i32
