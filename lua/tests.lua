@@ -354,11 +354,13 @@ end
 
 t.serialize = function()
 	local s="this \n is '\" a test"
-	local t1={1,2,3,t={a='a',b='b',c='c'},s=s}
+	local t1={1,2,3,t={a='a',['1b']='b',c='c'},s=s}
 	assert(util.compare_values(t1,util.unserialize(util.serialize(t1))))
 	assert(s == util.unserialize(util.serialize(s)))
 	assert(true == util.unserialize(util.serialize(true)))
 	assert(nil == util.unserialize(util.serialize(nil)))
+	assert(util.serialize({foo='vfoo'},{pretty=false,bracket_keys=false}) == '{foo="vfoo",}')
+	assert(util.serialize({foo='vfoo'},{pretty=false,bracket_keys=true}) == '{["foo"]="vfoo",}')
 	-- TODO test error conditions
 end
 

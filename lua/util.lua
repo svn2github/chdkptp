@@ -673,7 +673,7 @@ serialize_r = function(v,opts,r,seen,depth)
 			end
 			-- more compact/friendly format simple string keys
 			-- TODO we could make integers more compact by doing array part first
-			if type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$') then
+			if not opts.bracket_keys and type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$') then
 				table.insert(r,k)
 			else
 				table.insert(r,'[')
@@ -706,6 +706,7 @@ util.serialize_defaults = {
 	pretty=true, -- indents and newlines
 	fix_bignum=true, -- send values > 2^31 as hex, to avoid problems with camera conversion from decimal
 	forceint=true, -- convert numbers to integer
+	bracket_keys=false, -- force all keys to consistent [key] syntax
 }
 
 --[[

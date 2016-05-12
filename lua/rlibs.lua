@@ -168,7 +168,7 @@ serialize_r = function(v,opts,r,seen,depth)
 			if opts.pretty then
 				table.insert(r,'\n'..string.rep(' ',depth))
 			end
-			if type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$') then
+			if not opts.bracket_keys and type(k) == 'string' and string.match(k,'^[_%a][%a%d_]*$') then
 				table.insert(r,k)
 			else
 				table.insert(r,'[')
@@ -196,6 +196,7 @@ serialize_defaults = {
 	err_type=true,
 	err_cycle=true,
 	pretty=false,
+	bracket_keys=false,
 }
 function serialize(v,opts)
 	if opts then
