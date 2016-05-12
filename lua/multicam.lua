@@ -308,7 +308,7 @@ function mc:save_list(path,opts)
 			warnf("%s: missing serial\n",lcon.mc_id)
 		end
 	end
-	local s=util.serialize(t,{pretty=true})
+	local s=util.serialize(t,{pretty=true,bracket_keys=true})
 
 	fsutil.mkdir_parent(path)
 	local fh,err=io.open(path,'wb')
