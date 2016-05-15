@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2015 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -141,9 +141,19 @@ function argparser:parse(str)
 	return results
 end
 
--- a default for comands that want the raw string
+-- for comands that want the raw string
 argparser.nop = {
-	parse =function(self,str)
+	parse=function(self,str)
+		return str
+	end
+}
+
+-- for comands that expect no args
+argparser.none = {
+	parse=function(self,str)
+		if string.len(str) ~= 0 then
+			return false,'command takes no arguments'
+		end
 		return str
 	end
 }
@@ -216,7 +226,7 @@ function cli:add_commands(cmds)
 			cmd.arghelp = ''
 		end
 		if not cmd.args then
-			cmd.args = argparser.nop
+			cmd.args = argparser.none
 		end
 		for _,name in ipairs(cmd.names) do
 			if self.names[name] then
@@ -688,6 +698,7 @@ cli:add_commands{
 	{
 		names={'#'},
 		help='comment',
+		args=argparser.nop,
 		no_status=true,
 		func=function(self,args)
 			return true
@@ -819,6 +830,7 @@ cli:add_commands{
 	{
 		names={'putm'},
 		help='send message',
+		args=argparser.nop,
 		arghelp='<msg string>',
 		func=function(self,args)
 			con:write_msg(args)
