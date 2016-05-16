@@ -199,6 +199,41 @@ require'uartr'.start('%s',%s,0x%x)
 			return true
 		end
 	},
+	{
+		names={'dsearch32'},
+		help='search memory for specified 32 bit value',
+		arghelp="<start> <end> <val>",
+		args=cli.argparser.create{ },
+		help_detail=[[
+ <start> start address
+ <end>   end address
+ <val>   value to find
+]],
+		func=function(self,args)
+			local start=tonumber(args[1])
+			local last=tonumber(args[2])
+			local val=tonumber(args[3])
+			if not start then
+				return false, 'missing start address'
+			end
+			if not last then
+				return false, 'missing end address'
+			end
+			if not val then
+				return false, 'missing value'
+			end
+			printf("search 0x%08x-0x%08x 0x%08x\n")
+			local t={}
+			-- TODO should have limits on number of matches, ability to save results since it's slow
+			con:execwait(string.format([[
+mem_search_word{start=0x%x, last=0x%x, val=0x%x}
+]],start,last,val),{libs='mem_search_word',msgs=chdku.msg_unbatcher(t)})
+			for i,v in ipairs(t) do
+				printf("0x%08x\n",bit32.band(v,0xFFFFFFFF)) 
+			end
+			return true
+		end
+	},
 }
 end
 
