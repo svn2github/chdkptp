@@ -858,6 +858,7 @@ m.init_cli = function()
 		names={'dngbatch'},
 		help='manipulate multiple files',
 		arghelp="[options] [files] { command ; command ... }",
+		args=cli.argparser.nop,
 		-- TODO should allow filename substitutions for commands, e.g. dump -raw=$whatever
 		help_detail=[[
  options:
