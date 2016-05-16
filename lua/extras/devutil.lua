@@ -20,6 +20,7 @@ usage
 
 --]]
 local m={}
+local proptools=require'extras/proptools'
 
 m.stop_uart_log = function()
 	if not m.logname then
@@ -130,6 +131,71 @@ require'uartr'.start('%s',%s,0x%x)
 		help='resume uart log',
 		func=function(self,args)
 			m.resume_uart_log()
+			return true
+		end
+	},
+	{
+		names={'dpget'},
+		help='get range of propcase values',
+		arghelp="[options]",
+		args=cli.argparser.create{
+			s=0,
+			e=999,
+			c=false,
+		},
+		help_detail=[[
+ options:
+  -s min prop id, default 0
+  -e max prop id, default 999
+  -c=[code] lua code to execute before getting props
+]],
+
+		func=function(self,args)
+			args.e=tonumber(args.e)
+			args.s=tonumber(args.s)
+			if args.e < args.s then
+				return false,'invalid range'
+			end
+			m.psnap=proptools.get(args.s, args.e + 1 - args.s,args.c)
+			return true
+		end
+	},
+	{
+		names={'dpsave'},
+		help='save propcase values obtained with dpget',
+		arghelp="[file]",
+		args=cli.argparser.create{ },
+		help_detail=[[
+ [file] output file
+]],
+
+		func=function(self,args)
+			if not m.psnap then
+				return false,'no saved props'
+			end
+			if not args[1] then
+				return false,'missing filename'
+			end
+			proptools.write(m.psnap,args[1])
+			return true,'saved '..args[1]
+		end
+	},
+	{
+		names={'dpcmp'},
+		help='compare current propcase values with last dpget',
+		arghelp="[options]",
+		args=cli.argparser.create{
+			c=false,
+		},
+		help_detail=[[
+ options:
+  -c=[code] lua code to execute before getting props
+]],
+		func=function(self,args)
+			if not m.psnap then
+				return false,'no saved props'
+			end
+			proptools.comp(m.psnap,proptools.get(m.psnap._min, m.psnap._max - m.psnap._min,args.c))
 			return true
 		end
 	},
