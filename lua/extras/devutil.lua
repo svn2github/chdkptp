@@ -222,7 +222,7 @@ require'uartr'.start('%s',%s,0x%x)
 			if not val then
 				return false, 'missing value'
 			end
-			printf("search 0x%08x-0x%08x 0x%08x\n")
+			printf("search 0x%08x-0x%08x 0x%08x\n",start,last,val)
 			local t={}
 			-- TODO should have limits on number of matches, ability to save results since it's slow
 			con:execwait(string.format([[
