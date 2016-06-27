@@ -757,6 +757,9 @@ function mc:print_cmd_status(status,results)
 	end
 end
 function mc:print_cmd_status_short(status,results)
+	if self.verbose then
+		self:print_cmd_status(status,results)
+	end
 	if status then
 		printf("ok\n")
 	else
@@ -781,6 +784,7 @@ opts:{
 	synctime=number -- number of milliseconds in the future to shoot, must be >= min_sync_deley
 	shots=number -- number of shots, default 1
 	interval=number -- number of milliseconds between shots, default 2000
+	cont=bool -- use continuous mode for shooting, if enabled in canon UI
 --]]
 function mc:shoot(opts) 
 	opts = util.extend_table({
@@ -819,7 +823,7 @@ function mc:shoot(opts)
 	self:print_cmd_status_short(self:cmdwait('preshoot'))
 	self:print_cmd_status_short(self:cmdwait('shoot_burst',{
 		syncat=opts.synctime,
-		args=util.serialize{shots=opts.shots,interval=opts.interval}
+		args=util.serialize{shots=opts.shots,interval=opts.interval,cont=opts.cont}
 	}))
 	self:print_cmd_status_short(self:cmdwait('call release"shoot_half"'))
 end
@@ -1061,7 +1065,9 @@ mc={
 	msg_timeout=100,
 	shoot_hold=10,
 	shoot_hook_timeout=5000,
+	raw_hook_timeout=5000,
 	shoot_hook_ready_timeout=10000,
+	raw_hook_ready_timeout=10000,
 }
 
 color={
@@ -1207,27 +1213,64 @@ function cmds.shoot_burst()
 	opts=extend_table({
 		shots=1,
 		interval=2000,
+		cont=true,
 		shoot_hook_timeout=mc.shoot_hook_timeout,
+		raw_hook_timeout=mc.raw_hook_timeout,
 		shoot_hook_ready_timeout=mc.shoot_hook_ready_timeout,
+		raw_hook_ready_timeout=mc.raw_hook_ready_timeout,
 	},opts)
+	local cont = opts.cont and get_prop(props.DRIVE_MODE) == 1
+
+	local r={}
 	hook_shoot.set(opts.shoot_hook_timeout)
-	for i=1,opts.shots do
+	hook_raw.set(opts.raw_hook_timeout)
+	local last_shot_tick
+	if cont then
 		press('shoot_full_only')
-		local wait_time = 0
+	end
+
+	for i=1,opts.shots do
+		if not cont then
+			press('shoot_full_only')
+		end
 		if not hook_shoot.wait_ready({timeout=opts.shoot_hook_ready_timeout,timeout_error=false}) then
 			release('shoot_full_only')
+			hook_shoot.set(0)
+			hook_raw.set(0)
 			write_status(false, 'hook_shoot ready timeout')
 			return
 		end
+		ready_tick=get_tick_count()
 		wait_tick(synctick)
 		hook_shoot.continue()
+		local shot_tick=get_tick_count()
+		local shot_int
+		if last_shot_tick then
+			shot_int=shot_tick - last_shot_tick
+		else
+			shot_int=0
+		end
+		last_shot_tick = shot_tick
+		r[i]=string.format("%d w:%d i=%d",i,synctick-ready_tick,shot_int)
 		synctick=synctick+opts.interval
+		if not cont then
+			release('shoot_full_only')
+		end
+		-- wait for raw hook before shooting again
+		if not hook_raw.wait_ready({timeout=opts.raw_hook_ready_timeout,timeout_error=false}) then
+			hook_shoot.set(0)
+			hook_raw.set(0)
+			write_status(false, 'hook_raw ready timeout')
+			return
+		end
+		hook_raw.continue()
+	end
+	if cont then
 		release('shoot_full_only')
-		-- ensure shoot_full released for some noticable time. TODO could use raw hook
-		sleep(opts.interval/2)
 	end
 	hook_shoot.set(0)
-	write_status(true)
+	hook_raw.set(0)
+	write_status(true,table.concat(r,', '))
 end
 
 function cmds.tick()
