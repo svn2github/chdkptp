@@ -3,7 +3,7 @@
  * based on ptpcam.c
  * Copyright (C) 2001-2005 Mariusz Woloszyn <emsi@ipartners.pl>
  * additions
- * Copyright (C) 2010-2015 <reyalp (at) gmail dot com>
+ * Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -49,7 +49,12 @@
 #include <netdb.h>
 #endif
 #endif
+// NOTE libusb-win32 prior to V1.2.4.6 used <usb.h>
+#ifdef WIN32
+#include <lusb0_usb.h>
+#else
 #include <usb.h>
+#endif
 #ifdef CHDKPTP_READLINE
 #include <readline/readline.h>
 #include <readline/history.h>
