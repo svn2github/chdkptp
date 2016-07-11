@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -19,9 +19,10 @@ module for gui tree view
 ]]
 local m={}
 local itree=iup.tree{}
-itree.name="Camera"
+itree.title="Camera"
 itree.state="collapsed"
 itree.addexpanded="NO"
+-- default
 -- itree.addroot="YES"
 
 function itree:get_data(id)
