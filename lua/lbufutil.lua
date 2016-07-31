@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2011 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -19,22 +19,36 @@ utilities for working with lbuf objects
 ]]
 local lbu={}
 --[[
-load a file into an lbuf
+lb=lbu.loadfile("name", [offset [,len] ])
+load a file or part of file into an lbuf
 returns lbuf or false,error
 ]]
-function lbu.loadfile(name) 
+function lbu.loadfile(name,offset,len) 
+	if not offset then
+		offset=0
+	end
 	local f,err=io.open(name,'rb')
 	if not f then
 		return false, err
 	end
-	local len = f:seek('end')
-	f:seek('set')
+	local flen = f:seek('end')
+	if offset >= flen then
+		return false,'offset >= file size'
+	end
+	if len then
+		if offset + len > flen then
+			return false,'offset + len > file size'
+		end
+	else
+		len = flen - offset
+	end
 	local lb
+	f:seek('set',offset)
 	lb,err=lbuf.new(len)
 	if not lb then
 		return false, err
 	end
-	lb:fread(f)
+	lb:fread(f,0,len)
 	f:close()
 	return lb
 end

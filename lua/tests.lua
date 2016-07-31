@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2012-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2012-2016 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -312,6 +312,24 @@ t.lbufutil = function()
 	assert(b.i8_2==-1)
 	b:bind_u8('u8_1')
 	assert(b.u8_1==0xFF)
+	local f=io.open('lbuftest.dat','wb')
+	f:write('hello world')
+	f:close()
+	b=lbu.loadfile('lbuftest.dat')
+	assert(b:string() == 'hello world')
+	b=lbu.loadfile('lbuftest.dat',6)
+	assert(b:string() == 'world')
+	b=lbu.loadfile('lbuftest.dat',0,5)
+	assert(b:string() == 'hello')
+	b=lbu.loadfile('lbuftest.dat',6,2)
+	assert(b:string() == 'wo')
+	b=lbu.loadfile('lbuftest.dat',10,1)
+	assert(b:string() == 'd')
+	local err
+	b,err=lbu.loadfile('lbuftest.dat',11)
+	assert((b==false) and (err=='offset >= file size'))
+	b,err=lbu.loadfile('lbuftest.dat',10,3)
+	assert((b==false) and (err=='offset + len > file size'))
 end
 
 t.lbuff = function()
