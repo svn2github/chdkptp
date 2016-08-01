@@ -17,7 +17,7 @@
 various dev utils as cli commands
 usage
 !require'extras/devutil':init_cli()
-
+use help for information about individual commands
 --]]
 local m={}
 local proptools=require'extras/proptools'
@@ -147,7 +147,7 @@ require'uartr'.start('%s',%s,0x%x)
  options:
   -s min prop id, default 0
   -e max prop id, default 999
-  -c=[code] lua code to execute before getting props
+  -c=<code> lua code to execute before getting props
 ]],
 
 		func=function(self,args)
@@ -189,7 +189,7 @@ require'uartr'.start('%s',%s,0x%x)
 		},
 		help_detail=[[
  options:
-  -c=[code] lua code to execute before getting props
+  -c=<code> lua code to execute before getting props
 ]],
 		func=function(self,args)
 			if not m.psnap then
@@ -230,6 +230,84 @@ mem_search_word{start=0x%x, last=0x%x, val=0x%x}
 ]],start,last,val),{libs='mem_search_word',msgs=chdku.msg_unbatcher(t)})
 			for i,v in ipairs(t) do
 				printf("0x%08x\n",bit32.band(v,0xFFFFFFFF)) 
+			end
+			return true
+		end
+	},
+	{
+		names={'dromlog'},
+		help='get camera romlog',
+		arghelp="[dest]",
+		args=cli.argparser.create{ },
+		help_detail=[[
+ [dest] path/name for downloaded file, default ROMLOG.LOG
+ GK.LOG / RomLogErr.txt will be prefixed with dst name if present
+
+ requires native calls enabled
+ existing ROMLOG.LOG, GK.LOG and RomLogErr.txt files will be removed
+]],
+		func=function(self,args)
+			local dst=args[1]
+			local gkdst
+			local errdst
+			if dst then
+				-- make GK log name based on dest 
+				local dstbase=fsutil.split_ext(dst)
+				gkdst=dstbase..'-GK.LOG'
+				errdst=dstbase..'-Err.LOG'
+			else
+				dst='ROMLOG.LOG'
+				gkdst='GK.LOG'
+				errdst='RomLogErr.txt'
+			end
+			local status, logname, gklogname = con:execwait([[
+LOG_NAME="A/ROMLOG.LOG"
+GKLOG_NAME="A/GK.LOG"
+ERR_NAME="A/RomLogErr.txt"
+
+if call_event_proc("SystemEventInit") == -1 then
+    if call_event_proc("System.Create") == -1 then
+        error("ERROR: SystemEventInit and System.Create failed")
+    end
+end
+if os.stat(LOG_NAME) then
+	os.remove(LOG_NAME)
+end
+if os.stat(GKLOG_NAME) then
+	os.remove(GKLOG_NAME)
+end
+if os.stat(ERR_NAME) then
+	os.remove(ERR_NAME)
+end
+
+-- first arg: filename, NULL for ROMLOG.TXT (dryos) or ROMLOG (vxworks)
+-- second arg: if 0, shutdown camera after writing log
+-- note, on vxworks the exception code, registers and stack trace are binary
+call_event_proc("GetLogToFile",LOG_NAME,1)
+
+if os.stat(ERR_NAME) then
+	return false, ERR_NAME
+end
+
+if not os.stat(LOG_NAME) then
+    error('logfile %s does not exist',LOG_NAME)
+end
+if os.stat(GKLOG_NAME) then
+	return true, LOG_NAME, GKLOG_NAME
+else
+	return true, LOG_NAME
+end
+]])
+			if not status then
+				cli.infomsg("%s->%s\n",errlogname,errdst)
+				con:download(errlogname,errdst)
+				return false,string.format("ROMLOG failed, error %s\n",errdst)
+			end
+			cli.infomsg("%s->%s\n",logname,dst)
+			con:download(logname,dst)
+			if gklogname then
+				cli.infomsg("%s->%s\n",gklogname,gkdst)
+				con:download(gklogname,gkdst)
 			end
 			return true
 		end
