@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -29,6 +29,9 @@ container -- outermost widget
 icnv -- iup canvas
 vp_active -- viewport streaming selected
 bm_active -- bitmap streaming selected
+]]
+	bmo_active = true, -- digic 6 opacity selected when bitmap enabled
+--[[
 timer -- timer for fetching updates
 statslabel -- text for stats
 ]]
@@ -39,6 +42,7 @@ statslabel -- text for stats
 local screen_aspects = {
 	[0]=4/3,
 	16/9,
+	3/2,
 }
 
 function m.live_support()
@@ -67,6 +71,13 @@ local bm_toggle = iup.toggle{
 	end,
 }
 
+local bmo_toggle = iup.toggle{
+	title=" Skip D6 Opacity",
+	action=function(self,state)
+		m.bmo_active = (state ~= 1)
+	end,
+}
+
 local aspect_toggle = iup.toggle{
 	title="Scale for A/R",
 	value="ON",
@@ -80,6 +91,9 @@ local function get_fb_selection()
 	if m.bm_active then
 		what = what + 4
 		what = what + 8 -- palette TODO shouldn't request if we don't understand type, but palette type is in dynamic data
+		if m.bmo_active then
+			what = what + 16
+		end
 	end
 	return what
 end
@@ -96,7 +110,12 @@ local function update_canvas_size()
 	local vp_w = lv.vp:get_screen_width()/m.vp_par
 	local vp_h
 	if aspect_toggle.value == 'ON' then
-		vp_h = vp_w/screen_aspects[lv.lcd_aspect_ratio]
+		local lcd_ar=screen_aspects[lv.lcd_aspect_ratio]
+		if not lcd_ar then
+			gui.dbgmsg('update_canvas_size: unknown aspect ratio %d\n',lv.lcd_aspect_ratio)
+			lcd_ar=4/3
+		end
+		vp_h = vp_w/lcd_ar
 		m.vp_aspect_factor = vp_h/lv.vp:get_screen_height()
 	else
 		m.vp_aspect_factor = 1
@@ -169,11 +188,7 @@ local function update_should_run()
 end
 
 local last_frame_fields = {}
-local last_fb_fields = {
-	vp={},
-	bm={}
-}
-local last_bm_fields = {}
+local last_fb_fields = {}
 
 local palette_size_for_type={
 	16*4,
@@ -184,28 +199,31 @@ local palette_size_for_type={
 
 -- reset last frame fields so reload or new connection will be a "change"
 local function reset_last_frame_vals()
-	for i,f in ipairs(chdku.live_fields) do
-		last_frame_fields[f]=nil
-	end
-	for j,fb in ipairs({'vp','bm'}) do
-		for i,f in ipairs(chdku.live_fb_desc_fields) do
-			last_fb_fields[fb][f]=nil
-		end
+	last_frame_fields={}
+	for j,fb in ipairs(chdku.live_fb_names) do
+		last_fb_fields[fb]={}
 	end
 end
 
 local function update_frame_data(frame)
 	local dirty
-	for i,f in ipairs(chdku.live_fields) do
+	for i,f in ipairs(frame._field_names) do
 		local v = frame[f]
 		if v ~= last_frame_fields[f] then
 			dirty = true
 		end
 	end
-	for j,fb in ipairs({'vp','bm'}) do
-		for i,f in ipairs(chdku.live_fb_desc_fields) do
-			local v = frame[fb][f]
-			if v ~= last_fb_fields[fb][f] then
+	for j,fb in ipairs(chdku.live_fb_names) do
+		if frame[fb] then
+			for i,f in ipairs(frame._fb_field_names) do
+				local v = frame[fb][f]
+				if v ~= last_fb_fields[fb][f] then
+					dirty = true
+				end
+			end
+		else
+			-- if last had some value, new doesn't exist, changed
+			if last_fb_fields[fb].fb_type then
 				dirty = true
 			end
 		end
@@ -213,16 +231,20 @@ local function update_frame_data(frame)
 
 	if dirty then
 		gui.dbgmsg('update_frame_data: changed\n')
-		for i,f in ipairs(chdku.live_fields) do
+		for i,f in ipairs(frame._field_names) do
 			local v = frame[f]
 			gui.dbgmsg("%s:%s->%s\n",f,tostring(last_frame_fields[f]),v)
 			last_frame_fields[f]=v
 		end
-		for j,fb in ipairs({'vp','bm'}) do
-			for i,f in ipairs(chdku.live_fb_desc_fields) do
-				local v = frame[fb][f]
-				gui.dbgmsg("%s.%s:%s->%s\n",fb,f,tostring(last_fb_fields[fb][f]),v)
-				last_fb_fields[fb][f]=v
+		for j,fb in ipairs(chdku.live_fb_names) do
+			if frame[fb] then
+				for i,f in ipairs(frame._fb_field_names) do
+					local v = frame[fb][f]
+					gui.dbgmsg("%s.%s:%s->%s\n",fb,f,tostring(last_fb_fields[fb][f]),v)
+					last_fb_fields[fb][f]=v
+				end
+			else
+				gui.dbgmsg("%s->nil\n",fb)
 			end
 		end
 
@@ -298,7 +320,7 @@ local function init_dump_replay()
 	gui.infomsg("loading dump ver %s.%s\n",tostring(header:get_u32()),tostring(header:get_u32(4)))
 	m.dump_replay = true
 	if not m.dump_replay_frame then
-		m.dump_replay_frame = chdku.live_wrap()
+		m.dump_replay_frame = chdku.live_wrapper()
 	end
 end
 
@@ -321,7 +343,7 @@ local function read_dump_frame()
 		init_dump_replay()
 		data = read_dump_rec(m.dump_replay_frame._frame,m.dump_replay_file)
 	end
-	m.dump_replay_frame._frame = data
+	m.dump_replay_frame:set_frame(data)
 	if prefs.gui_force_replay_palette ~= -1 then
 		m.dump_replay_frame._frame:set_u32(chdku.live_frame_map.palette_type,prefs.gui_force_replay_palette)
 	end
@@ -551,6 +573,7 @@ function m.init()
 				iup.vbox{
 					vp_toggle,
 					bm_toggle,
+					bmo_toggle,
 					vp_par_toggle,
 					bm_par_toggle,
 					bm_fit_toggle,

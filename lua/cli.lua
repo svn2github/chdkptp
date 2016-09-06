@@ -1799,6 +1799,7 @@ PC clock times are set to the start of download, not per image
 			wait=100,
 			novp=false,
 			nobm=false,
+			nobmo=false,
 			nopal=false,
 			quiet=false,
 			pbm=false,
@@ -1811,6 +1812,7 @@ PC clock times are set to the start of download, not per image
    -wait=<N>  wait N ms between frames
    -novp      don't get viewfinder data
    -nobm      don't get ui overlay data
+   -nobmo     don't get D6 ui overlay opacity data
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
 ]],
@@ -1824,6 +1826,9 @@ PC clock times are set to the start of download, not per image
 				what = what + 4
 				if not args.nopal then
 					what = what + 8
+				end
+				if not args.nobmo then
+					what = what + 16
 				end
 			end
 			if what == 0 then
@@ -1880,6 +1885,7 @@ PC clock times are set to the start of download, not per image
 			pipevp=false,
 			pipebm=false,
 			nopal=false,
+			nobmo=false,
 			quiet=false,
 			nosubst=false,
 		}),
@@ -1897,6 +1903,7 @@ PC clock times are set to the start of download, not per image
       treat vp or bm 'dest' as a command to pipe to. With =oneproc a single process
       receives all frames. Otherwise, a new process is spawned for each frame
    -nopal     don't get palette for ui overlay
+   -nobmo     don't get D6 ui overlay opacity data
    -quiet     don't print progress
    -nosubst   don't do pattern substitution on file names
   vp and bm 'dest' may include substitution patterns
@@ -1915,6 +1922,9 @@ PC clock times are set to the start of download, not per image
 				what = what + 4
 				if not args.nopal then
 					what = what + 8
+				end
+				if not args.nobmo then
+					what = what + 16
 				end
 			end
 			if what == 0 then

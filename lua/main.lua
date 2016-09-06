@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2015 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -221,7 +221,7 @@ local function check_versions()
 		util.warnf("Lua 5.1 is deprecated\n")
 	end
 	local v=chdk.program_version()
-	if v.MAJOR ~= 0 or v.MINOR ~= 6 then
+	if v.MAJOR ~= 0 or v.MINOR ~= 7 then
 		error("incompatible chdkptp binary version")
 	end
 	-- TODO could check IUP and CD, but need to be initialized

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ * Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -81,6 +81,18 @@ void palette_type4_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgb
 void palette_type5_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba_t *pal_rgb);
 
 void yuv_live_to_cd_rgb(const char *p_yuv,
+						unsigned buf_width,
+						unsigned width,unsigned height,
+						int skip,
+						uint8_t *r,uint8_t *g,uint8_t *b);
+
+void yuvb_live_to_cd_rgb(const char *p_yuv,
+						unsigned buf_width,
+						unsigned width,unsigned height,
+						int skip,
+						uint8_t *r,uint8_t *g,uint8_t *b);
+
+void yuvc_live_to_cd_rgb(const char *p_yuv,
 						unsigned buf_width,
 						unsigned width,unsigned height,
 						int skip,
@@ -216,7 +228,7 @@ void palette_AYUV_to_rgba(const char *palette, uint8_t pixel, palette_entry_rgba
 }
 
 void palette_type3_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba_t *pal_rgb) {
-    palette_AYUV_to_rgba(palette, pixel, pal_rgb, 0);
+	palette_AYUV_to_rgba(palette, pixel, pal_rgb, 0);
 }
 
 // like 2, but vuya
@@ -245,7 +257,7 @@ void palette_type4_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba
 }
 
 void palette_type5_to_rgba(const char *palette, uint8_t pixel,palette_entry_rgba_t *pal_rgb) {
-    palette_AYUV_to_rgba(palette, pixel, pal_rgb, 4);
+	palette_AYUV_to_rgba(palette, pixel, pal_rgb, 4);
 }
 
 void yuv_live_to_cd_rgb(const char *p_yuv,
@@ -280,6 +292,113 @@ void yuv_live_to_cd_rgb(const char *p_yuv,
 		}
 	}
 }
+
+void yuvb_live_to_cd_rgb(const char *p_yuv,
+						unsigned buf_width,
+						unsigned width,unsigned height,
+						int skip,
+						uint8_t *r,uint8_t *g,uint8_t *b) {
+	unsigned x,row;
+	unsigned row_inc = (buf_width*16)/8;
+	const char *p;
+	// start at end to flip for CD
+	const char *p_row = p_yuv + (height - 1) * row_inc;
+	for(row=0;row<height;row++,p_row -= row_inc) {
+		for(x=0,p=p_row;x<width;x+=2,p+=4) {
+			char p2 = p[2] - 0x80;
+			char p0 = p[0] - 0x80;
+			*r++ = yuv_to_r(p[1],p2);
+			*g++ = yuv_to_g(p[1],p0,p2);
+			*b++ = yuv_to_b(p[1],p0);
+
+			if(!skip) {
+				*r++ = yuv_to_r(p[3],p2);
+				*g++ = yuv_to_g(p[3],p0,p2);
+				*b++ = yuv_to_b(p[3],p0);
+			}
+		}
+	}
+}
+
+void yuvc_live_to_cd_rgb(const char *p_yuv,
+						unsigned buf_width,
+						unsigned width,unsigned height,
+						int skip,
+						uint8_t *r,uint8_t *g,uint8_t *b) {
+	unsigned x,row;
+	unsigned row_inc = (buf_width*16)/8;
+	const char *p;
+	// start at end to flip for CD
+	const char *p_row = p_yuv + (height - 1) * row_inc;
+	for(row=0;row<height;row++,p_row -= row_inc) {
+		for(x=0,p=p_row;x<width;x+=2,p+=4) {
+			char p2 = p[2];
+			char p0 = p[0];
+			*r++ = yuv_to_r(p[1],p2);
+			*g++ = yuv_to_g(p[1],p0,p2);
+			*b++ = yuv_to_b(p[1],p0);
+
+			if(!skip) {
+				*r++ = yuv_to_r(p[3],p2);
+				*g++ = yuv_to_g(p[3],p0,p2);
+				*b++ = yuv_to_b(p[3],p0);
+			}
+		}
+	}
+}
+
+// C&P, handles alpha channel
+void yuvb_live_to_cd_rgba(const char *p_yuv,
+						unsigned buf_width,
+						unsigned width,unsigned height,
+						int skip,
+						uint8_t *r,uint8_t *g,uint8_t *b,uint8_t *a) {
+	unsigned x,row;
+	unsigned row_inc = (buf_width*16)/8;
+	const char *p;
+	const unsigned *u;
+	// start at end to flip for CD
+	const char *p_row = p_yuv + (height - 1) * row_inc;
+	for(row=0;row<height;row++,p_row -= row_inc) {
+		for(x=0,p=p_row;x<width;x+=2,p+=4) {
+			char p2 = p[2] - 0x80;
+			char p0 = p[0] - 0x80;
+			u = (unsigned *)p;
+			*r++ = yuv_to_r(p[1],p2);
+			*g++ = yuv_to_g(p[1],p0,p2);
+			*b++ = yuv_to_b(p[1],p0);
+			*a++ = *u==0x800080?0:255; // TODO alpha hack should only be used if real alpha not present
+
+			if(!skip) {
+				*r++ = yuv_to_r(p[3],p2);
+				*g++ = yuv_to_g(p[3],p0,p2);
+				*b++ = yuv_to_b(p[3],p0);
+				*a++ = *u==0x800080?0:255;
+			}
+		}
+	}
+}
+void opacity_live_to_cd_a(const char *p_opac,
+						unsigned buf_width,
+						unsigned width,unsigned height,
+						int skip,
+						uint8_t *a) {
+	unsigned x,row;
+	unsigned row_inc = buf_width;
+	const char *p;
+	// start at end to flip for CD
+	const char *p_row = p_opac + (height - 1) * row_inc;
+	// TODO could memcpy rows if not skipping
+	for(row=0;row<height;row++,p_row -= row_inc) {
+		for(x=0,p=p_row;x<width;x+=2,p+=2) {
+			*a++ = *p;
+			if(!skip) {
+				*a++ = *(p+1);
+			}
+		}
+	}
+}
+
 
 static void pimg_destroy(liveimg_pimg_t *im) {
 	free(im->data);
@@ -395,46 +514,122 @@ liveimg_pimg_t * pimg_get(lua_State *L,int i) {
 	return NULL;
 }
 
+/* check protocol version in frame against specified values */
+static int lv_proto_compatible(lv_data_header *frame, int req_major, int req_minor) {
+	if (req_major != frame->version_major) {
+		return 0;
+	}
+	if(req_minor < frame->version_minor) {
+		return 0;
+	}
+	return 1;
+}
 /*
-check framebuffer desc values, and return a descriptive error or NULL
+get framebuffer desc values, return if valid, otherwise put a descriptive string in err
 */
-static const char * check_fb_desc(lv_framebuffer_desc **desc_out,lv_data_header *frame, int expect_type,int data_len) {
-	int bpp;
-	int start;
-	lv_framebuffer_desc *desc;
-	// note, if there's ever more than on possible type for viewport or bitmap, this will need to change
-	switch(expect_type) {
-		case LV_FB_YUV8:
-			bpp = 12;
-			start = frame->vp_desc_start;
-			break;
-		case LV_FB_PAL8:
-			bpp = 8;
-			start = frame->bm_desc_start;
-			break;
-		default:
-			return "invalid type";
+static lv_framebuffer_desc *get_fb_desc(lv_data_header *frame,int data_len, int start,const char **err) {
+	if(start <= 0) {
+		*err="no desc";
+		return NULL;
 	}
-		
 	if( start + sizeof(lv_framebuffer_desc) > data_len) {
-		return "data < fb_desc";
+		*err="data < fb_desc";
+		return NULL;
 	}
+	*err=NULL;
+	return (lv_framebuffer_desc *)((char *)frame + start);
+}
 
-	desc = (lv_framebuffer_desc *)((char *)frame + start);
-	if(desc->fb_type != expect_type) {
-		return "incorrect type";
-	}
-
-	// note, we can get a frame with no FB data
+static lv_framebuffer_desc *check_fb_desc(lv_data_header *frame,lv_framebuffer_desc *desc,int bpp,int data_len,const char **err) {
 	if(desc->data_start && desc->data_start + (desc->buffer_width*desc->visible_height*bpp)/8 > data_len) {
-		return "data < buffer_width*height";
+		*err="data < buffer_width*height";
+		return NULL;
 	}
 
 	if(desc->visible_width > desc->buffer_width) {
-		return "width  > buffer_width";
+		*err="width  > buffer_width";
+		return NULL;
 	}
-	*desc_out = desc;
-	return NULL;
+	return desc;
+}
+/*
+validate and return viewport
+*/
+static lv_framebuffer_desc *get_vp_desc(lv_data_header *frame,int data_len,const char **err) {
+	lv_framebuffer_desc *desc = get_fb_desc(frame,data_len,frame->vp_desc_start,err);
+	if(!desc) {
+		return NULL;
+	}
+	int bpp;
+	switch (desc->fb_type) {
+		case LV_FB_YUV8:
+			bpp = 12;
+			break;
+		case LV_FB_YUV8B:
+		case LV_FB_YUV8C:
+			if(!lv_proto_compatible(frame,2,2)) {
+				*err="viewport type not supported by protocol";
+				return NULL;
+			}
+			bpp = 16;
+			break;
+		default:
+			*err="viewport type not supported";
+			return NULL;
+	}
+	return check_fb_desc(frame,desc,bpp,data_len,err);
+}
+
+/*
+validate and return bitmap
+*/
+static lv_framebuffer_desc *get_bm_desc(lv_data_header *frame,int data_len,const char **err) {
+	lv_framebuffer_desc *desc = get_fb_desc(frame,data_len,frame->bm_desc_start,err);
+	if(!desc) {
+		return NULL;
+	}
+	int bpp;
+	switch (desc->fb_type) {
+		case LV_FB_PAL8:
+			bpp = 8;
+			break;
+		case LV_FB_YUV8B:
+			if(!lv_proto_compatible(frame,2,2)) {
+				*err="bitmap type not supported by protocol";
+				return NULL;
+			}
+			bpp = 16;
+			break;
+		default:
+			*err="overlay type not supported";
+			return NULL;
+	}
+	return check_fb_desc(frame,desc,bpp,data_len,err);
+}
+
+/*
+validate and return bitmap opacity
+*/
+static lv_framebuffer_desc *get_bmo_desc(lv_data_header *frame,int data_len,const char **err) {
+	// check protocol support first, otherwise start is invalid data
+	if(!lv_proto_compatible(frame,2,2)) {
+		*err="opacity type not supported by protocol";
+		return NULL;
+	}
+	lv_framebuffer_desc *desc = get_fb_desc(frame,data_len,frame->bmo_desc_start,err);
+	if(!desc) {
+		return NULL;
+	}
+	int bpp;
+	switch (desc->fb_type) {
+		case LV_FB_OPACITY8:
+			bpp = 8;
+			break;
+		default:
+			*err="opacity type not supported";
+			return NULL;
+	}
+	return check_fb_desc(frame,desc,bpp,data_len,err);
 }
 
 /*
@@ -456,19 +651,22 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 	int par = (skip == 1)?2:1;
 
 	frame = (lv_data_header *)frame_lb->bytes;
-	const char *fb_desc_err = check_fb_desc(&vp,frame,LV_FB_YUV8,frame_lb->len);
-	if(fb_desc_err) {
-		return luaL_error(L,fb_desc_err);
-	}
 
-	// this is not currently an error, if sent live data without viewport selected, just return nil image
-	if(!vp->data_start) {
-		lua_pushnil(L);
-		return 1;
+	const char *fb_desc_err;
+	vp = get_vp_desc(frame,frame_lb->len,&fb_desc_err);
+	if(!vp) {
+		return luaL_error(L,fb_desc_err);
 	}
 
 	unsigned vwidth = vp->visible_width/par;
 	unsigned dispsize = vwidth*vp->visible_height;
+
+	// this is not currently an error, if sent live data without viewport selected, just return nil image
+	// can also send zero size image if camera viewport functions don't handle all corner cases
+	if(!vp->data_start || !dispsize) {
+		lua_pushnil(L);
+		return 1;
+	}
 
 	if(im && dispsize != im->width*im->height) {
 		pimg_destroy(im);
@@ -487,12 +685,28 @@ static int liveimg_get_viewport_pimg(lua_State *L) {
 		}
 	}
 
-	yuv_live_to_cd_rgb(frame_lb->bytes+vp->data_start,
+	if (vp->fb_type == LV_FB_YUV8) {
+		yuv_live_to_cd_rgb(frame_lb->bytes+vp->data_start,
 						vp->buffer_width,
 						vp->visible_width,
 						vp->visible_height,
 						skip,
 						im->r,im->g,im->b);
+	} else if (vp->fb_type == LV_FB_YUV8B) {
+		yuvb_live_to_cd_rgb(frame_lb->bytes+vp->data_start,
+						vp->buffer_width,
+						vp->visible_width,
+						vp->visible_height,
+						skip,
+						im->r,im->g,im->b);
+	} else {
+		yuvc_live_to_cd_rgb(frame_lb->bytes+vp->data_start,
+						vp->buffer_width,
+						vp->visible_width,
+						vp->visible_height,
+						skip,
+						im->r,im->g,im->b);
+	}
 	return 1;
 }
 
@@ -525,6 +739,7 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 
 	lv_data_header *frame;
 	lv_framebuffer_desc *bm;
+	lv_framebuffer_desc *bmo=NULL;
 
 	liveimg_pimg_t *im = pimg_get(L,1);
 	lBuf_t *frame_lb = luaL_checkudata(L,2,LBUF_META);
@@ -533,25 +748,37 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 	int par = (skip == 1)?2:1;
 
 	frame = (lv_data_header *)frame_lb->bytes;
-	const char *fb_desc_err = check_fb_desc(&bm,frame,LV_FB_PAL8,frame_lb->len);
-	if(fb_desc_err) {
+	const char *fb_desc_err;
+	bm = get_bm_desc(frame,frame_lb->len,&fb_desc_err);
+	if(!bm) {
 		return luaL_error(L,fb_desc_err);
 	}
-
-	if(!bm->data_start) {
-		lua_pushnil(L);
-		return 1;
-	}
-
-	if(get_palette_size(frame->palette_type) + frame->palette_data_start > frame_lb->len) {
-		return luaL_error(L,"data < palette size");
-	}
-
-	convert_palette(pal_rgba,frame);
 
 	unsigned vwidth = bm->visible_width/par;
 	unsigned dispsize = vwidth*bm->visible_height;
 
+// no data or zero sized image, return nil
+	if(!bm->data_start || !dispsize) {
+		lua_pushnil(L);
+		return 1;
+	}
+	// currently only d6 YUV overlay has alpha channel
+	if (bm->fb_type == LV_FB_YUV8B) {
+		// YUV bitmap should only be sent by supporting protocol, so no additional check needed
+		bmo=get_bmo_desc(frame,frame_lb->len,&fb_desc_err);
+		if(!bmo) {
+			return luaL_error(L,fb_desc_err);
+		}
+		// code currently assumes identical dimensions
+		if(bm->visible_width != bmo->visible_width
+			|| bm->visible_height != bmo->visible_height) {
+			return luaL_error(L,"opacity buffer size != bitmap size");
+		}
+	} else {
+		if(get_palette_size(frame->palette_type) + frame->palette_data_start > frame_lb->len) {
+			return luaL_error(L,"data < palette size");
+		}
+	}
 
 	if(im && dispsize != im->width*im->height) {
 		pimg_destroy(im);
@@ -566,6 +793,27 @@ static int liveimg_get_bitmap_pimg(lua_State *L) {
 			return luaL_error(L,"failed to create image");
 		}
 	}
+
+	if (bm->fb_type == LV_FB_YUV8B) {
+		yuvb_live_to_cd_rgba(frame_lb->bytes+bm->data_start,
+						bm->buffer_width,
+						bm->visible_width,
+						bm->visible_height,
+						skip,
+						im->r,im->g,im->b,im->a);
+		// use alpha if available
+		if(bmo && bmo->data_start) {
+			opacity_live_to_cd_a(frame_lb->bytes+bmo->data_start,
+								bmo->buffer_width,
+								bmo->visible_width,
+								bmo->visible_height,
+								skip,
+								im->a);
+		}
+		return 1;
+	}
+
+	convert_palette(pal_rgba,frame);
 
 	int y_inc = bm->buffer_width;
 	int x_inc = par;

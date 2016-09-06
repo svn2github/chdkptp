@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -1506,7 +1506,6 @@ opts{
 ]]
 function con_methods:connect(opts)
 	opts = util.extend_table({},opts)
-	self.live = nil
 	chdk_connection.connect(self._con)
 	if opts.raw then
 		return
@@ -1548,8 +1547,20 @@ function con_methods:reconnect(opts)
 end
 
 --[[
-all assumed to be 32 bit signed ints for the moment
+arrays describing live protocol fields for wrappers
+all assumed to be 32 bit signed ints for the moment, so index - 1 * 4 = offset
+_map maps name to offset
+v21 for compatibility with previous version
 ]]
+chdku.live_fields_v21={
+	'version_major',
+	'version_minor',
+	'lcd_aspect_ratio',
+	'palette_type',
+	'palette_data_start',
+	'vp_desc_start',
+	'bm_desc_start',
+}
 
 chdku.live_fields={
 	'version_major',
@@ -1559,6 +1570,7 @@ chdku.live_fields={
 	'palette_data_start',
 	'vp_desc_start',
 	'bm_desc_start',
+	'bmo_desc_start',
 }
 
 chdku.live_fb_desc_fields={
@@ -1575,7 +1587,19 @@ chdku.live_fb_desc_fields={
 	'margin_bot',
 }
 
+chdku.live_fb_names_v21={
+	'vp',
+	'bm',
+}
+
+chdku.live_fb_names={
+	'vp',
+	'bm',
+	'bmo',
+}
+
 chdku.live_frame_map={}
+chdku.live_frame_map_v21={}
 chdku.live_fb_desc_map={}
 
 --[[
@@ -1585,31 +1609,91 @@ local function live_init_maps()
 	for i,name in ipairs(chdku.live_fields) do
 		chdku.live_frame_map[name] = (i-1)*4
 	end
+	for i,name in ipairs(chdku.live_fields_v21) do
+		chdku.live_frame_map_v21[name] = (i-1)*4
+	end
 	for i,name in ipairs(chdku.live_fb_desc_fields) do
 		chdku.live_fb_desc_map[name] = (i-1)*4
 	end
 end
 live_init_maps()
 
-function chdku.live_get_frame_field(frame,field)
-	if not frame then
-		return nil
-	end
-	return frame:get_i32(chdku.live_frame_map[field])
-end
-local live_info_meta={
+local live_wrapper_meta={
 	__index=function(t,key)
+		-- rawget because frame may be nil, would recursively call index method
 		local frame = rawget(t,'_frame')
-		if frame and chdku.live_frame_map[key] then
-			return chdku.live_get_frame_field(frame,key)
+		if not frame then
+			return nil
+		end
+		local off = t._field_map[key]
+		if off then
+			return frame:get_i32(off)
 		end
 	end
 }
+local live_wrapper_methods={
+	clear_frame=function(self)
+		self._frame = nil
+		self._field_names = nil
+		self._field_map = nil
+		self._fb_field_names = nil
+		self._fb_field_map = nil
+		self._fb_names = nil
+		for i,fb in ipairs(chdku.live_fb_names) do
+			self[fb] = nil
+		end
+	end,
+	set_frame=function(self,frame)
+		-- no frame, reset to uninitialized
+		if not frame then
+			self:clear_frame()
+			return
+		end
+		local new_major = frame:get_i32(0)
+		local new_minor = frame:get_i32(4)
+		if new_major < 2 then
+			self:clear_frame()
+			errlib.throw{
+				etype='badversion',
+				msg=string.format('incompatible live vew protocol %s.%s',tostring(new_major),tostring(new_minor))
+			}
+		end
+			
+		-- check for version change, if not just replace frame data
+		if self.version_major == new_major and self.version_minor == new_minor then
+			self._frame = frame
+			return
+		end
+		-- if changing version make sure all old values/wrappers cleared
+		self:clear_frame()
+		self._frame = frame
+
+		if new_major == 2 and new_minor < 2 then
+			self._field_names = chdku.live_fields_v21
+			self._field_map = chdku.live_frame_map_v21
+			self._fb_names= chdku.live_fb_names_v21
+		else
+			self._field_names = chdku.live_fields
+			self._field_map = chdku.live_frame_map
+			self._fb_names = chdku.live_fb_names
+		end
+
+		-- fb desc fields don't currently vary by version
+		self._fb_field_names = chdku.live_fb_desc_fields
+		self._fb_field_map = chdku.live_fb_desc_map
+
+		for i,fb in ipairs(self._fb_names) do
+			self[fb] = chdku.live_fb_desc_wrap(self,fb)
+		end
+	end,
+}
+
 local live_fb_desc_meta={
 	__index=function(t,key)
 		local frame = t._lv._frame
-		if frame and chdku.live_fb_desc_map[key] then
-			return frame:get_i32(t:offset()+chdku.live_fb_desc_map[key])
+		local off = t._lv._fb_field_map[key]
+		if frame and off then
+			return frame:get_i32(t:offset()+off)
 		end
 	end
 }
@@ -1622,7 +1706,7 @@ local live_fb_desc_methods={
 		return self.margin_top + self.visible_height + self.margin_bot;
 	end,
 	offset = function(self) 
-		return chdku.live_get_frame_field(self._lv._frame,self._offset_name)
+		return self._lv[self._offset_name]
 	end,
 }
 function chdku.live_fb_desc_wrap(lv,fb_pfx)
@@ -1634,11 +1718,12 @@ function chdku.live_fb_desc_wrap(lv,fb_pfx)
 	return t
 end
 
-function chdku.live_wrap(frame)
-	local t={_frame = frame}
-	t.vp = chdku.live_fb_desc_wrap(t,'vp')
-	t.bm = chdku.live_fb_desc_wrap(t,'bm')
-	setmetatable(t,live_info_meta)
+--[[
+create a new live view data wrapper
+]]
+function chdku.live_wrapper()
+	local t=util.extend_table({},live_wrapper_methods)
+	setmetatable(t,live_wrapper_meta)
 	return t
 end
 
@@ -1747,10 +1832,7 @@ function con_methods:live_is_api_compatible()
 end
 
 function con_methods:live_get_frame(what)
-	if not self.live then
-		self.live = chdku.live_wrap()
-	end
-	self.live._frame = self:get_live_data(self.live._frame,what)
+	self.live:set_frame(self:get_live_data(self.live._frame,what))
 	return true
 end
 
@@ -1760,10 +1842,6 @@ function con_methods:live_dump_start(filename)
 	end
 	if not self:live_is_api_compatible() then
 		return false,'api not compatible'
-	end
-	-- TODO
-	if not self.live then
-		self.live = chdku.live_wrap()
 	end
 	if not filename then
 		filename = string.format('chdk_%x_%s.lvdump',tostring(con.condev.product_id),os.date('%Y%m%d_%H%M%S'))
@@ -1794,7 +1872,7 @@ function con_methods:live_dump_start(filename)
 end
 
 function con_methods:live_dump_frame()
-	if not self.live or not self.live.dump_fh then
+	if not self.live.dump_fh then
 		return false,'not initialized'
 	end
 	if not self.live._frame then
@@ -1912,6 +1990,7 @@ function chdku.connection(devspec)
 	local con = {}
 	setmetatable(con,con_meta)
 	con._con = chdk.connection(devspec)
+	con.live = chdku.live_wrapper()
 	return con
 end
 
