@@ -1,45 +1,45 @@
 =Introduction=
-chdkptp is a tool to access the custom PTP extension of the CHDK firmware addon for canon
-cameras. 
+chdkptp is a tool to access the custom PTP extension of the CHDK firmware addon
+for canon cameras. 
 
-This is an alpha version - protocol, functionality, APIs, commands, command line options 
-are all subject to change.
+This is an alpha version - protocol, functionality, APIs, commands, command
+line options are all subject to change.
 
 Source is available from http://subversion.assembla.com/svn/chdkptp/
 Binary snapshot builds are available from http://www.assembla.com/spaces/chdkptp/documents
-Roadmap is under development in http://www.assembla.com/spaces/chdkptp/tickets
 Changelog is at http://www.assembla.com/wiki/show/chdkptp/Changelog
 
 This README is primarily intended for developers.
 
-Documentation for end users can be found in USAGE.TXT
+See USAGE.TXT for end-user documentation
 
-Installation information can be found in INSTALL.TXT
+See INSTALL.TXT for installation information
 
 Information about the Raspberry pi binary builds can be found in README-RASPI.TXT
 
 For information about CHDK, see http://chdk.wikia.com/wiki/CHDK
 For information about the CHDK PTP extension, see http://chdk.wikia.com/wiki/PTP_Extension
 
-chdkptp is forked from libptp and ptpcam, as modified by mweerden, the chdkde project developers
-and others. All source is released under GPL or MIT licenses
+chdkptp is forked from libptp and ptpcam, as modified by mweerden, the chdkde project
+developers and others. All source is released under GPL or MIT licenses
 
 The original ptpcam source, written by Mariusz Woloszyn < emsi[A@T]ipartners.pl >
 is available from http://libptp.sourceforge.net/
 
 mweerdens modified version can be found at https://github.com/mweerden/CHDK/tree/ptp
 
-the CHDKDE ptpcam source may be found at http://tools.assembla.com/chdkde/browser/trunk/tools/ptpcam
+The CHDKDE ptpcam source may be found at http://tools.assembla.com/chdkde/browser/trunk/tools/ptpcam
 
 chdkptp includes software from several other projects, see THANKS.TXT for details.
 
 =Dependencies=
-- IUP version 3.10.1 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work)
+- IUP version 3.19.1 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work)
   Optional, edit config.mk to build without IUP GUI support
-- CD Version 5.7 http://www.tecgraf.puc-rio.br/cd/ (earlier 5.x versions may also work)
+- CD Version 5.10 http://www.tecgraf.puc-rio.br/cd/ (earlier 5.x versions may also work)
   Optional, used for remote display
 - Lua version 5.2 http://www.lua.org/
-  chdkptp no longer supports Lua 5.1, although it may work
+  Lua 5.1 is not supported, although it may work
+  Lua 5.3 is not supported, and is known to cause problems
 - LibUSB (libusb-win32 on windows)
 - GNU readline
   Optional, recommended on Linux
@@ -56,12 +56,15 @@ C++ support is required to use CD "context plus", not required or used by defaul
 Msys is suggested, and may be required
 
 ==Installing IUP libraries==
-Get the mingw4 binary package of IUP, 
+Get the mingw4 binary packages from
 http://sourceforge.net/projects/iup/files/
 
 Note, this package has the libraries in the root, with etc/ and include/ subdirectories.
 You may want to put the libraries in /lib to match the IUP recommended filesystem layout
 The examples and win32 binaries are not required, but may be helpful
+
+You must get both the main IUP file, and the corresponding Lua52 file.
+They should be unzipped in the same directory.
 
 ==Installing CD libraries==
 Similar to IUP, from http://sourceforge.net/projects/canvasdraw/files/
@@ -82,49 +85,67 @@ It's probably OK with a shared lua in typical linux environments.
 If in doubt, build your own Lua with the same compiler you build chdkptp with.
 
 ==Installing LibUSB development package==
-TODO
-describe filter driver installation
-http://sourceforge.net/projects/libusb-win32/files/libusb-win32-releases/1.2.4.0/
-libusb-win32-bin-1.2.4.0.zip
+https://sourceforge.net/projects/libusb-win32/files/libusb-win32-releases/1.2.6.0/
+libusb-win32-bin-1.2.6.0.zip
 Unzip somewhere convenient
 
-Some earlier and later versions will also probably work
+Some earlier and later versions will also probably work, however versions
+before 1.2.4.6 used a different name for the header file.
+
+The above installs the development files only. To use libusb-win32 programs,
+the driver must be installed. Using Zadig (http://zadig.akeo.ie/) as
+described on http://chdk.wikia.com/wiki/PTP_Extension#Installing_LibUSB_using_Zadig
+is the way to do this.
 
 =Linux development environment=
-The following is based on Ubuntu 10.04, 64 bit. YMMV
-Install the following packages and any required dependencies 
-libusb-1.0-0
-libusb-dev (may be called libusb-1.0-dev ?)
+A fully working gcc C build environment is required.
 
-Lua
-Packages will be called something like
-liblua5.2-dev
-liblua5.2
+==LibUSB==
+Install libusb development package, typically called something like
+libusb-dev or libusb-1.0-dev, along with any dependencies.
 
-Alternately, you may download and build your own. This is suggested
-if you are building IUP and CD from source.
+==Lua==
+The recommended approach is to download and build the lua 5.2 source, as this
+avoids any incompatibility with distro provided packages.
 
-GNU readline 
-You need the development package, probably called something like 
-libreadline6-dev or something like that
+If do you want to use the distro provided packages, they will be called something
+like liblua5.2-dev and liblua5.2.
 
-IUP - using precompiled binaries
-Download the appropriate IUP library for your platform from 
-http://www.tecgraf.puc-rio.br/iup/
-unpack the package
-adjust the IUP_LIB_DIR and IUP_INCLUDE_DIR in config.mk
-You will also need a fully working gcc environment.
+==GNU readline==
+You need the development package, usually called something like
+libreadline6-dev
 
-CD - similar to IUP
+==GUI Libraries: CD and IUP==
+Where available, using pre-built libraries is recommended.
+
+Pre-built IUP libraries are available from
+http://sourceforge.net/projects/iup/files/
+
+Pre-built CD libraries are available from
+http://sourceforge.net/projects/canvasdraw/files/
+
+For each package, you must download the main library package, called something
+like iup-3.19.1_Linux313_64_lib.tar.gz and the Lua library from the LuaNN
+subdirectory of the Lua version you want to use, called something like
+iup-3.19.1-Lua52_Linux313_64_lib.tar.gz
+
+The LinuxNNN number refers to the kernel version. An exact match for the kernel
+you are running is generally not required.
+
+Unpack all the packages, with both the main library and Lua contents in the
+same directory. 
+
+Adjust the IUP_LIB_DIR, IUP_INCLUDE_DIR, CD_LIB_DIR and CD_INCLUDE_DIR in
+config.mk to point to where you unpacked the packages
 
 ==Building IUP and CD==
 If available, using pre-compiled libraries is suggested, but if you want to
 build from source some notes can be found in README-RASPI-LIBS.TXT
 
 =Configuring the source (all platforms)=
-Edit config.mk to reflect the installation directories of the above packages and
-desired compile time options
-See config-sample-*.mk for examples
+Copy config-sample-<platform>.mk to config.mk and edit the values to to reflect
+the installation directories of the above packages and desired compile time
+options.
 
 ==Mac development==
 See README-OSX.TXT
