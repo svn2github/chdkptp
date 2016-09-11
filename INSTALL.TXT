@@ -75,15 +75,22 @@ chdkptp.sh and chdkppt_gui.sh in the zip provide an examples.
 
 h3. Interactions with default software 
 
-On Linux, default camera software may connect to the camera automatically. The
-details will depend on the Linux distribution and configuration. In general,
-most modern distros use
+On Linux, default camera software may connect to the camera automatically.
+The details will depend on the Linux distribution and configuration, but a
+common symptom is that the camera screen will go black when the camera is
+plugged in, and chdkptp will be unable to switch the camera to record mode.
+Note that this problem involves a state change on the camera, so once the
+camera has entered the black screen state, chdkptp will be unable to switch
+to record mode, even if software that triggered the change has been closed
+or the camera "unmounted" in the UI.
+
+In general, most modern distros use
 https://www.kernel.org/pub/linux/utils/kernel/hotplug/udev/udev.html
 to handle hot plugged USB devices. For PTP capable devices this will often
 invoke some kind of auto mount, which will often put the camera in a state
-where it cannot be fully controlled by chdkptp.
+described above where it cannot be fully controlled by chdkptp.
 
-Some general information on writing udev rules can be found at
+Some general information on writing udev rules can be found at 
 http://www.reactivated.net/writing_udev_rules.html
 
 Some discussion can be found in the following forum threads:
