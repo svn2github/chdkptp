@@ -11,11 +11,11 @@ Changelog is at http://www.assembla.com/wiki/show/chdkptp/Changelog
 
 This README is primarily intended for developers.
 
-See USAGE.TXT for end-user documentation
-
 See INSTALL.TXT for installation information
 
-Information about the Raspberry pi binary builds can be found in README-RASPI.TXT
+See USAGE.TXT for end-user documentation
+
+See README-LINUX-BINARIES.TXT for information about the linux builds (including raspberry pi) 
 
 For information about CHDK, see http://chdk.wikia.com/wiki/CHDK
 For information about the CHDK PTP extension, see http://chdk.wikia.com/wiki/PTP_Extension

@@ -5,13 +5,13 @@ ptpcam http://libptp.sourceforge.net/
 ptpcam is distributed under the GPL, as described in COPYING
 
 Lua http://www.lua.org/ 
-Copyright (c) 1994-2011 Lua.org, PUC-Rio.
+Copyright (c) 1994-2016 Lua.org, PUC-Rio.
 
 IUP http://www.tecgraf.puc-rio.br/iup/
-Copyright (c) 1994-2012 Tecgraf, PUC-Rio.
+Copyright (c) 1994-2016 Tecgraf, PUC-Rio.
 
 CD http://www.tecgraf.puc-rio.br/cd/
-Copyright (c) 1994-2012 Tecgraf, PUC-Rio.
+Copyright (c) 1994-2016 Tecgraf, PUC-Rio.
 
 LuaFileSystem http://keplerproject.github.com/luafilesystem/
 Copyright (c) 2003 Kepler Project.
