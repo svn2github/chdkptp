@@ -8,8 +8,8 @@ function error_exit {
 }
 
 CHDKPTP_DIR=../chdkptp
-LUA51_SRC=lua-5.1.5
-LUA52_SRC=lua-5.2.3
+LUA52_SRC=lua-5.2.4
+LINVER_DIR=Linux44_arm
 
 ZIPNAME=chdkptp-raspbian-libs-`date +%Y%m%d`.zip
 
@@ -45,7 +45,7 @@ while [ ! -z "$arg" ] ; do
 	arg="$1"
 done
 
-for dir in lua5.1 lua52 im iup "$CHDKPTP_DIR" ; do
+for dir in lua52 im iup "$CHDKPTP_DIR" ; do
 	if [ ! -d "$dir" ] ; then
 		error_exit "missing dir: $dir"
 	fi
@@ -72,12 +72,13 @@ for lib in cd iup ; do
 	mkdir -p stage/$lib/{lib,include}
 	cp $lib/COPYRIGHT stage/$lib
 	echo "$lib lib"
-	cp $lib/lib/Linux310/* stage/$lib/lib
+	cp $lib/lib/$LINVER_DIR/* stage/$lib/lib
+	cp $lib/lib/$LINVER_DIR/Lua52/* stage/$lib/lib
 	echo "$lib include"
 	cp $lib/include/* stage/$lib/include
 done
 
-for lib in lua5.1 lua52 ; do
+for lib in lua52 ; do
 	mkdir -p stage/$lib/{lib,include,bin}
 	echo "$lib lib"
 	cp $lib/lib/*.a stage/$lib/lib
@@ -87,10 +88,8 @@ for lib in lua5.1 lua52 ; do
 	cp $lib/bin/* stage/$lib/bin
 done
 
-cp "$LUA51_SRC"/COPYRIGHT stage/lua5.1
-
 mkdir stage/lua52/doc
-cp "$LUA51_SRC"/doc/* stage/lua52/doc
+cp "$LUA52_SRC"/doc/* stage/lua52/doc
 
 cp "$CHDKPTP_DIR"/README-RASPI-LIBS.TXT stage
 cp "$CHDKPTP_DIR"/misc/tecmake.mak.patch stage
