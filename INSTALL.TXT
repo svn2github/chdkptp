@@ -87,7 +87,7 @@ or the camera "unmounted" in the UI.
 In general, most modern distros use
 https://www.kernel.org/pub/linux/utils/kernel/hotplug/udev/udev.html
 to handle hot plugged USB devices. For PTP capable devices this will often
-invoke some kind of auto mount, which will often put the camera in a state
+invoke some kind of auto mount, which will often put the camera in the state
 described above where it cannot be fully controlled by chdkptp.
 
 Some general information on writing udev rules can be found at 
