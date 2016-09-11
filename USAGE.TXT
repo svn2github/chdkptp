@@ -349,6 +349,7 @@ lvdump (dumpframes) [options] [file]: - dump camera display frames to file
    -wait=<N>  wait N ms between frames
    -novp      don't get viewfinder data
    -nobm      don't get ui overlay data
+   -nobmo     don't get D6 ui overlay opacity data
    -nopal     don't get palette for ui overlay
    -quiet     don't print progress
 
@@ -364,6 +365,7 @@ lvdumpimg    [options]   : - dump camera display frames to netpbm images
       treat vp or bm 'dest' as a command to pipe to. With =oneproc a single process
       receives all frames. Otherwise, a new process is spawned for each frame
    -nopal     don't get palette for ui overlay
+   -nobmo     don't get D6 ui overlay opacity data
    -quiet     don't print progress
    -nosubst   don't do pattern substitution on file names
   vp and bm 'dest' may include substitution patterns
