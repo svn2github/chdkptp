@@ -123,5 +123,7 @@ if [ ! -z "$liblist" ] ; then
 	for libfile in $liblist ; do
 		cp "$libroot/$libfile" "$stagedir"/lib || error_exit "lib copy $libfile failed"
 	done
+	cp "$libroot/iup/COPYRIGHT" "$stagedir"/lib/IUP-COPYRIGHT
+	cp "$libroot/cd/COPYRIGHT" "$stagedir"/lib/CD-COPYRIGHT
 fi
 zip -r "$ZIPNAME" "$stagedir"
