@@ -4,6 +4,9 @@ and chdkptp respectively. To run these, use the corresponding .sh scripts.
 The CLI binary should have no external dependencies that aren't part of the
 standard system.
 
+These builds may or may not be compatible with distributions other different
+from the ones used to build.
+
 The GUI executable requires IUP and CD libraries. Since these are generally
 not available in standard Linux repositories and are non-trivial to build, a 
 minimum set of libraries is included in the binary packages.
@@ -42,11 +45,11 @@ IUP 3.19.1
 Raspberry pi:
 Raspbian 8.0 4.4.13+ armv6l
 IUP and CD built locally, available in the chdkptp files area 
-https://www.assembla.com/spaces/chdkptp/documents as chdkptp-raspbian-libs-YYYYMMDD.zip
+https://www.assembla.com/spaces/chdkptp/documents as chdkptp-raspbian-libs-20160910.zip
 
-Information on building the libraries can be found in README-RASPI-LIBS.TXT
+See README-RASPI-LIBS.TXT for the source packages used and build information.
 
-Lua 5.2.4 is used on all platforms
+Lua 5.2.4 is built from source and statically linked on all platforms, using
  https://www.lua.org/ftp/lua-5.2.4.tar.gz
 
 
