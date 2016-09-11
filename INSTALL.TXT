@@ -11,39 +11,66 @@ There is no installer, just unzip the file wherever you want.
 
 h2. Windows
 
-* You must install a libusb driver to connect to cameras. Instructions
-  are available on the CHDK wiki at
-  http://chdk.wikia.com/wiki/PTP_Extension#LibUSB_Driver_for_Windows
-* After the driver is configured, simply run the executable. If you double 
-  click on the .exe, the GUI will start. If you want to start the cli, 
-  run chdkptp -i
+You must install a libusb-win32 driver to connect to cameras.
+
+Zadig is the recommended way to install the libusb-win32 driver.
+To install using this tool:
+
+* Download the appropriate file for your OS from http://zadig.akeo.ie/
+* Connect the camera
+ * If you have never connected the camera before, wait for windows to install
+   the default driver. 
+* Run the zadig program
+* Select "Show all devices" in the options menu
+* Select your camera in the dropdown. It will probably appear as "Canon Digital Camera".
+ * If you have multiple Canon cameras, make sure only one is connected and powered on.
+ * You can edit the name to allow identifying the driver later.
+ * Be sure you have the camera selected. If you select the wrong device, the
+   device you selected may become unusable until you remove the driver. The
+   first item in the Driver link should be something referring to Mtp, 
+   (e.g. WUDFWpdMtp on windows 10.) The first part of the USB ID will be 04A9
+   for a Canon camera, and the second part will be the PID of your camera. 
+* Select libusb-win32 in the driver option.
+* click "replace driver"
+* Restart the camera before attempting to access it with a CHDK client. There
+  is no need to restart your PC. 
+
+See http://chdk.wikia.com/wiki/PTP_Extension for additional information
+
+After the driver is configured, simply run the executable. If you double click
+on the .exe, the GUI will start. If you want to start the cli, run chdkptp -i
+
+Note that installing the libusb driver normally prevents standard windows
+software from connecting to the camera. To restore normal windows access, use
+Zadig or windows device manager to remove the libusb driver.
 
 h2. Linux
 
 If a binary for your particular flavor of Linux is not available, you must build
 from source. Some instructions can be found in README.TXT
 
-Current linux binary packages include both cli and gui executables named
-chdkptp and chdkptp_gui respectively. Adjust chdkptp-sample.sh to use the
-desired executable and set LD_LIBRARY_PATH as needed.
+The linux binary packages include executable files with and without GUI support.
+Use the included chdkptp.sh to start the CLI-only build, or chdkptp_gui.sh to
+start the GUI enabled executable.
 
-To use the GUI executable in the raspberry pi package, you must also download
-the raspberry pi library package (chdkptp-raspbian-libs-20140331.zip) from the
-files area and set your LD_LIBRARY_PATH to point to it.
+These scripts should set all necessary environment variables.
 
-To use the GUI in the Linux x64 package executable, you must installed the
-corresponding IUP and CD libraries from those projects download areas. The
-specific libraries used for each snapshot build will be linked in the changelog.
+The Linux packages include a minimal set of IUP and CD libraries for the GUI
+executables. 
 
 h3. Environment
 
-To allow chdkptp to locate it's Lua files and libraries, it is necessary to set
-some environment variables. chdkptp-sample.sh in the zip provides an example.
-* set CHDKPTP_DIR to the path where you unzipped the files (the directory
-  containing the chdkptp binary)
+On Linux, it is necessary to set some environment variables to allow chdkptp
+to find the required lua files and shared libraries. This should be done
+automatically by the scripts in the binary packages, but if you build
+chdkptp yourself or wish to use different libraries, you may need to
+adjust the values.
+
+chdkptp.sh and chdkppt_gui.sh in the zip provide an examples.
+* CHDKPTP_DIR should be set to the path where the chdkptp binary is located
 * If you are using a GUI build and the IUP and CD libraries are not on your
   default LD_LIBRARY_PATH, add them to LD_LIBRARY_PATH. 
-* If the package includes both GUI and non-GUI executables, set CHDKPTP_EXE
+* If you have both GUI and non-GUI executables, set CHDKPTP_EXE
   to the desired executable.
 
 h3. Interactions with default software 

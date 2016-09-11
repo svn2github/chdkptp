@@ -16,22 +16,18 @@ See INSTALL.TXT
 =Invoking=
 The interface is selected by command line options, described below.
 
-==Running under linux==
-Under linux, the .lua files will not automatically found relative to the
-executable directory. You can set LUA_PATH on the command line to allow them
-to be located:
-$ LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp ...
-
-Similarly, if the IUP and CD shared libraries are not on the default system
-path, you must also set LD_LIBARARY_PATH
-$ LD_LIBRARY_PATH=/path/to/iup LUA_PATH="/path/to/chdkptp/lua/?.lua" /path/to/chdkptp -g
-
-It is suggested that you put all this in a shell script, see chdkptp-sample.sh
-for an example.
+==Running under Linux==
+Under linux, chdkptp should be started with a shell script to ensure
+the Lua files and any GUI libraries can be loaded. Use chdkptp.sh and
+chdkptp_gui.sh scripts provided with the binary packages to start the
+CLI and GUI builds, respectively. If you build chdkptp yourself, you
+can use these scripts or the chdkptp-sample.sh as an example.
 
 You may need to make permission changes to allow users other than root to open
-the USB device. Some notes can be found in this forum post:
-http://chdk.setepontos.com/index.php?topic=6231.msg89252#msg89252
+the USB device. See INSTALL.TXT for more information.
+
+You may also encounter problems if default software (gphoto etc) accesses
+the camera when the USB is connected. See INSTALL.TXT for more information.
 
 ==Command line==
 Usage: chdkptp [options]
