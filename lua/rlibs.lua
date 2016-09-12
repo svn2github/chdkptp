@@ -1379,6 +1379,7 @@ mem_search_word{
 	last:number
 	count:number
 	val:number
+	limit:number
 }
 ]]
 {
@@ -1389,17 +1390,19 @@ function mem_search_word(opts)
 	if type(opts) ~= 'table' then
 		error('missing opts')
 	end
-	local start = tonumber(opts.start)
+	local start = opts.start
 	local last 
 	if opts.count then
-		last = start + (tonumber(opts.count)-1)*4
+		last = start + (opts.count-1)*4
 	else
-		last = tonumber(opts.last)
+		last = opts.last
 	end
-	local val = tonumber(opts.val)
+	local val = opts.val
+	local limit = opts.limit
 	if not start or not last or last < start or not val then
 		error('bad opts')
 	end
+	local matches=0
 	set_yield(-1,100)
 	local b=msg_batcher()
 	for i=start,last,4 do
@@ -1407,6 +1410,12 @@ function mem_search_word(opts)
 		if v == val then
 			if not b:write(i) then
 				error('write failed')
+			end
+			if limit then
+				matches = matches+1
+				if matches >= limit then
+					break
+				end
 			end
 		end
 	end

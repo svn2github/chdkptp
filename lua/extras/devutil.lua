@@ -202,12 +202,16 @@ require'uartr'.start('%s',%s,0x%x)
 	{
 		names={'dsearch32'},
 		help='search memory for specified 32 bit value',
-		arghelp="<start> <end> <val>",
-		args=cli.argparser.create{ },
+		arghelp="[-l=<n>] <start> <end> <val>",
+		args=cli.argparser.create{
+			l=false,
+		},
 		help_detail=[[
  <start> start address
  <end>   end address
  <val>   value to find
+ options
+  -l=<n> stop after n matches 
 ]],
 		func=function(self,args)
 			local start=tonumber(args[1])
@@ -224,10 +228,10 @@ require'uartr'.start('%s',%s,0x%x)
 			end
 			printf("search 0x%08x-0x%08x 0x%08x\n",start,last,val)
 			local t={}
-			-- TODO should have limits on number of matches, ability to save results since it's slow
+			-- TODO should have ability to save results since it's slow
 			con:execwait(string.format([[
-mem_search_word{start=0x%x, last=0x%x, val=0x%x}
-]],start,last,val),{libs='mem_search_word',msgs=chdku.msg_unbatcher(t)})
+mem_search_word{start=0x%x, last=0x%x, val=0x%x, limit=%s}
+]],start,last,val,tostring(args.l)),{libs='mem_search_word',msgs=chdku.msg_unbatcher(t)})
 			for i,v in ipairs(t) do
 				printf("0x%08x\n",bit32.band(v,0xFFFFFFFF)) 
 			end
