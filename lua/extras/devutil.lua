@@ -240,12 +240,12 @@ mem_search_word{start=0x%x, last=0x%x, val=0x%x, limit=%s}
 	},
 	{
 		names={'dromlog'},
-		help='get camera romlog + related files',
-		arghelp="[prefix]",
+		help='get camera romlog',
+		arghelp="[dest]",
 		args=cli.argparser.create{ },
 		help_detail=[[
- [dest] path/name for downloaded files, default <MMYYDD_HHMMSS_ROMLOG.LOG
- GK.LOG, RomLogErr.txt, modules.log will be prefixed with dst name if present
+ [dest] path/name for downloaded file, default ROMLOG.LOG
+ GK.LOG / RomLogErr.txt will be prefixed with dst name if present
 
  requires native calls enabled
  existing ROMLOG.LOG, GK.LOG and RomLogErr.txt files will be removed
@@ -254,13 +254,11 @@ mem_search_word{start=0x%x, last=0x%x, val=0x%x, limit=%s}
 			local dst=args[1]
 			local gkdst
 			local errdst
-			local moddst
 			if dst then
 				-- make GK log name based on dest 
 				local dstbase=fsutil.split_ext(dst)
 				gkdst=dstbase..'-GK.LOG'
 				errdst=dstbase..'-Err.LOG'
-				moddst=dstbase..'-modules'
 			else
 				dst='ROMLOG.LOG'
 				gkdst='GK.LOG'
@@ -270,7 +268,6 @@ mem_search_word{start=0x%x, last=0x%x, val=0x%x, limit=%s}
 LOG_NAME="A/ROMLOG.LOG"
 GKLOG_NAME="A/GK.LOG"
 ERR_NAME="A/RomLogErr.txt"
-MOD_NAME="A/MODULES.LOG"
 
 if call_event_proc("SystemEventInit") == -1 then
     if call_event_proc("System.Create") == -1 then
