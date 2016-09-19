@@ -387,7 +387,7 @@ function fs_iter:singledir()
 end
 
 function fs_iter.run(paths,opts)
-	local t=extend_table({},opts)
+	local t=util.extend_table({},opts)
 	util.mt_inherit(t,fs_iter)
 
 	for i,path in ipairs(paths) do

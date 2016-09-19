@@ -402,6 +402,12 @@ t.extend_table = function()
 	assert(util.compare_values(util.extend_table({},t,{keys={1,2,'tsub'}}),{1,2,tsub=tsub}))
 	assert(not util.compare_values(util.extend_table({},t,{keys={1,2,'tsub'}}),t))
 	assert(util.compare_values(util.extend_table({a='a'},t,{keys={1,2,'a'}}),{1,2,a='a'}))
+	assert(util.compare_values(util.extend_table_multi(
+		{a='a',b='A'},{{b='b',c='B',t={ka='b',kc='c'}},{c='c',t=tsub}}),
+		{a='a',b='b',c='c',t=tsub}))
+	assert(util.compare_values(util.extend_table_multi(
+		{a='a',b='A'},{{b='b',c='B',t={ka='b',kc='c'}},{c='c',t=tsub}},{deep=true}),
+		{a='a',b='b',c='c',t={ka='a',kb='b',kc='c','one','two'}}))
 end
 
 t.flip_table = function()

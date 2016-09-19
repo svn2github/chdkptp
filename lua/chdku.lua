@@ -240,7 +240,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	if not dstpath then
 		dstpath = '.'
 	end
-	local lopts=extend_table({
+	local lopts=util.extend_table({
 		mtime=true,
 		overwrite=true,
 		info_fn=util.printf,
@@ -249,7 +249,7 @@ function con_methods:mdownload(srcpaths,dstpath,opts)
 	if lopts.pretend then
 		lopts.verbose=true
 	end
-	local ropts=extend_table({},opts)
+	local ropts=util.extend_table({},opts)
 	ropts.dirsfirst=true
 	-- unset options that don't apply to remote
 	ropts.mtime=nil
@@ -601,7 +601,7 @@ opts are as for find_files, plus
 	ignore_errors: ignore failed deletes
 ]]
 function con_methods:mdelete(paths,opts)
-	opts=extend_table({},opts)
+	opts=util.extend_table({},opts)
 	opts.dirsfirst=false -- delete directories only after recursing into
 	local results
 	local msg_handler
@@ -849,23 +849,23 @@ chdku.execflags={
 convenience, defaults wait=true
 ]]
 function con_methods:execwait(code,opts_in)
-	return self:exec(code,extend_table({wait=true,initwait=5},opts_in))
+	return self:exec(code,util.extend_table({wait=true,initwait=5},opts_in))
 end
 
 function con_methods:exec(code,opts_in)
 	-- setup the options
-	local opts = extend_table({flush_cam_msgs=true,flush_host_msgs=true},opts_in)
+	local opts = util.extend_table({flush_cam_msgs=true,flush_host_msgs=true},opts_in)
 	local liblist={}
 	-- add default libs, unless disabled
 	-- TODO default libs should be per connection
 	if not opts.nodefaultlib then
-		extend_table(liblist,chdku.default_libs)
+		util.extend_table(liblist,chdku.default_libs)
 	end
 	-- allow a single lib to be given as by name
 	if type(opts.libs) == 'string' then
 		liblist={opts.libs}
 	else
-		extend_table(liblist,opts.libs)
+		util.extend_table(liblist,opts.libs)
 	end
 
 	local execflags = 0
@@ -989,7 +989,7 @@ returns
 message|msg value
 ]]
 function con_methods:read_msg_strict(opts)
-	opts=extend_table({},opts)
+	opts=util.extend_table({},opts)
 	local msg=self:read_msg()
 	if msg.type == 'none' then
 		errlib.throw({etype='nomsg',msg='read_msg_strict no message'})
@@ -1021,7 +1021,7 @@ throws if matching message is not available within timeout
 opts passed wait_status, and read_msg_strict
 ]]
 function con_methods:wait_msg(opts)
-	opts=extend_table({},opts)
+	opts=util.extend_table({},opts)
 	opts.msg=true
 	opts.run=nil
 	local status=self:wait_status(opts)

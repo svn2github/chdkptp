@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -134,7 +134,7 @@ function m.test_msg(len)
 end
 
 function m.test(opts)
-	opts = util.extend_table(util.extend_table({},default_opts),opts)
+	opts = util.extend_table_multi({},{default_opts,opts})
 	
 	m.opts = opts
 

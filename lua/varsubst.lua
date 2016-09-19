@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2014-2016 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -105,7 +105,6 @@ m.new=function(funcs,state)
 	local t={
 		funcs=funcs,
 		state=state,
-		run=m.run,
 	}
 	if not t.state then
 		t.state={}

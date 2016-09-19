@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -205,6 +205,16 @@ function util.extend_table(target,source,opts)
 end
 
 --[[
+sources is a numeric array of source tables to merge into target with extend_table
+]]
+function util.extend_table_multi(target,sources,opts)
+	for i,src in ipairs(sources) do
+		util.extend_table(target,src,opts)
+	end
+	return target
+end
+
+--[[
 swap keys and values
 dupe values will be lost
 ]]
@@ -225,7 +235,7 @@ util.compare_values_subset_defaults = {
 function util.compare_values_subset(v1,v2,opts,seen,depth)
 	if not depth then
 		depth=1
-		opts = util.extend_table(util.extend_table({},util.compare_values_subset_defaults),opts)
+		opts = util.extend_table_multi({},{util.compare_values_subset_defaults,opts})
 	elseif depth > opts.maxdepth then
 		error('compare_values_subset: maxdepth exceeded')
 	end
@@ -715,7 +725,7 @@ options as documented above
 ]]
 function util.serialize(v,opts)
 	local r={}
-	serialize_r(v,util.extend_table(util.extend_table({},util.serialize_defaults),opts),r)
+	serialize_r(v,util.extend_table_multi({},{util.serialize_defaults,opts}),r)
 	return table.concat(r)
 end
 
