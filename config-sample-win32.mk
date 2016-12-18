@@ -1,5 +1,6 @@
 # configurable build settings
 # these can be set on the command line or in config.mk
+# paths in the various _DIR variables should be absolute paths, not relative
 
 # use Lua 5.2 
 # Lua 5.1 is no longer supported by chdkptp, but it may work

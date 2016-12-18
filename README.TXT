@@ -147,6 +147,8 @@ Copy config-sample-<platform>.mk to config.mk and edit the values to to reflect
 the installation directories of the above packages and desired compile time
 options.
 
+Paths for library and include directories should be absolute, not relative.
+
 ==Mac development==
 See README-OSX.TXT
 
