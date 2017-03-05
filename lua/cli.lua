@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2017 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -2025,6 +2025,7 @@ PC clock times are set to the start of download, not per image
 			rm=false,
 		}),
 		-- TODO allow setting destinations and filetypes for -dl
+		-- TODO should support canon native raw
 		help_detail=[[
  options:
    -u=<s|a|96>
@@ -2081,7 +2082,7 @@ PC clock times are set to the start of download, not per image
 			end
 			if args.nowait then
 				con:exec(cmd,{libs={'rlib_shoot'}})
-				return
+				return true
 			end
 
 			local rstatus,rerr = con:execwait('return '..cmd,{libs={'serialize_msgs','rlib_shoot'}})
@@ -2136,18 +2137,34 @@ PC clock times are set to the start of download, not per image
 				end
 				raw_path = string.format('%s/%s_%04d.%s',raw_dir,raw_pfx,info.exp,raw_ext)
 			end
-			-- TODO some delay may be required between shot and dl start
-			if args.dl then
-				cli:print_status(cli:execute('download '..jpg_path))
-				if raw_path then
+			-- raw should always exist by the time shoot() finishes
+			if raw_path then
+				if args.dl then
 					cli:print_status(cli:execute('download '..raw_path))
 				end
+				if args.rm then
+					cli:print_status(cli:execute('rm -maxdepth=0 '..raw_path))
+				end
+			end
+
+			-- some wait may be required before jpeg file exists
+			con:execwait(string.format([[
+rlib_wait_timeout(
+	function()
+		return os.stat('%s')
+	end,{
+		timeout=500,
+		sleep=50,
+		msg='wait %s timeout'
+	}
+)
+]],jpg_path,jpg_path),{libs='wait_timeout'})
+
+			if args.dl then
+				cli:print_status(cli:execute('download '..jpg_path))
 			end
 			if args.rm then
 				cli:print_status(cli:execute('rm -maxdepth=0 '..jpg_path))
-				if raw_path then
-					cli:print_status(cli:execute('rm -maxdepth=0 '..raw_path))
-				end
 			end
 			return true
 		end,
