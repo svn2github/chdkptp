@@ -21,7 +21,7 @@ To install using this tool:
  * If you have never connected the camera before, wait for windows to install
    the default driver. 
 * Run the zadig program
-* Select "Show all devices" in the options menu
+* Select "List all devices" in the options menu
 * Select your camera in the dropdown. It will probably appear as "Canon Digital Camera".
  * If you have multiple Canon cameras, make sure only one is connected and powered on.
  * You can edit the name to allow identifying the driver later.
@@ -31,7 +31,7 @@ To install using this tool:
    (e.g. WUDFWpdMtp on windows 10.) The first part of the USB ID will be 04A9
    for a Canon camera, and the second part will be the PID of your camera. 
 * Select libusb-win32 in the driver option.
-* click "replace driver"
+* click "Reinstall driver"
 * Restart the camera before attempting to access it with a CHDK client. There
   is no need to restart your PC. 
 
