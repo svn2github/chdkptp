@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2017 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -1067,6 +1067,35 @@ function ls(path,opts_in)
 end
 ]],
 },
+--[[
+wait for function to return true or timeout
+]]
+{
+	name='wait_timeout',
+	depend={'extend_table'},
+	code=[[
+function rlib_wait_timeout(func,opts)
+	opts=extend_table({
+		timeout=1000,
+		timeout_error=true,
+		sleep=10,
+		msg='timeout',
+	},opts)
+	local timeout_tick = get_tick_count() + opts.timeout
+	repeat
+		if func() then
+			return true
+		end
+		sleep(opts.sleep)
+	until get_tick_count() > timeout_tick
+	if opts.timeout_error then
+		error(opts.msg)
+	end
+	return false
+end
+]],
+},
+
 --[[
 support for cli shoot command, set exposure params
 TODO could check that ISO mode gets set, esp for 1.2 which ignores unknown values
