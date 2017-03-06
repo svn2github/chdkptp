@@ -33,9 +33,10 @@ The CHDKDE ptpcam source may be found at http://tools.assembla.com/chdkde/browse
 chdkptp includes software from several other projects, see THANKS.TXT for details.
 
 =Dependencies=
-- IUP version 3.19.1 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work)
+- IUP version 3.21 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work,
+  but 3.21 or later is required on linux with GTK newer than 3.18)
   Optional, edit config.mk to build without IUP GUI support
-- CD Version 5.10 http://www.tecgraf.puc-rio.br/cd/ (earlier 5.x versions may also work)
+- CD Version 5.11 http://www.tecgraf.puc-rio.br/cd/ (earlier 5.x versions may also work)
   Optional, used for remote display
 - Lua version 5.2 http://www.lua.org/
   Lua 5.1 is not supported, although it may work

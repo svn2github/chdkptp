@@ -88,9 +88,9 @@ if [ -f "$ZIPNAME" ] ; then
 fi
 
 PROGS=chdkptp$EXE
-make DEBUG="$debug" clean all
+make DEBUG="$debug" clean all || error_exit "build failed"
 if [ ! -z "$gui" ] ; then
-	make DEBUG="$debug" GUI=1 clean all
+	make DEBUG="$debug" GUI=1 clean all || error_exit "GUI build failed"
 	PROGS="$PROGS chdkptp_gui$EXE"
 fi
 
