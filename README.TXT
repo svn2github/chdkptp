@@ -1,9 +1,10 @@
 =Introduction=
 chdkptp is a tool to access the custom PTP extension of the CHDK firmware addon
-for canon cameras. 
+for Canon cameras. 
 
-This is an alpha version - protocol, functionality, APIs, commands, command
-line options are all subject to change.
+chdkptp builds are labeled "alpha", but it is stable enough for everyday use.
+Protocol, functionality, APIs, commands, command line options are
+all subject to change.
 
 Source is available from http://subversion.assembla.com/svn/chdkptp/
 Binary snapshot builds are available from http://www.assembla.com/spaces/chdkptp/documents
@@ -33,11 +34,12 @@ The CHDKDE ptpcam source may be found at http://tools.assembla.com/chdkde/browse
 chdkptp includes software from several other projects, see THANKS.TXT for details.
 
 =Dependencies=
-- IUP version 3.21 http://www.tecgraf.puc-rio.br/iup/ (earlier 3.x versions may also work,
-  but 3.21 or later is required on linux with GTK newer than 3.18)
+- IUP version 3.21 http://www.tecgraf.puc-rio.br/iup/ 
   Optional, edit config.mk to build without IUP GUI support
-- CD Version 5.11 http://www.tecgraf.puc-rio.br/cd/ (earlier 5.x versions may also work)
+  (earlier 3.x versions may also work, but 3.21 or later is required on linux with GTK newer than 3.18)
+- CD Version 5.11 http://www.tecgraf.puc-rio.br/cd/
   Optional, used for remote display
+  (earlier 5.x versions may also work)
 - Lua version 5.2 http://www.lua.org/
   Lua 5.1 is not supported, although it may work
   Lua 5.3 is not supported, and is known to cause problems
@@ -126,9 +128,9 @@ Pre-built CD libraries are available from
 http://sourceforge.net/projects/canvasdraw/files/
 
 For each package, you must download the main library package, called something
-like iup-3.19.1_Linux313_64_lib.tar.gz and the Lua library from the LuaNN
+like iup-3.21_Linux313_64_lib.tar.gz and the Lua library from the LuaNN
 subdirectory of the Lua version you want to use, called something like
-iup-3.19.1-Lua52_Linux313_64_lib.tar.gz
+iup-3.21-Lua52_Linux313_64_lib.tar.gz
 
 The LinuxNNN number refers to the kernel version. An exact match for the kernel
 you are running is generally not required.
@@ -183,9 +185,6 @@ Camtests will also create and delete some files and directories on the camera.
 
 The final line of output from both test modules should be 
 failed 0
-
-For for vesions prior to r562, camtests shoud be invoked with
-chdkptp -e"exec require'camtests'.runstd()"
 
 None of the above is a comprehensive test of chdkptp functionality.
 

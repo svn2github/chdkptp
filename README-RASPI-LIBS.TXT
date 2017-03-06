@@ -1,7 +1,10 @@
 The chdkptp raspberry pi library package provides Lua 5.2, IUP and CD
 compiled for the raspbian distribution. The latest package can be found
-in the chdkptp files area as chdkptp-raspbian-libs-YYYYMMDD.zip
-https://www.assembla.com/spaces/chdkptp/documents
+in the chdkptp files area as https://www.assembla.com/spaces/chdkptp/documents
+named chdkptp-raspbian-libs-YYYYMMDD.zip
+
+The chdkptp binary packages contain the minimum require libraries, so
+this full library package is only required for development. 
 
 Information about chdkptp can be found at:
 http://www.assembla.com/wiki/show/chdkptp
@@ -17,20 +20,14 @@ lua52, cd and iup respectively
 See COPYRIGHT file or doc subdirectory in each directory for copyright
 information.
 
-These files are intended to allow you to run the chdkptp GUI binary on
-raspberry pi, or build your own chdkptp without building the GUI libraries.
-Some files not required by CHDK are included, but these are not complete
-distributions of Lua, CD and IUP, and are not thoroughly tested. 
+These files are intended to allow you to build your own chdkptp without
+building the GUI libraries.  Some files not required by CHDK may be included,
+but these are not complete distributions of Lua, CD and IUP, and are not
+thoroughly tested. 
 
-Using the libraries with chdkptp:
-The chdkptp binary packages contain the minimum require libraries, so
-this full library package is only required for development. 
-
-To use these libraries with your own chdkptp build, ensure the iup/lib
-and cd/lib directories are on your LD_LIBRARY_PATH
 
 Using the libraries to build chdkptp:
-Use something like the following in your config.mk
+Add something like the following in your config.mk
 
 TEC_LIBS=/path/to/zip/contents
 
@@ -41,6 +38,12 @@ IUP_LIB_DIR=$(TEC_LIBS)/iup/lib
 IUP_INCLUDE_DIR=$(TEC_LIBS)/iup/include
 CD_LIB_DIR=$(TEC_LIBS)/cd/lib
 CD_INCLUDE_DIR=$(TEC_LIBS)/cd/include
+
+
+Using the libraries with chdkptp:
+
+To use these libraries with your own chdkptp build, ensure the iup/lib
+and cd/lib directories are on your LD_LIBRARY_PATH
 
 
 Build notes:
@@ -78,27 +81,28 @@ Note some of the above packages may not be required for a minimal build
 
 Download the source packages
 $ wget http://www.lua.org/ftp/lua-5.2.4.tar.gz
-$ wget https://sourceforge.net/projects/iup/files/3.19.1/Docs%20and%20Sources/iup-3.19.1_Sources.tar.gz
-$ wget https://sourceforge.net/projects/imtoolkit/files/3.11/Docs%20and%20Sources/im-3.11_Sources.tar.gz
-$ wget https://sourceforge.net/projects/canvasdraw/files/5.10/Docs%20and%20Sources/cd-5.10_Sources.tar.gz
+$ wget https://sourceforge.net/projects/iup/files/3.21/Docs%20and%20Sources/iup-3.21_Sources.tar.gz
+$ wget https://sourceforge.net/projects/imtoolkit/files/3.12/Docs%20and%20Sources/im-3.12_Sources.tar.gz
+$ wget https://sourceforge.net/projects/canvasdraw/files/5.11/Docs%20and%20Sources/cd-5.11_Sources.tar.gz
 
 $ tar -xzf lua-5.2.4.tar.gz
-$ tar -xzf im-3.11_Sources.tar.gz
-$ tar -xzf cd-5.10_Sources.tar.gz
-$ tar -xzf iup-3.19.1_Sources.tar.gz
+$ tar -xzf pkg/im-3.12_Sources.tar.gz
+$ tar -xzf pkg/cd-5.11_Sources.tar.gz
+$ tar -xzf pkg/iup-3.21_Sources.tar.gz
 
 The default tekmake.mak files do not properly detect the raspbian as arm,
 which in turn makes it define TEC_BIGENDIAN. Apply the included
 tecmake.mak.patch patch with
 
-$ for d in im cd iup ; do pushd $d ; patch -p0 <../tecmake.mak.patch ; popd ; done
+$ for d in im cd iup ; do pushd $d ; patch -p0 </path/to/chdkptp/misc/tecmake.mak.patch ; popd ; done
 
 Build Lua
 
 $ cd lua-5.2.4
 $ make linux
 
-Make an Lua installation tree. Adjust /home/pi/teclibs/ if desired.
+Make a Lua installation tree. Adjust /home/pi/teclibs/ if desired.
+
 $ make INSTALL_TOP=/home/pi/teclibs/lua52 install
 
 The IUP build expects a different sub-path than the above install creates.
@@ -127,7 +131,9 @@ $ cd iup
 $ make USE_LUA52=Yes USE_PKGCONFIG=Yes iup
 $ make USE_LUA52=Yes USE_PKGCONFIG=Yes iupcd
 $ make USE_LUA52=Yes USE_PKGCONFIG=Yes iupcontrols
-$ make USE_LUA52=Yes USE_PKGCONFIG=Yes iupmatrixex
-$ make USE_LUA52=Yes USE_PKGCONFIG=Yes iuplua5
+$ cd srclua5
+$ make USE_LUA52=Yes USE_PKGCONFIG=Yes iuplua
+$ make USE_LUA52=Yes USE_PKGCONFIG=Yes iupluacd
+$ make USE_LUA52=Yes USE_PKGCONFIG=Yes iupluacontrols
 
 The above may build more than strictly required by chdkptp.
