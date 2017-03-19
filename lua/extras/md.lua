@@ -16,10 +16,9 @@
 a script for testing motion detection
 basic usage
 !m=require'extras/md'
-!m.start()
-!r=m.do_md({threshold=10,grid=3,timeout=10000,wait=true,cell_diffs=true,cell_vals=true})
+!m.init()
+!r=m.do_md({threshold=10,grid=3,timeout=10000,wait=true,cell_diffs=true,start_delay=0,cell_vals=true})
 !m.print_result(r)
-putm quit
 ]]
 
 local m={}
@@ -43,13 +42,14 @@ m.md_defaults={
 		exclude_r2=0, -- m: mask last row 
 		fl=0, -- n: flags bit 1 = immediate shoot, bit 2 = debug log, bit 4 = dump liveview, bit 8 = don't release shoot_full
 		step=6, -- o: pixel step
-		start_delay=10, -- p: start delay. Zero delay seems to cause false trigger the first time md_detect_motion runs
+		start_delay=0, -- p: start delay
 }
-
-function m.start()
-	con:exec([[
-msg_shell.cmds.md = function(msg)
-	local opts=unserialize(string.sub(msg,3))
+function m.init()
+	chdku.rlibs:register({
+		name='rlib_md',
+		depend={'serialize_msgs'},
+		code=[[
+function rlib_md(opts)
 	local r={}
 	local t0=get_tick_count()
 	r.cell_count=md_detect_motion(
@@ -89,10 +89,25 @@ msg_shell.cmds.md = function(msg)
 			end
 		end
 	end
-	write_usb_msg(r)
+	return r
+end
+]]
+	})
+end
+
+function m.start_shell()
+	con:exec([[
+msg_shell.cmds.md = function(msg)
+	local opts=unserialize(string.sub(msg,3))
+	local r=rlib_md(opts)
+	write_usb_msg(serialize(r))
 end
 msg_shell:run()
-]],{libs={'msg_shell','unserialize','serialize_msgs'}})
+]],{libs={'msg_shell','rlib_md','unserialize','serialize'}})
+end
+
+function m.quit_shell()
+	con:write_msg('quit')
 end
 
 function m.build_md_opts(opts)
@@ -106,7 +121,10 @@ function m.build_md_opts(opts)
 	return opts
 end
 
-function m.do_md(opts)
+--[[
+call md in a message shell, allows repeated calls without resetting script state
+]]
+function m.do_shell_md(opts)
 	opts=m.build_md_opts(opts)
 	con:write_msg(string.format('md %s',util.serialize(opts)))
 	if not opts.wait then
@@ -114,6 +132,15 @@ function m.do_md(opts)
 	end
 	return con:wait_msg({mtype='user',munserialize=true})
 end
+
+--[[
+call md as a standalond script and wait for it to complete
+]]
+function m.do_md(opts)
+	opts=m.build_md_opts(opts)
+	return con:execwait(string.format('return rlib_md(%s)',util.serialize(opts)),{libs={'rlib_md'}})
+end
+
 function m.print_cell_result(cells)
 	for y,row in ipairs(cells) do
 		for x,val in ipairs(row) do
