@@ -35,21 +35,48 @@ m.md_defaults={
 		threshold=10, -- f: trigger threshold
 		grid=0, -- g: grid 0=no, 1=grid, 2=sensitivity readout, 3=sensitivity readout & grid
 		-- h is return value
-		exclude_type=0, -- i: masking type  0=no regions, 1=include, 2=exclude
-		exclude_c1=0, -- j: mask first column
-		exclude_r1=0, -- k: mask first row 
-		exclude_c2=0, -- l: mask last column (in this module, negative values count from the left, so -1 = cols - 1)
-		exclude_r2=0, -- m: mask last row 
-		fl=0, -- n: flags bit 1 = immediate shoot, bit 2 = debug log, bit 4 = dump liveview, bit 8 = don't release shoot_full
+		mask_type=0, -- i: masking type  0=no regions, 1=include, 2=exclude
+		mask_c1=0, -- j: mask first column
+		mask_r1=0, -- k: mask first row 
+		mask_c2=0, -- l: mask last column (in this module, negative values count from the left, so -1 = cols - 1)
+		mask_r2=0, -- m: mask last row 
+		flags=0, -- n: flags bit 1 = immediate shoot, bit 2 = debug log, bit 4 = dump liveview, bit 8 = don't release shoot_full
 		step=6, -- o: pixel step
 		start_delay=0, -- p: start delay
 }
+m.enums={
+	mode={
+		u=0,
+		y=1,
+		v=2,
+		r=3,
+		g=4,
+		b=5,
+	},
+	grid={
+		none=0,
+		grid=1,
+		value=2,
+		both=3,
+	},
+	mask_type={
+		none=0,
+		include=1,
+		exclude=2,
+	},
+}
+
+m.enum_vals={}
+
 function m.init()
 	chdku.rlibs:register({
 		name='rlib_md',
 		depend={'serialize_msgs'},
 		code=[[
 function rlib_md(opts)
+	if not get_mode() then
+		error('not in rec')
+	end
 	local r={}
 	local t0=get_tick_count()
 	r.cell_count=md_detect_motion(
@@ -61,12 +88,12 @@ function rlib_md(opts)
 		opts.threshold,
 		opts.grid,
 		0,
-		opts.exclude_type,
-		opts.exclude_c1,
-		opts.exclude_r1,
-		opts.exclude_c2,
-		opts.exclude_r2,
-		opts.fl,
+		opts.mask_type,
+		opts.mask_c1,
+		opts.mask_r1,
+		opts.mask_c2,
+		opts.mask_r2,
+		opts.flags,
 		opts.step,
 		opts.start_delay
 	)
@@ -93,6 +120,9 @@ function rlib_md(opts)
 end
 ]]
 	})
+	for name,enum in pairs(m.enums) do
+		m.enum_vals[name]=util.flip_table(enum)
+	end
 end
 
 function m.start_shell()
@@ -110,13 +140,56 @@ function m.quit_shell()
 	con:write_msg('quit')
 end
 
+function m.set_enum_opt(opts,name)
+	if not m.enums[name] then
+		errlib.throw{etype='bad_arg',msg='md: invalid enum '..tostring(name)}
+	end
+	local val=tonumber(opts[name])
+	if val then
+		if not m.enum_vals[name][val] then
+			errlib.throw{etype='bad_arg',msg='md: invalid '..tostring(name)..' value '..tostring(opts[name])}
+		end
+	else
+		val=m.enums[name][tostring(opts[name]):lower()]
+		if not val then
+			errlib.throw{etype='bad_arg',msg='md: invalid '..tostring(name)..' value '..tostring(opts[name])}
+		end
+	end
+	opts[name]=val
+end
+
 function m.build_md_opts(opts)
 	opts=util.extend_table_multi({},{m.md_defaults,opts})
-	if opts.exclude_c2 < 0 then
-		opts.exclude_c2	= opts.cols - opts.exclude_c2
+	if opts.mask_c2 < 0 then
+		opts.mask_c	= opts.cols - opts.mask_c2
 	end
-	if opts.exclude_r2 < 0 then
-		opts.exclude_r2	= opts.cols - opts.exclude_r2
+	if opts.mask_r2 < 0 then
+		opts.mask_r2 = opts.cols - opts.mask_r2
+	end
+	for name,enum in pairs(m.enums) do
+		m.set_enum_opt(opts,name)
+	end
+
+	if opts.verbose then
+		printf( 'md: cols=%d rows=%d mode=%d timeout=%d interval=%d threshold=%d\n'..
+				'    grid=%d mask_type=%d mask_c1=%d mask_r1=%d mask_c2=%d mask_r2=%d\n'..
+				'    flags=%d step=%d start_delay=%d\n',
+			opts.cols,
+			opts.rows,
+			opts.mode,
+			opts.timeout,
+			opts.interval,
+			opts.threshold,
+			opts.grid,
+			opts.mask_type,
+			opts.mask_c1,
+			opts.mask_r1,
+			opts.mask_c2,
+			opts.mask_r2,
+			opts.flags,
+			opts.step,
+			opts.start_delay
+		);
 	end
 	return opts
 end
