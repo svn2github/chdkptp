@@ -1135,8 +1135,8 @@ if devinfo is absent, the dummy connection is returned
 static int chdk_connection(lua_State *L) {
 	PTP_CON_STATE *ptp_cs;
 	PTPParams *params;
-	const char *bus="dummy";
-	const char *dev="dummy";
+	const char *bus=NULL;
+	const char *dev=NULL;
 	const char *host=NULL;
 	const char *port=NULL;
 	char con_key[LIBUSB_PATH_MAX*2+4];
@@ -1152,6 +1152,9 @@ static int chdk_connection(lua_State *L) {
 		lua_getfield(L,1,"port");
 		port = lua_tostring(L,-1);
 		lua_pop(L,1);
+	} else {
+		bus = "dummy";
+		dev = "dummy";
 	}
 
 	if(host || port) {
