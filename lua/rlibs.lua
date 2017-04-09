@@ -1419,6 +1419,7 @@ function mem_search_word(opts)
 	if type(opts) ~= 'table' then
 		error('missing opts')
 	end
+	local _peek = peek
 	local start = opts.start
 	local last 
 	if opts.count then
@@ -1435,8 +1436,7 @@ function mem_search_word(opts)
 	set_yield(-1,100)
 	local b=msg_batcher()
 	for i=start,last,4 do
-		local v = peek(i)
-		if v == val then
+		if _peek(i) == val then
 			if not b:write(i) then
 				error('write failed')
 			end
