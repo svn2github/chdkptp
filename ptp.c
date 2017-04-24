@@ -2067,7 +2067,7 @@ ptp_get_operation_name(PTPParams* params, uint16_t oc)
 
 
 /****** CHDK interface ******/
-uint16_t ptp_chdk_get_memory(PTPParams* params, int start, int num, char **buf)
+uint16_t ptp_chdk_get_memory(PTPParams* params, int start, int num, int flags, char **buf)
 {
   uint16_t ret;
   PTPContainer ptp;
@@ -2075,10 +2075,11 @@ uint16_t ptp_chdk_get_memory(PTPParams* params, int start, int num, char **buf)
 
   PTP_CNT_INIT(ptp);
   ptp.Code=PTP_OC_CHDK;
-  ptp.Nparam=3;
+  ptp.Nparam=4;
   ptp.Param1=PTP_CHDK_GetMemory;
   ptp.Param2=start;
   ptp.Param3=num;
+  ptp.Param4=flags;
   ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, buf);
   if ( ret != PTP_RC_OK )
   {

@@ -994,7 +994,7 @@ typedef struct {
 } ptp_chdk_rc_chunk;
 
 
-uint16_t ptp_chdk_get_memory(PTPParams* params, int start, int num, char **mem);
+uint16_t ptp_chdk_get_memory(PTPParams* params, int start, int num, int flags, char **mem);
 uint16_t ptp_chdk_set_memory_long(PTPParams* params, int addr, int val);
 uint16_t ptp_chdk_upload(PTPParams* params, char *local_fn, char *remote_fn);
 uint16_t ptp_chdk_download(PTPParams* params, char *remote_fn, char *local_fn);

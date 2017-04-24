@@ -114,18 +114,23 @@ opts:{
 	count=number -- number of iterations
 	size=number  -- size to transfer
 	addr=number  -- address to transfer from (default 0x1900)
+	buffer=bool  -- use camera side buffered getmem
 }
 ]]
 function m.xfermem(opts)
-	opts = util.extend_table({count=100, size=1024*1024,addr=0x1900},opts)
+	opts = util.extend_table({count=100, size=1024*1024,addr=0x1900,buffer=false},opts)
 	if not con:is_connected() then
 		error('not connected')
 	end
 	local times={}
 	local tstart = ustime.new()
+	local flags = 0
+	if opts.buffer then
+		flags = 1
+	end
 	for i=1,opts.count do
 		local t0 = ustime.new()
-		local v=con:getmem(opts.addr,opts.size)
+		local v=con:getmem(opts.addr,opts.size,'string',flags)
 		table.insert(times,ustime.diff(t0)/1000000)
 	end
 	local wall_time = ustime.diff(tstart)/1000000

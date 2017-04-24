@@ -3,7 +3,7 @@
  * based on ptpcam.c
  * Copyright (C) 2001-2005 Mariusz Woloszyn <emsi@ipartners.pl>
  * additions
- * Copyright (C) 2010-2016 <reyalp (at) gmail dot com>
+ * Copyright (C) 2010-2017 <reyalp (at) gmail dot com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -1502,7 +1502,7 @@ static int chdk_capture_get_chunk(lua_State *L) {
 }
 
 /*
-r=con:getmem(address,count[,dest])
+r=con:getmem(address,count[,dest[,flags]])
 dest is
 "string"
 "number" TODO int or unsigned ?
@@ -1519,12 +1519,14 @@ static int chdk_getmem(lua_State *L) {
 	unsigned addr, count;
 	const char *dest;
 	char *buf;
+	int flags;
 	addr = (unsigned)luaL_checknumber(L,2);
 	count = (unsigned)luaL_checknumber(L,3);
 	dest = luaL_optstring(L,4,"string");
+	flags = luaL_optnumber(L,5,0);
 
 	// TODO check dest values
-	api_check_ptp_throw(L,ptp_chdk_get_memory(params,addr,count,&buf));
+	api_check_ptp_throw(L,ptp_chdk_get_memory(params,addr,count,flags,&buf));
 
 	if(strcmp(dest,"string") == 0) {
 		lua_pushlstring(L,buf,count);

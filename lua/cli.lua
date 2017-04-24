@@ -898,17 +898,20 @@ cli:add_commands{
 		args=argparser.create{
 				i32=false, -- word
 				f=false,
+				buf=false,
 		},
-		arghelp='<address> [count] [-i32[=fmt] | -f=<filename>]',
+		arghelp='<address> [count] [-buf] [-i32[=fmt] | -f=<filename>]',
 		help_detail=[[
  Dump <count> bytes or words starting at <address>
   -i32 count as 32 bit words, display as ints instead of byte oriented hex dump
   -i32=<fmt> use printf format string fmt to display, default 0x%08x
   -f=<filename> write binary data to file instead of displaying
+  -buf buffer data in camera memory, useful for reading TCM, address 0 etc
 ]],
 		func=function(self,args)
 			local addr = tonumber(args[1])
 			local count = tonumber(args[2])
+			local flags = 0
 			if not addr then
 				return false, "bad args"
 			end
@@ -918,8 +921,11 @@ cli:add_commands{
 			if args.i32 then
 				count = count * 4
 			end
+			if args.buf then
+				flags = 1
+			end
 
-			local r = con:getmem(addr,count)
+			local r = con:getmem(addr,count,'string',flags)
 
 			if args.f then
 				local fh,err=io.open(args.f,"wb")

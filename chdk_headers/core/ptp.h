@@ -7,7 +7,7 @@
 // Do not add platform dependent stuff in here (#ifdef/#endif compile options or camera dependent values)
 
 #define PTP_CHDK_VERSION_MAJOR 2  // increase only with backwards incompatible changes (and reset minor)
-#define PTP_CHDK_VERSION_MINOR 7  // increase with extensions of functionality
+#define PTP_CHDK_VERSION_MINOR 8  // increase with extensions of functionality
                                   // minor > 1000 for development versions
 
 /*
@@ -23,6 +23,7 @@ protocol version history
 2.5 - remote capture
 2.6 - script execution flags
 2.7 - IN DEVELOPMENT live view protocol 2.2
+2.8 - IN DEVELOPMENT GetMemory extensions
 */
 
 #define PTP_OC_CHDK 0x9999
@@ -31,8 +32,9 @@ protocol version history
 enum ptp_chdk_command {
   PTP_CHDK_Version = 0,     // return param1 is major version number
                             // return param2 is minor version number
-  PTP_CHDK_GetMemory,       // param2 is base address (not NULL; circumvent by taking 0xFFFFFFFF and size+1)
+  PTP_CHDK_GetMemory,       // param2 is base address (direct may fail on MMIO etc. Use buffered for those)
                             // param3 is size (in bytes)
+                            // param4 is options: 0 read directly, 1 buffer. Other values reserved
                             // return data is memory block
   PTP_CHDK_SetMemory,       // param2 is address
                             // param3 is size (in bytes)
@@ -130,6 +132,10 @@ enum ptp_chdk_script_data_type {
 // bit flags for scripting support
 #define PTP_CHDK_SCRIPT_SUPPORT_LUA  0x1
 
+
+// GetMemory modes
+#define PTP_CHDK_GETMEM_MODE_DIRECT   0x0 // default, using Canon send_data (DMA), may fail on MMIO or TCM
+#define PTP_CHDK_GETMEM_MODE_BUFFER   0x1 // buffered with memcpy, slower. May not be correct for MMIO but seems to work
 
 // bit flags for remote capture
 // used to select and also to indicate available data in PTP_CHDK_RemoteCaptureIsReady
