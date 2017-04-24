@@ -137,11 +137,12 @@ killscript   [-noflush][-force][-nowait]: - kill running remote script
    -noflush: don't discard script messages
    -force: force kill even if camera does not support (crash / memory leaks likely!)
 
-rmem         <address> [count] [-i32[=fmt] | -f=<filename>]: - read memory
+rmem         <address> [count] [-buf] [-i32[=fmt] | -f=<filename>]: - read memory
  Dump <count> bytes or words starting at <address>
   -i32 count as 32 bit words, display as ints instead of byte oriented hex dump
   -i32=<fmt> use printf format string fmt to display, default 0x%08x
   -f=<filename> write binary data to file instead of displaying
+  -buf buffer data in camera memory, useful for reading TCM, address 0 etc
 
 list                     : - list USB devices
  Lists all recognized PTP devices in the following format on success
