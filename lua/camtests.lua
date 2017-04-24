@@ -210,6 +210,9 @@ end
 function tests.xfer()
 	m.xfermem({count=50})
 end
+function tests.xferbuf()
+	m.xfermem({count=50,buffer=true})
+end
 
 function tests.exectimes()
 	m.execwaittime({count=50})
@@ -394,6 +397,7 @@ function m.runbatch(opts)
 	if opts.bench then
 		m.run('exectimes')
 		m.run('xfer')
+		m.run('xferbuf')
 		m.run('msgs')
 	end
 	if opts.filexfer then
