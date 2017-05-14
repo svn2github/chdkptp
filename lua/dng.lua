@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2011 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2017 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -530,14 +530,14 @@ function dng_methods.build_histogram(self,opts)
 		h[i]=0
 	end
 	local total = 0
+	local img=self.img
 	for y = opts.top, opts.bottom-1 do
 		for x = opts.left, opts.right-1 do
-			local v = self.img:get_pixel(x,y)
+			local v = img:get_pixel(x,y)
 			h[v] = h[v] + 1
-			total = total+1
 		end
 	end
-	h.total = total
+	h.total = (opts.bottom - opts.top)*(opts.right - opts.left)
 	return h
 end
 
