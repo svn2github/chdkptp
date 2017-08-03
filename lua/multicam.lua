@@ -202,7 +202,7 @@ table specifying range with {min=min_id,max=max_id}
 min,max default to 1, max_id respectively
 single id
 ]]
-function mc:sel(what,range)
+function mc:sel(what)
 	-- treat single id like array
 	if type(what) == 'number' then
 		what={what}
