@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2012-2015 <reyalp (at) gmail dot com>
+ Copyright (C) 2012-2017 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -580,6 +580,7 @@ end
 
 --[[
 fill in status table r for a single camera
+cmd is the command for which status is expect, nil or false accepts any
 status table is in the form
 {
  done=bool -- state to track all cameras that have returned a status
@@ -612,7 +613,7 @@ function mc:get_single_status(lcon,cmd,r)
 			return 
 		end
 		-- TODO it would be good to skip over any stale status messages
-		if msg.cmd ~= cmd then
+		if cmd and msg.cmd ~= cmd then
 			r.failed = true
 			r.err = 'status from unexpected cmd:'..tostring(msg.cmd)
 		end
@@ -759,6 +760,7 @@ end
 function mc:print_cmd_status_short(status,results)
 	if self.verbose then
 		self:print_cmd_status(status,results)
+		return
 	end
 	if status then
 		printf("ok\n")
@@ -784,22 +786,26 @@ opts:{
 	synctime=number -- number of milliseconds in the future to shoot, must be >= min_sync_deley
 	shots=number -- number of shots, default 1
 	interval=number -- number of milliseconds between shots, default 2000
-	cont=bool -- use continuous mode for shooting, if enabled in canon UI
+	cont=bool -- use continuous mode for shooting, if enabled in canon UI, default true
+	usb_pwr_sync=bool -- hardware usb sync, shoots when +5v goes to 0.
+						-- synctime and interval ignored, does not wait for status
 --]]
 function mc:shoot(opts) 
 	opts = util.extend_table({
 	},opts)
-	if not self.min_sync_delay then
-		warnf('sync not initialized\n')
-		return
+	if not opts.usb_pwr_sync then
+		if not self.min_sync_delay then
+			warnf('sync not initialized\n')
+			return
+		end
+		if not opts.synctime then
+			opts.synctime=self.min_sync_delay + 50
+		elseif opts.synctime < self.min_sync_delay then
+			warnf("synctime %d < min_sync_delay %d, adjusted\n",opts.synctime,self.min_sync_delay)
+			opts.synctime = self.min_sync_delay + 50
+		end
 	end
 	self:flushmsgs()
-	if not opts.synctime then
-		opts.synctime=self.min_sync_delay + 50
-	elseif opts.synctime < self.min_sync_delay then
-		warnf("synctime %d < min_sync_delay %d, adjusted\n",opts.synctime,self.min_sync_delay)
-		opts.synctime = self.min_sync_delay + 50
-	end
 	local init_cmds = {}
 	local init_cmd
 	if opts.tv then
@@ -821,11 +827,17 @@ function mc:shoot(opts)
 		self:print_cmd_status_short(self:cmdwait(init_cmd))
 	end
 	self:print_cmd_status_short(self:cmdwait('preshoot'))
-	self:print_cmd_status_short(self:cmdwait('shoot_burst',{
-		syncat=opts.synctime,
-		args=util.serialize{shots=opts.shots,interval=opts.interval,cont=opts.cont}
-	}))
-	self:print_cmd_status_short(self:cmdwait('call release"shoot_half"'))
+	if opts.usb_pwr_sync then
+		-- no wait because polling while camera is in USB busy loop causes errors
+		self:cmd('shoot_burst_usb_pwr',{
+			args=util.serialize{shots=opts.shots,cont=opts.cont,release_half=true}
+		})
+	else
+		self:print_cmd_status_short(self:cmdwait('shoot_burst',{
+			syncat=opts.synctime,
+			args=util.serialize{shots=opts.shots,interval=opts.interval,cont=opts.cont,release_half=true}
+		}))
+	end
 end
 --[[
 take one ore more shots, printing timestamps on the screen to allow rough sync comparison
@@ -1035,7 +1047,8 @@ commands
 	preshoot: press shoot half and wait for get_shooting
 	shoot [ms]: wait [ms], press shoot full, wait for get_shooting
 	shoot_hook_sync [ms]: as above, except using chdk >= 1.3 shoot hook
-	shoot_burst <ms> <options>: shoot multiple shots using shoot hook
+	shoot_burst <ms> <options>: shoot one or more shots using shoot hook
+	shoot_burst_usb_pwr <options>: shoot one or more shots using usb vbus hardware control
 	tick: return the value of get_tick_count
 	synctick [ms]: wait [ms], return get_tick_count after wait
 	exit: end script
@@ -1234,7 +1247,7 @@ function cmds.shoot_burst()
 			press('shoot_full_only')
 		end
 		if not hook_shoot.wait_ready({timeout=opts.shoot_hook_ready_timeout,timeout_error=false}) then
-			release('shoot_full_only')
+			release('shoot_full') -- both full and half
 			hook_shoot.set(0)
 			hook_raw.set(0)
 			write_status(false, 'hook_shoot ready timeout')
@@ -1258,6 +1271,7 @@ function cmds.shoot_burst()
 		end
 		-- wait for raw hook before shooting again
 		if not hook_raw.wait_ready({timeout=opts.raw_hook_ready_timeout,timeout_error=false}) then
+			release('shoot_full') -- both full and half
 			hook_shoot.set(0)
 			hook_raw.set(0)
 			write_status(false, 'hook_raw ready timeout')
@@ -1267,6 +1281,83 @@ function cmds.shoot_burst()
 	end
 	if cont then
 		release('shoot_full_only')
+	end
+	if opts.release_half then
+		release('shoot_half')
+	end
+	hook_shoot.set(0)
+	hook_raw.set(0)
+	write_status(true,table.concat(r,', '))
+end
+
+function cmds.shoot_burst_usb_pwr()
+	if type(hook_shoot) ~= 'table' then
+		write_status(false, 'build does not support shoot hook')
+		return
+	end
+	local opts,err
+	if string.len(mc.args) > 0 then
+		opts,err=unserialize(mc.args)
+		if not opts then
+			write_status(false,'unserialize failed '..tostring(err))
+			return
+		end
+	end
+	opts=extend_table({
+		shots=1,
+		cont=true,
+		shoot_hook_timeout=mc.shoot_hook_timeout,
+		raw_hook_timeout=mc.raw_hook_timeout,
+		shoot_hook_ready_timeout=mc.shoot_hook_ready_timeout,
+		raw_hook_ready_timeout=mc.raw_hook_ready_timeout, -- TODO should account for expected USB interval, exposure time
+	},opts)
+	local cont = opts.cont and get_prop(props.DRIVE_MODE) == 1
+
+	usb_force_active(true) -- users should probably set this on startup, but setting again doesn't hurt
+
+	local r={}
+	hook_shoot.set(opts.shoot_hook_timeout)
+	hook_raw.set(opts.raw_hook_timeout)
+	local last_shot_tick
+	if cont then
+		press('shoot_full_only')
+	end
+
+	for i=1,opts.shots do
+		usb_sync_wait(true)
+		if not cont then
+			press('shoot_full_only')
+		end
+		-- used only for button control
+		if not hook_shoot.wait_ready({timeout=opts.shoot_hook_ready_timeout,timeout_error=false}) then
+			usb_sync_wait(false)
+			release('shoot_full') -- both full and half
+			hook_shoot.set(0)
+			hook_raw.set(0)
+			write_status(false, 'hook_shoot ready timeout')
+			return
+		end
+		hook_shoot.continue()
+		if not cont then
+			release('shoot_full_only')
+		end
+		-- wait for raw hook before shooting again
+		if not hook_raw.wait_ready({timeout=opts.raw_hook_ready_timeout,timeout_error=false}) then
+			release('shoot_full') -- both full and half
+			usb_sync_wait(false)
+			hook_shoot.set(0)
+			hook_raw.set(0)
+			write_status(false, 'hook_raw ready timeout')
+			return
+		end
+		r[i]=string.format("%d r:%d",i,get_tick_count())
+		hook_raw.continue()
+	end
+	if cont then
+		release('shoot_full_only')
+	end
+	if opts.release_half then
+		release('shoot_half')
 	end
 	hook_shoot.set(0)
 	hook_raw.set(0)
