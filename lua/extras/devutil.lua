@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2016 <reyalp (at) gmail dot com>
+ Copyright (C) 2016-2017 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -48,12 +48,14 @@ m.init_cli = function()
 		arghelp="[options] [file]",
 		args=cli.argparser.create{
 			csize=0x6000,
+			clevel=0x20,
 			a=false,
 		},
 		help_detail=[[
  [file] name for log file, default A/dbg.log
  options
-  -csize=<n> camera log buffer size
+  -csize=<n> camera log buffer size, default 0x6000
+  -clevel=<n> camera log level, messages with matching bits set are logged. default 0x20
   -a  append to existing log
  requires native calls enabled, camera with uart log support (all DryOS)
 ]],
@@ -62,14 +64,28 @@ m.init_cli = function()
 			if not logname then
 				logname='dbg.log'
 			end
-			logname = fsutil.make_camera_path(logname)
-			con:execwait(string.format([[
+			opts = {
+				logname=fsutil.make_camera_path(logname),
+				overwrite=(args.a==false),
+				logsize=tonumber(args.csize)+512,
+				clevel=tonumber(args.clevel),
+				csize=tonumber(args.csize),
+			}
+			con:execwait('opts='..serialize(opts)..[[
+
 call_event_proc('StopCameraLog')
 sleep(200)
-call_event_proc('StartCameraLog',0x20,0x%x)
+call_event_proc('StartCameraLog',opts.clevel,opts.csize)
 sleep(100)
-require'uartr'.start('%s',%s,0x%x)
-]],args.csize,logname,tostring(args.a==false),args.csize+512))
+require'uartr'.start(opts.logname,opts.overwrite,opts.logsize)
+sleep(100)
+call_event_proc('Printf',
+	'%s dlstart CameraLog 0x%x,0x%x Uart "%s",%s,0x%x\n',
+	os.date('%Y%m%d %H:%M:%S'),
+	opts.clevel,opts.csize,
+	opts.logname,tostring(opts.overwrite),opts.logsize
+	)
+]])
 			m.logname=logname
 			m.logsize=args.csize
 			return true,'log started: '..m.logname
@@ -77,19 +93,23 @@ require'uartr'.start('%s',%s,0x%x)
 	},
 	{
 		names={'dlgetcam'},
-		help='show camera log and download uart log',
+		help='print camera log on uart, download uart log',
 		arghelp="[local]",
 		args=cli.argparser.create{},
 		help_detail=[[
  [local] name to download log to, default same as uart log
- log must have been started with startlog
+ log must have been started with dlstart
 ]],
 		func=function(self,args)
 			if not m.logname then
 				return false,'log not started'
 			end
-			con:execwait([[call_event_proc('ShowCameraLog')]])
-			sys.sleep(500)
+			con:execwait([[
+call_event_proc('Printf','%s dlgetcam\n',os.date('%Y%m%d %H:%M:%S'))
+call_event_proc('ShowCameraLog')
+call_event_proc('Printf','%s dlgetcam end\n',os.date('%Y%m%d %H:%M:%S'))
+]])
+			sys.sleep(1000) -- 500 was sometimes too short
 			local dlcmd='download '..m.logname
 			if args[1] then
 				dlcmd = dlcmd..' '..args[1]
@@ -145,8 +165,8 @@ require'uartr'.start('%s',%s,0x%x)
 		},
 		help_detail=[[
  options:
-  -s min prop id, default 0
-  -e max prop id, default 999
+  -s=<number> min prop id, default 0
+  -e=<number> max prop id, default 999
   -c=<code> lua code to execute before getting props
 ]],
 
