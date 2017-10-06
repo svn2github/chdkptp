@@ -105,6 +105,19 @@ msg_shell.cmds.memstats=function()
 	write_usb_msg(serialize({mem=get_meminfo().free_size,lmem=collectgarbage('count')}))
 end
 ]])
+	if m.opts.busy then
+		con:write_msg([[exec
+set_yield(-1,-1)
+msg_shell.read_msg_timeout = 0
+msg_shell.idle = function()
+	for i=1,1000 do
+		x=string.format("0x%x",math.random(0xffff))
+	end
+	sleep(10)
+	collectgarbage('step')
+end
+]])
+	end
 end
 
 function m.quit()
