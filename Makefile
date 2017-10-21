@@ -99,9 +99,11 @@ endif
 # iup
 endif
 
-# needed for linking static lua lib on linux, should be harmless if dynamic linking
 ifneq ($(OSTYPE),Windows)
+# needed for linking static lua lib on linux, should be harmless if dynamic linking
 LINK_LIBS+=m dl
+# need to allow chdkptp executable to load C modules
+LDFLAGS+=-Wl,-E
 endif
 
 INC_PATHS+=-I$(CHDK_SRC_DIR)
