@@ -1476,7 +1476,7 @@ PC clock times are set to the start of download, not per image
 		help_detail=[[
  <target...> files/directories to remote
  options:
-   -fmatch=<pattern> upload only file with names matching <pattern>
+   -fmatch=<pattern> only delete files with names matching <pattern>
    -dmatch=<pattern> only delete directories with names matching <pattern>
    -rmatch=<pattern> only recurse into directories with names matching <pattern>
    -nodirs           don't delete directories recursed into, only files
@@ -2040,7 +2040,7 @@ PC clock times are set to the start of download, not per image
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value, Canon "real" ISO
-   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3)
+   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3 or later)
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
@@ -2179,7 +2179,7 @@ rlib_wait_timeout(
 	-- or at least make the syntax / options consistent
 	{
 		names={'remoteshoot','rs'},
-		help='shoot and download without saving to SD (requires CHDK 1.2)',
+		help='shoot and download without saving to SD (requires CHDK >= 1.2)',
 		arghelp="[local] [options]",
 		args=argparser.create{
 			u='s',
@@ -2212,7 +2212,7 @@ rlib_wait_timeout(
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value, Canon "real" ISO
-   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3)
+   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3 or later)
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
@@ -2461,7 +2461,7 @@ rlib_wait_timeout(
       96  APEX*96
    -tv=<v>    shutter speed. In standard units both decimal and X/Y accepted
    -sv=<v>    ISO value, Canon "real" ISO
-   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3)
+   -svm=<v>   ISO value, Canon "Market" ISO (requires CHDK 1.3 or later)
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state

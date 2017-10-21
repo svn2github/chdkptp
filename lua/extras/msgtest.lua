@@ -29,6 +29,7 @@ opions:{
 	checkmem=bool   -- check free memory and lua allocated memory for each message
 	memverbose=bool -- print memory stats for each message
 	gc=string|nil   -- garbage collection mode, 'step', 'collect' or nil
+	busy=bool		-- stress test keeping lua busy instead of yielding to wait for messages
 }
 example
 !m.test{size=100,sizeinc=10,sizemax=200,verbose=0,memverbose=true,checkmem=true,gc='step'}
