@@ -425,6 +425,7 @@ chdku.imglist_remote_opts={
 get a list of image files with ff_imglist
 ]]
 function con_methods:imglist(opts)
+	opts=util.extend_table({},opts)
 	local ropts=util.extend_table({
 		use_idir=true,
 		dirs=false,
@@ -446,12 +447,9 @@ function con_methods:imglist(opts)
 		files._dbg_fn=chdku.msg_unbatcher_dbgstr
 	end
 
-	local rstatus,rerr = self:execwait('return ff_imglist('..serialize(ropts)..')',
+	self:execwait('return ff_imglist('..serialize(ropts)..')',
 										{libs={'ff_imglist'},msgs=chdku.msg_unbatcher(files)})
 
-	if not rstatus then
-		errlib.throw{etype='remote',msg=rerr}
-	end
 	return files
 end
 
