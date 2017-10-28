@@ -421,6 +421,19 @@ chdku.imglist_remote_opts={
 	'batchsize',
 	'dbgmem',
 }
+function chdku.imglist_sort(files,opts)
+	local sortopts={
+		path={'full'},
+		name={'name'},
+		date={'st','mtime'},
+		size={'st','size'},
+	}
+	local sortpath = sortopts[opts.sort]
+	if not sortpath then
+		errlib.throw{etype='bad_arg',msg='imglist_sort: invalid sort '..tostring(opts.sort)}
+	end
+	util.table_path_sort(files,sortpath,opts.sort_order)
+end
 --[[
 get a list of image files with ff_imglist
 ]]
@@ -450,6 +463,9 @@ function con_methods:imglist(opts)
 	self:execwait('return ff_imglist('..serialize(ropts)..')',
 										{libs={'ff_imglist'},msgs=chdku.msg_unbatcher(files)})
 
+	if opts.sort then
+		chdku.imglist_sort(files,opts)
+	end
 	return files
 end
 

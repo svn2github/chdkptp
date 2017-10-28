@@ -1315,17 +1315,13 @@ PC clock times are set to the start of download, not per image
 				mtime=not args.nomtime,
 				batchsize=tonumber(args.batchsize),
 				dbgmem=args.dbgmem,
-				verbose=not args.quiet
+				verbose=not args.quiet,
+				sort=args.sort,
 			}
-			local sortopts={
-				path={'full'},
-				name={'name'},
-				date={'st','mtime'},
-				size={'st','size'},
-			}
-			local sortpath = sortopts[args.sort]
-			if not sortpath then
-				return false,'invalid sort '..tostring(args.sort)
+			if args.r then
+				opts.sort_order = 'des'
+			else
+				opts.sort_order = 'asc'
 			end
 			if #args > 0 then
 				opts.start_paths={}
@@ -1335,11 +1331,6 @@ PC clock times are set to the start of download, not per image
 			end
 
 			local files=con:imglist(opts)
-			if args.r then
-				util.table_path_sort(files,sortpath,'des')
-			else
-				util.table_path_sort(files,sortpath,'asc')
-			end
 			local r=''
 			for i,finfo in ipairs(files) do
 					local size = finfo.st.size
