@@ -940,9 +940,14 @@ end
 list images for all cams, return in array indexed by mc_id
 ]]
 function mc:imglist(opts)
+	opts=util.extend_table({},opts)
 	local r={}
 	for lcon in self:icams() do
 		local l=self:imglist_cam(lcon,opts)
+		if opts.sort then
+			chdku.imglist_sort(l,opts)
+		end
+
 		if l then
 			r[lcon.mc_id] = l
 		end
@@ -1003,6 +1008,10 @@ function mc:download_images(opts)
 	opts=util.extend_table({
 		dst='${id}/${subdir}/${name}',
 		info_fn=util.printf,
+		dlseq_start=1,
+		shotseq_start=1,
+		sort='date',
+		sort_order='asc',
 	},opts)
 	if opts.pretend then
 		opts.verbose = true
@@ -1011,6 +1020,7 @@ function mc:download_images(opts)
 		id=varsubst.format_state_val('id','%02d'),
 	},chdku.imglist_subst_funcs))
 	chdku.imglist_set_subst_time_state(subst.state)
+
 	-- list all images
 	local list=self:imglist(opts)
 	for id,imgs in pairs(list) do
@@ -1021,10 +1031,24 @@ function mc:download_images(opts)
 		end
 		subst.state.id = id
 		lcon:imglist_set_subst_con_state(subst.state)
+
+		local last_imgnum
+		subst.state.dlseq = opts.dlseq_start
+		subst.state.shotseq = opts.shotseq_start
+
 		for i,f in ipairs(imgs) do
 			chdku.imglist_set_subst_finfo_state(subst.state,f)
+			-- sequential by shot. Assumes list is sorted in a way that groups shots (date or shot)
+			local imgnum = tonumber(subst.state.imgnum)
+			if last_imgnum and last_imgnum ~= imgnum then
+				subst.state.shotseq = subst.state.shotseq+1
+			end
+			last_imgnum = imgnum
+
 			local dst = subst:run(opts.dst)
 			lcon:download_file_ff(f,dst,opts)
+
+			subst.state.dlseq = subst.state.dlseq+1
 		end
 	end
 	if opts.delete then

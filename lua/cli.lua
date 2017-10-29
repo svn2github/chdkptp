@@ -1107,6 +1107,9 @@ cli:add_commands{
 			overwrite='ask',
 			quiet=false,
 			rm=false,
+			seq=1,
+			sort='date', -- order for seq options
+			r=false,
 		},
 		help_detail=[[
  [src] source directories, default A/DCIM.
@@ -1132,6 +1135,10 @@ cli:add_commands{
    -overwrite=<str>  overwrite existing files (y|n|old|ask), default ask
    -quiet            don't display actions
    -rm               delete files after downloading
+   -seq=n            initial value for dlseq and shotseq subst strings, default 1
+   -sort=order       download order for dlseq and shotseq substitution, may be
+                     'path','name','date','size','shot' or a subst string, default 'date'
+   -r                sort descending instead of ascending
 
  NOTE
   <pattern> is a lua pattern, not a filesystem glob like *.JPG
@@ -1150,12 +1157,18 @@ ${basename}       Image name without extension, like IMG_1234
 ${ext}            Image extension, like .JPG
 ${subdir}         Image DCIM subdirectory, like 100CANON or 100___01 or 100_0101
 ${imgnum}         Image number like 1234
+${imgpfx}         Image prefix like IMG
 ${dirnum}         Image directory number like 101
 ${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cameras only
 ${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
+${dlseq}          Sequential number incremented per file downloaded
+${shotseq}        Sequential number incremented when imgnum changes.
 
-Unavailable values (e.g. ${dirday} without daily folders) result in an empty string
-PC clock times are set to the start of download, not per image
+ NOTE
+  ${shotseq} depends on sort grouping related shots together, like 'date' or 'shot'
+
+  Unavailable values (e.g. ${dirday} without daily folders) result in an empty string
+  PC clock times are set to the start of download, not per image
 ]],
 
 		func=function(self,args)
@@ -1177,7 +1190,17 @@ PC clock times are set to the start of download, not per image
 				dbgmem=args.dbgmem,
 				verbose=not args.quiet,
 				overwrite=cli.get_download_overwrite_opt(args.overwrite),
+				-- shot seq subst requires sort
+				sort=args.sort,
+				sort_order='asc',
+				dlseq_start=tonumber(args.seq),
+				shotseq_start=tonumber(args.seq),
 			}
+			if args.r then
+				opts.sort_order = 'des'
+			else
+				opts.sort_order = 'asc'
+			end
 			if #args > 0 then
 				opts.start_paths={}
 				for i,v in ipairs(args) do
@@ -1273,7 +1296,7 @@ PC clock times are set to the start of download, not per image
 			fmatch='%a%a%a_%d%d%d%d%.%w%w%w',
 			rmatch=false,
 			maxdepth=2, -- dcim/subdir
-			sort='path',
+			sort='date',
 			r=false,
 			batchsize=20,
 			dbgmem=false,
@@ -1290,7 +1313,7 @@ PC clock times are set to the start of download, not per image
    -fmatch=<pattern> list only files with path/name matching <pattern>
    -rmatch=<pattern> only recurse into directories with path/name matching <pattern>
    -maxdepth=n       only recurse into N levels of directory, default 2
-   -sort=order       where order is one of 'path','name','date','size' default 'path'
+   -sort=order       order may be 'path','name','date','size','shot' or a subst string, default 'date'
    -r                sort descending instead of ascending
    -batchsize=n      lower = slower, less memory used
    -dbgmem           print memory usage info
