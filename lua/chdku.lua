@@ -443,6 +443,20 @@ function chdku.imglist_set_subst_finfo_state(state,finfo)
 		end
 	end
 end
+-- assumes _finfo_state already run
+function chdku.imglist_set_subst_seq_state(state)
+	local imgnum = tonumber(state.imgnum)
+	-- state setting happens before expansion, so only increment after first call
+	if state._seq_first_done then
+		if state._seq_imgnum_prev ~= imgnum then
+			state.shotseq = state.shotseq+1
+		end
+		state.dlseq = state.dlseq+1
+	else
+		state._seq_first_done=true
+	end
+	state._seq_imgnum_prev = imgnum
+end
 --[[
 names of option to pass to remote code
 ]]
@@ -579,23 +593,16 @@ function con_methods:imglist_download(files,opts)
 	local subst=varsubst.new(chdku.imglist_subst_funcs)
 	chdku.imglist_set_subst_time_state(subst.state)
 	self:imglist_set_subst_con_state(subst.state)
-	local last_imgnum
 	subst.state.dlseq = opts.dlseq_start
 	subst.state.shotseq = opts.shotseq_start
 	for i,finfo in ipairs(files) do
 		chdku.imglist_set_subst_finfo_state(subst.state,finfo)
-		-- sequential by shot. Assumes list is sorted in a way that groups shots (date or shot)
-		local imgnum = tonumber(subst.state.imgnum)
-		if last_imgnum and last_imgnum ~= imgnum then
-			subst.state.shotseq = subst.state.shotseq+1
-		end
-		last_imgnum = imgnum
+		chdku.imglist_set_subst_seq_state(subst.state)
 		local dst = subst:run(opts.dst)
 		if opts.dstdir then
 			dst=fsutil.joinpath(opts.dstdir,dst)
 		end
 		self:download_file_ff(finfo,dst,opts)
-		subst.state.dlseq = subst.state.dlseq+1
 	end
 end
 

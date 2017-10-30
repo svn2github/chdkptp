@@ -1032,23 +1032,15 @@ function mc:download_images(opts)
 		subst.state.id = id
 		lcon:imglist_set_subst_con_state(subst.state)
 
-		local last_imgnum
 		subst.state.dlseq = opts.dlseq_start
 		subst.state.shotseq = opts.shotseq_start
 
 		for i,f in ipairs(imgs) do
 			chdku.imglist_set_subst_finfo_state(subst.state,f)
-			-- sequential by shot. Assumes list is sorted in a way that groups shots (date or shot)
-			local imgnum = tonumber(subst.state.imgnum)
-			if last_imgnum and last_imgnum ~= imgnum then
-				subst.state.shotseq = subst.state.shotseq+1
-			end
-			last_imgnum = imgnum
-
+			chdku.imglist_set_subst_seq_state(subst.state)
 			local dst = subst:run(opts.dst)
 			lcon:download_file_ff(f,dst,opts)
 
-			subst.state.dlseq = subst.state.dlseq+1
 		end
 	end
 	if opts.delete then
