@@ -548,8 +548,12 @@ function con_methods:imglist(opts)
 		files._dbg_fn=chdku.msg_unbatcher_dbgstr
 	end
 
-	self:execwait('return ff_imglist('..serialize(ropts)..')',
+	local rstatus,rerr = self:execwait('return ff_imglist('..serialize(ropts)..')',
 										{libs={'ff_imglist'},msgs=chdku.msg_unbatcher(files)})
+
+	if not rstatus then
+		errlib.throw{etype='remote',msg=rerr}
+	end
 
 	if opts.sort then
 		chdku.imglist_sort(files,opts)
