@@ -898,19 +898,12 @@ function mc:testshots(opts)
 end
 
 --[[
-return a list of camera image file paths and stat info
+run a cmd that returns data via batched messages, for things like file lists
 ]]
-function mc:imglist_cam(lcon,opts)
-	local ropts=util.extend_table({
-		dirs=false,
-		fmatch='%a%a%a_%d%d%d%d%.%w%w%w',
-	},opts,{
-		keys=chdku.imglist_remote_opts,
-	})
-	local sendcmd = string.format('imglist %s',util.serialize(ropts))
-	local status,err = lcon:write_msg_pcall(sendcmd)
+function mc:cmd_msgbatch_cam(lcon,cmd)
+	local status,err = lcon:write_msg_pcall(cmd)
 	if not status then
-		warnf('%s: send %s cmd failed: %s\n',lcon.mc_id,tostring(sendcmd),tostring(err))
+		warnf('%s: send %s cmd failed: %s\n',lcon.mc_id,tostring(cmd),tostring(err))
 		return
 	end
 	local r={}
@@ -935,19 +928,10 @@ function mc:imglist_cam(lcon,opts)
 		end
 	end
 end
-
---[[
-list images for all cams, return in array indexed by mc_id
-]]
-function mc:imglist(opts)
-	opts=util.extend_table({},opts)
+function mc:cmd_msgbatch(cmd)
 	local r={}
 	for lcon in self:icams() do
-		local l=self:imglist_cam(lcon,opts)
-		if opts.sort then
-			chdku.imglist_sort(l,opts)
-		end
-
+		local l=self:cmd_msgbatch_cam(lcon,cmd)
 		if l then
 			r[lcon.mc_id] = l
 		end
@@ -955,7 +939,48 @@ function mc:imglist(opts)
 	return r
 end
 
-function mc:delete_images_list_cam(lcon,imgs,opts)
+--[[
+list images for all cams, return in array indexed by mc_id
+]]
+function mc:imglist(opts)
+	opts=util.extend_table({},opts)
+	local ropts=util.extend_table({
+		dirs=false,
+		fmatch='%a%a%a_%d%d%d%d%.%w%w%w',
+	},opts,{
+		keys=chdku.imglist_remote_opts,
+	})
+	local cmd = string.format('imglist %s',util.serialize(ropts))
+
+	local r=self:cmd_msgbatch(cmd)
+	if opts.sort then
+		for lcon in self:icams() do
+			if r[lcon.mc_id] then
+				chdku.imglist_sort(r[lcon.mc_id],opts)
+			end
+		end
+	end
+	return r
+end
+
+--[[
+general file listing
+]]
+function mc:find_files(paths,opts)
+	if type(paths) == 'string' then
+		paths = {paths}
+	end
+	opts=util.extend_table({},opts)
+	local ropts=util.extend_table({},opts)
+	ropts.ff_func=nil
+	local cmd = string.format('call return find_files(%s,%s,%s)',
+		util.serialize(paths),
+		util.serialize(ropts),
+		opts.ff_func)
+	return self:cmd_msgbatch(cmd)
+end
+
+function mc:delete_files_list_cam(lcon,imgs,opts)
 	for i,f in ipairs(imgs) do
 		if opts.verbose then
 			printf('os.remove("%s")\n',f.full)
@@ -980,16 +1005,30 @@ function mc:delete_images_list_cam(lcon,imgs,opts)
 	end
 end
 
-function mc:delete_images_list(list,opts)
+--[[
+delete files/directories listed in format return by find_files / imglist
+to delete directories, you must ensure files are sorted with directories last (dirsfirst=false for find_files)
+e.g.
+l=mc:find_files('A/DCIM',{dmatch='%d%d%d___%d%d',fmatch='%d%d%d___%d%d/.*',dirsfirst=false,ff_func='find_files_all_fn'})
+mc:delete_files_list(l)
+]]
+function mc:delete_files_list(list,opts)
+	opts=util.extend_table({},opts)
+	if opts.pretend then
+		opts.verbose = true
+	end
+
 	for id,imgs in pairs(list) do
 		local lcon = self:find_id(id)
 		if lcon then
-			self:delete_images_list_cam(lcon,imgs,opts)
+			self:delete_files_list_cam(lcon,imgs,opts)
 		else
 			warnf("missing connection %s\n",id)
 		end
 	end
 end
+-- backwards compat
+mc.delete_images_list = mc.delete_files_list
 
 --[[
 opts={
@@ -1044,7 +1083,7 @@ function mc:download_images(opts)
 		end
 	end
 	if opts.delete then
-		self:delete_images_list(list,{pretend=opts.pretend,verbose=opts.verbose})
+		self:delete_files_list(list,{pretend=opts.pretend,verbose=opts.verbose})
 	end
 end
 
