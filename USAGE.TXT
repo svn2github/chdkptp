@@ -403,9 +403,25 @@ shoot        [options]   : - shoot a picture with specified exposure
    -dng[=1|0] Force DNG on or off, implies raw if on, default current camera setting
    -pretend   print actions instead of running them
    -nowait    don't wait for shot to complete
-   -dl        download shot file(s)
+   -dl[=<dest spec>] download shot file(s), dest spec is a substituion string default ${name}
    -rm        remove file after shooting
   Any exposure parameters not set use camera defaults
+
+Substitutions
+${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${pid,strfmt}     camera platform ID, default format %x
+${ldate,datefmt}  PC clock date of shot, os.date format, default %Y%m%d_%H%M%S
+${lts,strfmt}     PC clock date as unix timestamp + microseconds, default format %f
+${lms,strfmt}     PC clock milliseconds part, default format %03d
+${name}           Image full name, like IMG_1234.JPG
+${basename}       Image name without extension, like IMG_1234
+${ext}            Image extension, like .JPG
+${subdir}         Image DCIM subdirectory, like 100CANON or 100___01 or 100_0101
+${imgnum}         Image number like 1234
+${imgpfx}         Image prefix like IMG
+${dirnum}         Image directory number like 101
+${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cameras only
+${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
 
 remoteshoot (rs) [local] [options]: - shoot and download without saving to SD (requires CHDK >= 1.2)
  [local]       local destination directory or filename (w/o extension!)

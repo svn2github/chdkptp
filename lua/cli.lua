@@ -2063,9 +2063,25 @@ ${shotseq}        Sequential number incremented when imgnum changes.
    -dng[=1|0] Force DNG on or off, implies raw if on, default current camera setting
    -pretend   print actions instead of running them
    -nowait    don't wait for shot to complete
-   -dl        download shot file(s)
+   -dl[=<dest spec>] download shot file(s), dest spec is a substituion string default ${name}
    -rm        remove file after shooting
   Any exposure parameters not set use camera defaults
+
+Substitutions
+${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${pid,strfmt}     camera platform ID, default format %x
+${ldate,datefmt}  PC clock date of shot, os.date format, default %Y%m%d_%H%M%S
+${lts,strfmt}     PC clock date as unix timestamp + microseconds, default format %f
+${lms,strfmt}     PC clock milliseconds part, default format %03d
+${name}           Image full name, like IMG_1234.JPG
+${basename}       Image name without extension, like IMG_1234
+${ext}            Image extension, like .JPG
+${subdir}         Image DCIM subdirectory, like 100CANON or 100___01 or 100_0101
+${imgnum}         Image number like 1234
+${imgpfx}         Image prefix like IMG
+${dirnum}         Image directory number like 101
+${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cameras only
+${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
 ]],
 		func=function(self,args)
 			local opts,err = cli:get_shoot_common_opts(args)
@@ -2104,6 +2120,16 @@ ${shotseq}        Sequential number incremented when imgnum changes.
 				con:exec(cmd,{libs={'rlib_shoot'}})
 				return true
 			end
+			-- default download name - match camera name with no directory
+			if args.dl == true then
+				args.dl='${name}'
+			end
+			local subst = varsubst.new(util.extend_table_multi({},{
+				chdku.con_subst_funcs,
+				chdku.ltime_subst_funcs,
+--				chdku.stat_subst_funcs,
+				chdku.path_subst_funcs,
+			})) 
 
 			local rstatus,rerr = con:execwait('return '..cmd,{libs={'serialize_msgs','rlib_shoot'}})
 
@@ -2113,6 +2139,9 @@ ${shotseq}        Sequential number incremented when imgnum changes.
 			if not (args.dl or args.rm) then
 				return true
 			end
+
+			chdku.set_subst_time_state(subst.state)
+			con:set_subst_con_state(subst.state)
 
 			local info = rstatus
 
@@ -2160,7 +2189,9 @@ ${shotseq}        Sequential number incremented when imgnum changes.
 			-- raw should always exist by the time shoot() finishes
 			if raw_path then
 				if args.dl then
-					cli:print_status(cli:execute('download '..raw_path))
+					util.extend_table(subst.state,fsutil.parse_image_path_cam(raw_path,{string=true}))
+					local dst=subst:run(args.dl)
+					cli:print_status(cli:execute('download '..raw_path..' '..dst))
 				end
 				if args.rm then
 					cli:print_status(cli:execute('rm -maxdepth=0 '..raw_path))
@@ -2181,7 +2212,9 @@ rlib_wait_timeout(
 ]],jpg_path,jpg_path),{libs='wait_timeout'})
 
 			if args.dl then
-				cli:print_status(cli:execute('download '..jpg_path))
+				util.extend_table(subst.state,fsutil.parse_image_path_cam(jpg_path,{string=true}))
+				local dst=subst:run(args.dl)
+				cli:print_status(cli:execute('download '..jpg_path..' '..dst))
 			end
 			if args.rm then
 				cli:print_status(cli:execute('rm -maxdepth=0 '..jpg_path))
