@@ -383,7 +383,7 @@ chdku.imglist_subst_funcs=util.extend_table_multi({},{
 --[[
 per connection state
 ]]
-function con_methods:imglist_set_subst_con_state(state)
+function con_methods:set_subst_con_state(state)
 	if self.ptpdev.serial_number then
 		state.serial = self.ptpdev.serial_number
 	else
@@ -396,7 +396,7 @@ end
 local PC time related state
 callers may want this to apply to an entire batch, or each file
 ]]
-function chdku.imglist_set_subst_time_state(state)
+function chdku.set_subst_time_state(state)
 	state.ldate = os.time() -- local time as a timestamp
 	local t=ustime.new()
 	state.lts = t:float() -- local unix timestamp + microseconds
@@ -409,39 +409,7 @@ per file state
 function chdku.imglist_set_subst_finfo_state(state,finfo)
 	state.mdate = chdku.ts_cam2pc(finfo.st.mtime)
 	state.mts = chdku.ts_cam2pc(finfo.st.mtime)
-	state.name = finfo.name
-	state.basename,state.ext = fsutil.split_ext(finfo.name)
-	state.subdir = fsutil.basename_cam(fsutil.dirname_cam(finfo.full))
-	state.imgnum = string.match(state.basename,'(%d%d%d%d)$')
-	if not state.imgnum then
-		state.imgnum = ''
-	end
-	state.imgpfx = string.match(state.basename,'^(...)_%d%d%d%d$')
-	if not state.imgpfx then
-		state.imgpfx = ''
-	end
-	-- 100CANON or 100_xxxx or 100___xx
-	state.dirnum = string.match(state.subdir,'^(%d%d%d)')
-	if not state.dirnum then
-		state.dirnum = ''
-	end
-
-	-- try date folder, daily naming
-	local dirmonth,dirday string.match(state.subdir,'_(%d%d)(%d%d)$')
-	if dirmonth then
-		state.dirmonth = dirmonth
-		state.dirday = dirday
-	else
-		-- try date folder, monthly naming
-		local dirmonth = string.match(state.subdir,'_(%d%d)$')
-		if dirmonth then
-			state.dirmonth = dirmonth
-			state.dirday = ''
-		else
-			state.dirmonth = ''
-			state.dirday = ''
-		end
-	end
+	util.extend_table(state,fsutil.parse_image_path_cam(finfo.full,{string=true}))
 end
 -- assumes _finfo_state already run
 function chdku.imglist_set_subst_seq_state(state)
@@ -591,8 +559,8 @@ function con_methods:imglist_download(files,opts)
 		opts.verbose = true
 	end
 	local subst=varsubst.new(chdku.imglist_subst_funcs)
-	chdku.imglist_set_subst_time_state(subst.state)
-	self:imglist_set_subst_con_state(subst.state)
+	chdku.set_subst_time_state(subst.state)
+	self:set_subst_con_state(subst.state)
 	subst.state.dlseq = opts.dlseq_start
 	subst.state.shotseq = opts.shotseq_start
 	for i,finfo in ipairs(files) do

@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2015 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2017 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -15,7 +15,8 @@
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 --]]
 --[[
-local path and filesystem related utilities
+path and filesystem related utilities
+funtions ending in _cam deal with camera side paths
 depends on sys.ostype, errlib and lfs
 ]]
 local fsutil={}
@@ -289,6 +290,69 @@ function fsutil.make_camera_path(path)
 		return 'A' .. string.sub(path,2,-1)
 	end
 	return 'A/' .. path
+end
+
+--[[
+split useful information out of a full camera image path like 'A/DCIM/139___10/IMG_5609.JPG'
+partial paths e.g. just image name are handled
+parsed=fsutil.parse_image_path_cam(path,opts)
+opts {
+	string=bool -- return missing components as empty string, default true. otherwise, nil
+}
+parsed {
+	name=string -- full name, e.g 'IMG_5609.JPG'
+	basename=string -- 'IMG_5609'
+	ext=string -- '.JPG'
+	imgnum=string or nil -- number portion e.g. '5609'
+	imgnpfx=string or nil -- prefix portion, e.g. 'IMG_'
+	pathparts=array -- path components as an array from splitpath_cam, e.g. {'A/','DCIM','139___10','IMG_5609.JPG'}
+	subdir=string or nil -- parent directory of image, e.g. '139___10' or '101CANON'
+	dirnum=string or nil -- directory number '139'
+	dirmonth=string or nil -- month from date based directory name, e.g. '10'
+	dirday=string or nil -- day from date based directory name
+}
+]]
+function fsutil.parse_image_path_cam(path,opts)
+	opts = util.extend_table({string=true},opts)
+	local r={}
+	r.pathparts = fsutil.splitpath_cam(path)
+	r.name = fsutil.basename_cam(r.pathparts[#r.pathparts])
+	r.basename,r.ext = fsutil.split_ext(r.name)
+
+	-- split_ext defaults to empty string
+	if r.ext == '' and not opts.string then
+		r.ext = nil
+	end
+
+	r.imgnum = string.match(r.basename,'(%d%d%d%d)$')
+	r.imgpfx = string.match(r.basename,'^(...)_%d%d%d%d$')
+
+	r.subdir = r.pathparts[#r.pathparts - 1]
+	if r.subdir then
+		-- 100CANON or 100_xxxx or 100___xx
+		r.dirnum = string.match(r.subdir,'^(%d%d%d)')
+
+		-- try date folder, daily naming
+		local dirmonth,dirday = string.match(r.subdir,'_(%d%d)(%d%d)$')
+		if dirmonth then
+			r.dirmonth = dirmonth
+			r.dirday = dirday
+		else
+			-- try date folder, monthly naming
+			local dirmonth = string.match(r.subdir,'_(%d%d)$')
+			if dirmonth then
+				r.dirmonth = dirmonth
+			end
+		end
+	end
+	if opts.string then
+		for i,k in ipairs{'imgnum','imgpfx','subdir','dirnum','dirmonth','dirday'} do
+			if not r[k] then
+				r[k]='';
+			end
+		end
+	end
+	return r
 end
 
 --[[

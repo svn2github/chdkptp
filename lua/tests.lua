@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2012-2016 <reyalp (at) gmail dot com>
+ Copyright (C) 2012-2017 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -149,6 +149,53 @@ t.split_ext = function()
 	assert(name == '' and ext == '')
 end
 
+t.parse_image_path_cam = function()
+	assert(util.compare_values(fsutil.parse_image_path_cam('A/DCIM/139___10/IMG_5609.JPG'),{
+		dirnum="139",
+		dirday="",
+		imgnum="5609",
+		ext=".JPG",
+		pathparts={
+			[1]="A/",
+			[2]="DCIM",
+			[3]="139___10",
+			[4]="IMG_5609.JPG",
+		},
+		dirmonth="10",
+		subdir="139___10",
+		name="IMG_5609.JPG",
+		imgpfx="IMG",
+		basename="IMG_5609",
+	}))
+	assert(util.compare_values(fsutil.parse_image_path_cam('A/DCIM/136_1119/CRW_0013.DNG',{string=false}),{
+		dirnum="136",
+		pathparts={
+			[1]="A/",
+			[2]="DCIM",
+			[3]="136_1119",
+			[4]="CRW_0013.DNG",
+		},
+		dirday="19",
+		imgnum="0013",
+		basename="CRW_0013",
+		imgpfx="CRW",
+		subdir="136_1119",
+		dirmonth="11",
+		name="CRW_0013.DNG",
+		ext=".DNG",
+		}))
+	assert(util.compare_values(fsutil.parse_image_path_cam('IMG_5609.JPG',{string=false}),{
+		ext=".JPG",
+		pathparts={
+			[1]="IMG_5609.JPG",
+		},
+		imgpfx="IMG",
+		basename="IMG_5609",
+		name="IMG_5609.JPG",
+		imgnum="5609",
+	}))
+end
+
 t.find_files = function()
 	-- note assumes test run from chdkptp root directory
 	-- should throw on error
@@ -176,8 +223,8 @@ t.ustime = function()
 	local t0=ustime.new()
 	sys.sleep(100)
 	local d = t0:diff()
-	-- allow 40 msec (!) fudge, timing is bad on some windows systems
-	assert(d > 80000 and d < 120000)
+	-- allow 50 msec (!) fudge, timing is bad on some windows systems
+	assert(d > 80000 and d < 150000)
 end
 
 t.lbuf = function()

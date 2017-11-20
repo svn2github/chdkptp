@@ -1058,7 +1058,7 @@ function mc:download_images(opts)
 	local subst=varsubst.new(util.extend_table({
 		id=varsubst.format_state_val('id','%02d'),
 	},chdku.imglist_subst_funcs))
-	chdku.imglist_set_subst_time_state(subst.state)
+	chdku.set_subst_time_state(subst.state)
 
 	-- list all images
 	local list=self:imglist(opts)
@@ -1069,7 +1069,7 @@ function mc:download_images(opts)
 			break
 		end
 		subst.state.id = id
-		lcon:imglist_set_subst_con_state(subst.state)
+		lcon:set_subst_con_state(subst.state)
 
 		subst.state.dlseq = opts.dlseq_start
 		subst.state.shotseq = opts.shotseq_start
