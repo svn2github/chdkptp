@@ -576,7 +576,7 @@ end
 function m:run(name)
 	-- TODO side affects galore
 	printf('%s:start\n',name)
-	status,msg = xpcall(t[name],util.err_traceback)
+	local status,msg = xpcall(t[name],util.err_traceback)
 	printf('%s:',name)
 	if status then
 		printf('ok\n')
