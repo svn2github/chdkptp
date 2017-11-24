@@ -1589,6 +1589,9 @@ ${shotseq}        Sequential number incremented when imgnum changes.
 			end
 			if args.l then
 				r = r .. '\n'.._VERSION -- Lua version
+				if lfs then
+					r = r .. '\n'..lfs._VERSION
+				end
 				-- note these will only show up if actually running gui
 				if iup then
 					r = r .. '\nIUP '..iup._VERSION
