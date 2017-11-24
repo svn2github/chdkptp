@@ -1281,7 +1281,7 @@ dng_info:
 ]]
 function chdku.rc_handler_raw_dng_file(dir,filename_base,ext,dng_info)
 	return function(lcon,hdata)
-		local filename,err = chdku.rc_build_path(hdata,dir,filename_base,'dng')
+		local filename,err = chdku.rc_build_path(hdata,dir,filename_base,ext)
 		if not filename then
 			return false, err
 		end
@@ -1370,6 +1370,54 @@ function chdku.rc_handler_file(dir,filename_base,ext)
 		return true
 	end
 end
+--[[
+create handlers suitable for saving jpg, dng and raw files
+opts {
+	jpg=bool -- jpeg
+	dng=bool -- dng file, combining raw with dng header (exclusive with raw and dng_hdr)
+	raw=bool -- CHDK frambuffer raw
+	dnghdr=bool -- DNG header alone
+	dst=string -- destination file base name
+	dst_dir=string -- destination directory
+	badpix=bool -- threshold to patch bad pixels in in dng
+	lstart=number -- starting line for sub-image dng (default = 0)
+	lcount=number -- number of lines for sub-image dng (default = 0 = all)
+]]
+function chdku.rc_init_std_handlers(opts)
+	opts=util.extend_table({
+		lstart=0,
+		lcount=0,
+	},opts)
+	local rcopts={}
+	if opts.jpg then
+		rcopts.jpg=chdku.rc_handler_file(opts.dst_dir,opts.dst)
+	end
+	if opts.dng then
+		if opts.raw or opts.dng_hdr then
+			errlib.throw{etype='bad_arg',msg='rc_init_std_handlers: dng cannot be combined with raw or dng_hdr'}
+		end
+		if opts.badpix == true then
+			opts.badpix = 0
+		end
+		-- local structure used for dng options, and to pass header from header handler to DNG handler
+		local dng_info = {
+			lstart=opts.lstart,
+			lcount=opts.lcount,
+			badpix=opts.badpix,
+		}
+		rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
+		rcopts.raw = chdku.rc_handler_raw_dng_file(opts.dst_dir,opts.dst,'dng',dng_info)
+	else
+		if opts.raw then
+			rcopts.raw=chdku.rc_handler_file(opts.dst_dir,opts.dst)
+		end
+		if opts.dnghdr then
+			rcopts.dng_hdr=chdku.rc_handler_file(opts.dst_dir,opts.dst)
+		end
+	end
+	return rcopts
+end
+
 function con_methods:capture_is_api_compatible()
 	return self:is_ver_compatible(2,5)
 end

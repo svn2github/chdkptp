@@ -2249,6 +2249,7 @@ rlib_wait_timeout(
 			int=false,
 			badpix=false,
 			shotwait=false,
+			jpgdummy=false
 		},
 		help_detail=[[
  [local]       local destination directory or filename (w/o extension!)
@@ -2276,6 +2277,7 @@ rlib_wait_timeout(
    -int=<n.m>   interval for multiple shots, in seconds
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
    -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
+   -jpgdummy	write dummy IMG_nnnn.JPG to avoid play / shutdown crash on some cams
 ]],
 		func=function(self,args)
 			local dst = args[1]
@@ -2306,6 +2308,7 @@ rlib_wait_timeout(
 				lstart=0,
 				lcount=0,
 			})
+			opts.jpgdummy = args.jpgdummy
 			-- fformat required for init
 			if args.jpg then
 				opts.fformat = opts.fformat + 1
@@ -2380,29 +2383,17 @@ rlib_wait_timeout(
 			-- TODO script errors will not get picked up here
 			con:exec('rs_shoot('..opts_s..')',{libs={'rs_shoot'}})
 
-			local rcopts={}
-			if args.jpg then
-				rcopts.jpg=chdku.rc_handler_file(dst_dir,dst)
-			end
-			if args.dng then
-				if args.badpix == true then
-					args.badpix = 0
-				end
-				local dng_info = {
-					lstart=opts.lstart,
-					lcount=opts.lcount,
-					badpix=args.badpix,
-				}
-				rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
-				rcopts.raw = chdku.rc_handler_raw_dng_file(dst_dir,dst,'dng',dng_info)
-			else
-				if args.raw then
-					rcopts.raw=chdku.rc_handler_file(dst_dir,dst)
-				end
-				if args.dnghdr then
-					rcopts.dng_hdr=chdku.rc_handler_file(dst_dir,dst)
-				end
-			end
+			local rcopts=chdku.rc_init_std_handlers{
+				jpg=args.jpg,
+				dng=args.dng,
+				raw=args.raw,
+				dnghdr=args.dnghdr,
+				dst=dst,
+				dst_dir=dst_dir,
+				badpix=args.badpix,
+				lstart=opts.lstart,
+				lcount=opts.lcount,
+			}
 
 			if args.shotwait then
 				rcopts.timeout=tonumber(args.shotwait)
@@ -2498,6 +2489,7 @@ rlib_wait_timeout(
 			cont=false,
 			pipe=false,
 			shotwait=false,
+			jpgdummy=false,
 		},
 		help_detail=[[
  [local]       local destination directory or filename (w/o extension!)
@@ -2524,7 +2516,7 @@ rlib_wait_timeout(
    -cont        use continuous mode
    -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
    -pipe=<program> read commands from standard output of <program> instead of stdin
-
+   -jpgdummy	write dummy IMG_nnnn.JPG to avoid play / shutdown crash on some cams (reg CHDK >= 1.3)
 
  The following commands are available at the rsint> prompt
   s    shoot

@@ -1131,6 +1131,34 @@ function rlib_shoot_init_exp(opts)
 end
 ]],
 },
+--[[
+create a dummy of the current image, used to prevent remoteshoot from crashing on play/shutdown
+]]
+{
+	name='rlib_shoot_jpgdummy',
+	depend={'mkdir_m'},
+	code=[[
+function rlib_shoot_jpgdummy()
+	local dir=get_image_dir()
+	local status,err=mkdir_m(dir)
+	if not status then
+		return false,err
+	end
+	local fn=string.format('%s/IMG_%04d.JPG',dir,get_exp_count())
+	-- don't overwrite an actual file if it exists
+	if os.stat(fn) then
+		return true
+	end
+	local fh,err=io.open(fn,'wb')
+	if not fh then
+		return false,err
+	end
+	fh:close()
+	os.utime(fn)
+	return true
+end
+]],
+},
 {
 	name='rlib_shoot',
 	depend={'rlib_shoot_common'}, -- note require serialize_msgs if info
@@ -1229,15 +1257,22 @@ end
 },
 {
 	name='rs_shoot',
-	depend={'rlib_shoot_common'},
+	depend={'rlib_shoot_common','rlib_shoot_jpgdummy'},
 -- TODO should use shoot hook count for chdk 1.3, exp count may have issues in some ports
 	code=[[
+function rs_do_jpgdummy(opts)
+	if not opts.jpgdummy then
+		return
+	end
+	rlib_shoot_jpgdummy()
+end
 function rs_shoot_full(opts)
 	local shot=0
 	local m
 	repeat
 		local tnext=get_tick_count() + opts.int
 		shoot()
+		rs_do_jpgdummy(opts)
 		shot = shot + 1
 		if shot >= opts.shots then
 			return
@@ -1327,6 +1362,7 @@ function rs_shoot_cont_hook(opts)
 		if not rs_shoot_multi_wait(state,opts) then
 			break
 		end
+		rs_do_jpgdummy(opts)
 	until state.shots >= opts.shots
 	hook_shoot.set(0)
 	release('shoot_full')
@@ -1342,6 +1378,7 @@ function rs_shoot_cont(opts)
 		if not rs_shoot_multi_wait(state,opts) then
 			break
 		end
+		rs_do_jpgdummy(opts)
 	until state.shots >= opts.shots
 	release('shoot_full')
 end
@@ -1356,6 +1393,7 @@ function rs_shoot_quick(opts)
 		press('shoot_full_only')
 		local status = rs_shoot_multi_wait(state,opts)
 		release('shoot_full_only')
+		rs_do_jpgdummy(opts)
 		if state.shots >= opts.shots or not status then
 			break
 		end

@@ -40,30 +40,17 @@ function init_handlers(args,opts)
 			dst = nil
 		end
 	end
-	m.rcopts={}
-	if args.jpg then
-		m.rcopts.jpg=chdku.rc_handler_file(dst_dir,dst)
-	end
-	if args.dng then
-		local badpix = args.badpix
-		if badpix == true then
-			badpix = 0
-		end
-		local dng_info = {
-			lstart=opts.lstart,
-			lcount=opts.lcount,
-			badpix=badpix,
-		}
-		m.rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
-		m.rcopts.raw = chdku.rc_handler_raw_dng_file(dst_dir,dst,'dng',dng_info)
-	else
-		if args.raw then
-			m.rcopts.raw=chdku.rc_handler_file(dst_dir,dst)
-		end
-		if args.dnghdr then
-			m.rcopts.dng_hdr=chdku.rc_handler_file(dst_dir,dst)
-		end
-	end
+	m.rcopts=chdku.rc_init_std_handlers{
+		jpg=args.jpg,
+		dng=args.dng,
+		raw=args.raw,
+		dnghdr=args.dnghdr,
+		dst=dst,
+		dst_dir=dst_dir,
+		badpix=args.badpix,
+		lstart=opts.lstart,
+		lcount=opts.lcount,
+	}
 	if args.shotwait then
 		m.rcopts.timeout=tonumber(args.shotwait)
 	elseif opts.tv then -- opts.tv is normalized to a tv96 value
@@ -158,6 +145,7 @@ m.run = function(args)
 	if args.cont then
 		opts.cont=1
 	end
+	opts.jpgdummy = args.jpgdummy
 
 	local input_func
 	local inpipe
@@ -295,7 +283,7 @@ end
 function m.register_rlib() 
 	chdku.rlibs:register{
 		name='rsint',
-		depend={'extend_table','serialize_msgs','rlib_shoot_common','rs_shoot_init'},
+		depend={'extend_table','serialize_msgs','rlib_shoot_common','rlib_shoot_jpgdummy','rs_shoot_init'},
 		code=[[
 function wait_shooting(state, timeout)
 	if not timeout then
@@ -317,6 +305,31 @@ function rsint_init(opts)
 	end
 
 	return rs_init(opts)
+end
+
+local last_exp_count
+
+function handle_exp_count_change(opts)
+	local exp=get_exp_count()
+	if last_exp_count == exp then
+		return true
+	end
+	last_exp_count=exp
+	if not opts.jpgdummy then
+		return true
+	end
+	return rlib_shoot_jpgdummy()
+end
+
+function handle_last_jpgdummy(opts)
+	if not opts.jpgdummy then
+		return
+	end
+	local timeout=get_tick_count()+5000
+	while get_tick_count() < timeout and get_exp_count() == last_exp_count do
+		sleep(10)
+	end
+	handle_exp_count_change(opts)
 end
 
 -- from msg_shell
@@ -357,19 +370,25 @@ cmds={
 function rsint_run_cont(opts)
 	local errmsg
 	local next_shot
+	local cmd
 
 	hook_shoot.set(opts.shoot_hook_timeout)
 	local shoot_count = hook_shoot.count()
 	press('shoot_full')
 	while true do
 		local msg=read_usb_msg(10)
+		local status, err = handle_exp_count_change(opts)
+		if not status then
+			errmsg = err
+			break
+		end
 
 		if type(get_usb_capture_target) == 'function' and get_usb_capture_target() == 0 then
 			errmsg = 'remote capture cancelled'
 			break
 		end
 
-		local cmd=nil
+		cmd=nil
 		if msg then
 			cmd = string.match(msg,'^%w+')
 		end
@@ -400,6 +419,9 @@ function rsint_run_cont(opts)
 	end
 	hook_shoot.set(0)
 	release('shoot_full')
+	if cmd == 'l' then
+		handle_last_jpgdummy(opts)
+	end
 	if errmsg then
 		return false, errmsg
 	end
@@ -407,17 +429,21 @@ end
 
 function rsint_run_single(opts)
 	local errmsg
-
 	local last_msg=get_tick_count()
 	while true do
 		local msg=read_usb_msg(10)
+		local status, err = handle_exp_count_change(opts)
+		if not status then
+			errmsg = err
+			break
+		end
 
 		if type(get_usb_capture_target) == 'function' and get_usb_capture_target() == 0 then
 			errmsg = 'remote capture cancelled'
 			break
 		end
 
-		local cmd=nil
+		local cmd
 		if msg then
 			cmd = string.match(msg,'^%w+')
 			last_msg=get_tick_count()
@@ -425,6 +451,7 @@ function rsint_run_single(opts)
 		if cmd == 's' or cmd == 'l' then
 			click('shoot_full_only')
 			if cmd == 'l' then
+				handle_last_jpgdummy(opts)
 				break
 			end
 		elseif cmd == 'q' then
@@ -455,6 +482,8 @@ function rsint_run(opts)
 	if not status then
 		return false, err
 	end
+
+	last_exp_count=get_exp_count()
 
 	if opts.cont then
 		return rsint_run_cont(opts)
