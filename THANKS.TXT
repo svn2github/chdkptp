@@ -16,7 +16,12 @@ Copyright (c) 1994-2017 Tecgraf, PUC-Rio.
 LuaFileSystem http://keplerproject.github.com/luafilesystem/
 Copyright (c) 2003 Kepler Project.
 
-Lua, IUP, CD and LuaFileSystem are distributed under the following license:
+Lua-Signal https://github.com/LuaDist/lua-signal
+Copyright (C) 2007  Patrick J. Donnelly (batrick at batbytes.com)
+Note developer site is https://github.com/batrick/lua-signal but
+latest version is not Lua 5.2 compatible
+
+Lua, IUP, CD, LuaFileSystem and Lua are distributed under the following license:
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

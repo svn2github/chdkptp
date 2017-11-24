@@ -114,6 +114,10 @@ LDFLAGS+=$(LIB_PATHS) $(patsubst %,-l%,$(LINK_LIBS) $(SYS_LIBS))
 
 SUBDIRS=lfs
 
+ifeq ($(LUASIGNAL_SUPPORT),1)
+SUBDIRS+=lua-signal
+endif
+
 CHDKPTP_EXE=chdkptp$(EXE_EXTRA)$(EXE)
 
 EXES=$(CHDKPTP_EXE)

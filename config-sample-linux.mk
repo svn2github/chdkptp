@@ -45,6 +45,10 @@ DEBUG=1
 #CD_LIB_DIR=/path/to/cd
 #CD_INCLUDE_DIR=/path/to/cd/include
 
+# build optional signal module, for automation applications
+# not used by default, but source included and should build on any linux
+LUASIGNAL_SUPPORT=1
+
 # include svn revision in build number
 #USE_SVNREV=1
 
