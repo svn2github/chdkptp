@@ -7,6 +7,7 @@ HOSTPLATFORM:=$(patsubst MINGW%,MINGW,$(shell uname -s))
 ifeq ($(HOSTPLATFORM),MINGW)
 OSTYPE=Windows
 EXE=.exe
+DLL=.dll
 # Note may be freetype or freetype6 depending on your CD version, zlib requried for 5.5 and later
 CD_FREETYPE_LIB=freetype6 z
 #CD_FREETYPE_LIB=freetype z
@@ -14,6 +15,7 @@ else
 ifeq ($(HOSTPLATFORM),Linux)
 OSTYPE=Linux
 EXE= 
+DLL=.so
 CD_FREETYPE_LIB=freetype z
 endif
 endif
