@@ -108,6 +108,23 @@ function m.execwaittime(opts)
 		wall_time, opts.count / wall_time)
 end
 
+function m.fake_rsint_input(seq)
+	return function()
+		while true do
+			-- ensure sequence ends
+			if #seq == 0 then
+				return 'l'
+			end
+			local op=table.remove(seq,1)
+			if type(op) == 'number' then
+				sys.sleep(op)
+			elseif type(op) == 'string' then
+				return op
+			end
+		end
+	end
+end
+
 --[[
 repeatedly time memory transfers from cam
 opts:{
@@ -355,6 +372,111 @@ function tests.msgs()
 	assert(mt.test({size=10,sizeinc=10,count=100,verbose=0}))
 end
 
+function tests.rec()
+	m.cliexec('rec')
+	sys.sleep(250)
+end
+
+function tests.remoteshoot()
+	-- check filewrite capability (could do RAW/DNG only)
+	if not con:execwait([[ return (bitand(get_usb_capture_support(),7) == 7) ]]) then
+		printf('cam does not support remote capture, skipping\n')
+		return
+	end
+	-- try to set the camera to a normal shooting mode
+	con:execwait([[
+capmode=require'capmode'
+if not capmode.set('P') then
+	error('capmode.set failed')
+end
+sleep(200)
+if capmode.get_name() ~= 'P' then
+	error('failed to set mode')
+end
+]])
+	local ldir='camtest'
+	fsutil.mkdir_m(ldir)
+	-- TODO would be good to sanity check files
+	m.cliexec(string.format('remoteshoot -jpg -dng -jpgdummy %s/',ldir))
+	m.cliexec(string.format('remoteshoot -raw -dnghdr -jpgdummy %s/',ldir))
+	m.cliexec(string.format('remoteshoot -quick=3 -jpg -jpgdummy %s/',ldir))
+	m.cliexec(string.format('remoteshoot -quick=3 -int=5 -jpg -jpgdummy %s/',ldir))
+	-- check if cont mode enabled
+	if con:execwait([[ return (get_prop(require'propcase'.DRIVE_MODE) == 1) ]]) then
+		m.cliexec(string.format('remoteshoot -cont=3 -jpg -jpgdummy %s/',ldir))
+	else
+		printf('cont mode not set, skipping remoteshoot cont test\n')
+	end
+	-- TODO cleanup jpeg dummies on cam, need to be in playback to avoid crash
+	fsutil.rm_r(ldir)
+end
+
+function tests.rsint()
+	-- setup / cleanup duplicated from remoteshoot
+	-- check filewrite capability (could do RAW/DNG only)
+	if not con:execwait([[ return (bitand(get_usb_capture_support(),7) == 7) ]]) then
+		printf('cam does not support remote capture, skipping\n')
+		return
+	end
+	-- try to set the camera to a normal shooting mode
+	con:execwait([[
+capmode=require'capmode'
+if not capmode.set('P') then
+	error('capmode.set failed')
+end
+sleep(200)
+if capmode.get_name() ~= 'P' then
+	error('failed to set mode')
+end
+]])
+	local ldir='camtest'
+	fsutil.mkdir_m(ldir)
+	local rsint=require'rsint'
+	-- build arguments for rsint.run instead of using cli so we can override input
+	-- have to set some options that default to non-false in cli code (e.g. u)
+	assert(rsint.run{
+		[1]=ldir..'/',
+		u='s',
+		cmdwait=60,
+		jpg=true,
+		jpgdummy=true,
+		input_func=m.fake_rsint_input{
+			's',
+			5000,
+			's',
+			5000,
+			'q',
+		}
+	})
+	if con:execwait([[ return (get_prop(require'propcase'.DRIVE_MODE) == 1) ]]) then
+		assert(rsint.run{
+			[1]=ldir..'/',
+			u='s',
+			cmdwait=60,
+			cont=true,
+			jpg=true,
+			jpgdummy=true,
+			input_func=m.fake_rsint_input{
+				's',
+				5000,
+				's',
+				5000,
+				'l',
+			}
+		})
+	else
+		printf('cont mode not set, skipping rsint cont test\n')
+	end
+	
+	fsutil.rm_r(ldir)
+end
+
+function tests.play()
+	sys.sleep(250)
+	m.cliexec('play')
+	sys.sleep(250)
+end
+
 function tests.reconnect()
 	assert(con:is_connected())
 	m.cliexec('reconnect')
@@ -386,6 +508,7 @@ opts:{
 	devspec=<usb device spec> -- specify which device to use, default to first available
 	bench=bool -- run "benchmark" tests
 	filexfer=bool -- run file transfer tests
+	shoot=bool -- tests that involve switching to rec mode and shooting
 }
 NOTE
 filexfer creates and deletes various hard coded paths, both locally and on the camera
@@ -413,6 +536,13 @@ function m.runbatch(opts)
 		m.run('filexfer')
 		m.run('mfilexfer')
 		m.run('rmemfile')
+	end
+	if opts.shoot then
+		if m.run('rec') then
+			m.run('remoteshoot')
+			m.run('rsint')
+			m.run('play')
+		end
 	end
 	m.run('reconnect')
 	m.run('disconnect')
