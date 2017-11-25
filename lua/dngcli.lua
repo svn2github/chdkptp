@@ -401,10 +401,7 @@ m.init_cli = function()
 				mtime = lfs.attributes(filename,'modification')
 			end
 
-			local fh,err = io.open(filename,'wb')
-			if not fh then
-				return false, err
-			end
+			local fh = fsutil.open_e(filename,'wb')
 
 			local status, err = d._lb:fwrite(fh)
 			fh:close()
@@ -715,11 +712,7 @@ m.init_cli = function()
 			if args.fmt == 'count' then
 				outfn = function() end
 			elseif args.out then
-				local err
-				fh,err = io.open(args.out,'wb')
-				if not fh then return
-					false, err
-				end
+				fh = fsutil.open_e(args.out,'wb')
 
 				outfn = function(fmt,x,y)
 					fh:write(string.format(fmt,x,y))

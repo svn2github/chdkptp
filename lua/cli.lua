@@ -533,10 +533,7 @@ function cli:get_luatext_arg(arg)
 	if not arg.input then
 		return arg.text
 	end
-	local fh,err = io.open(arg.input,'rb')
-	if not fh then
-		errlib.throw{etype='io',msg='failed to open input: '..tostring(err)}
-	end
+	local fh = fsutil.open_e(arg.input,'rb')
 	local r=fh:read("*a")
 	fh:close()
 	return r
@@ -928,10 +925,8 @@ cli:add_commands{
 			local r = con:getmem(addr,count,'string',flags)
 
 			if args.f then
-				local fh,err=io.open(args.f,"wb")
-				if not fh then
-					return false, err
-				end
+				fsutil.mkdir_parent(args.f)
+				local fh=fsutil.open_e(args.f,"wb")
 				fh:write(r)
 				fh:close()
 				return true, string.format("0x%08x %u %s\n",addr,count,args.f)

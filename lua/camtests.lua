@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2013-2014 <reyalp (at) gmail dot com>
+ Copyright (C) 2013-2017 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -169,7 +169,7 @@ function m.cliexec_ret_fail(cmd)
 	if not status then
 		return err
 	end
-	assert('command succeeded when expected to fail')
+	error('command succeeded when expected to fail')
 end
 
 function m.makelocalfile(path,content)
@@ -339,6 +339,15 @@ function tests.mfilexfer()
 	fsutil.rm_r(ldir)
 end
 
+function tests.rmemfile()
+	local ldir='camtest'
+	local fn=ldir..'/rmem.dat'
+	local out=m.cliexec_ret_ok('rmem 0x1900 0x400 -f='..fn)
+	assert(out == '0x00001900 1024 '..fn..'\n')
+	assert(lfs.attributes(fn).size == 1024)
+	fsutil.rm_r(ldir)
+end
+
 function tests.msgs()
 	local mt=require'extras/msgtest'
 	assert(mt.test({size=1,sizeinc=1,count=100,verbose=0}))
@@ -403,6 +412,7 @@ function m.runbatch(opts)
 	if opts.filexfer then
 		m.run('filexfer')
 		m.run('mfilexfer')
+		m.run('rmemfile')
 	end
 	m.run('reconnect')
 	m.run('disconnect')

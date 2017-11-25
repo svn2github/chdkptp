@@ -573,6 +573,44 @@ t.varsubst = function()
 	assert(subst:run('${date,whee %H:%M:%S}') == 'whee 12:00:00')
 end
 
+t.dng = function()
+	local infile='test10.dng'
+	local outfile='dngtest.tmp'
+	-- test files not checked in, skip if not present
+	if not lfs.attributes(infile) then
+		printf('dng test file not present, skipping\n')
+		return
+	end
+	local status,err=cli:execute('dngload '..infile)
+	assert(status and err == 'loaded '..infile)
+	status,err=cli:execute('dngsave '..outfile)
+	assert(status) -- TODO 'wrote' message goes to stdout
+	status,err=cli:execute('dngdump -thm='..outfile..'.ppm  -tfmt=ppm -raw='..outfile..'.pgm  -rfmt=8pgm')
+	assert(status)
+	status,err=os.remove(outfile)
+	assert(status)
+	status,err=os.remove(outfile..'.ppm')
+	assert(status)
+	status,err=os.remove(outfile..'.pgm')
+	assert(status)
+	status,err=cli:execute('dnglistpixels -max=0 -out='..outfile..'.bad.txt -fmt=chdk')
+	assert(status)
+	status,err=os.remove(outfile..'.bad.txt')
+	assert(status)
+end
+
+t.climisc = function()
+	local status,msg=cli:execute('!return 1')
+	assert(status and msg=='=1')
+	local tmpfile=os.tmpname()
+	local fh=fsutil.open_e(tmpfile,'wb')
+	fh:write('return 1+1\n')
+	fh:close()
+	status,msg=cli:execute('!<'..tmpfile)
+	assert(status and msg=='=2')
+	os.remove(tmpfile)
+end
+
 function m:run(name)
 	-- TODO side affects galore
 	printf('%s:start\n',name)

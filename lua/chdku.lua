@@ -210,10 +210,7 @@ function con_methods:download_file_ff(finfo,dst,opts)
 	if finfo.st.size > 0 then
 		self:download(src,dst)
 	else
-		local f,err=io.open(dst,"wb")
-		if not f then
-			error(err)
-		end
+		local f=fsutil.open_e(dst,"wb")
 		f:close()
 	end
 	if opts.mtime then

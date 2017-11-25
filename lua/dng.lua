@@ -325,11 +325,7 @@ function ifd_methods.write_image_data(self,dst)
 	end
 
 	if type(dst) == 'string' then
-		local err
-		fh, err = io.open(dst,'wb')
-		if not fh then
-			error('open failed '..tostring(err))
-		end
+		fh = fsutil.open_e(dst,'wb')
 	elseif type(dst) == 'userdata' and type(dst.read) == 'function' then
 		fh = dst
 	else

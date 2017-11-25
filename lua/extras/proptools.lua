@@ -72,10 +72,7 @@ function m.print(props)
 	end
 end
 function m.write(props,filename)
-	local fh,err=io.open(filename,'wb')
-	if not fh then
-		error(err)
-	end
+	local fh=fsutil.open_e(filename,'wb')
 	for i=props._min,props._max do
 		fh:write(string.format("%s\n",m.fmt(props,i)))
 	end

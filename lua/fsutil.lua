@@ -630,4 +630,25 @@ function fsutil.popen(prog,mode)
 	end
 	return io.popen(prog,mode)
 end
+
+--[[
+wrapper for fsutil.popen that throws on error
+]]
+function fsutil.popen_e(prog,mode)
+	local fh, err=fsutil.popen(path,mode)
+	if not fh then
+		errlib.throw{etype='io',msg=tostring(err)}
+	end
+	return fh
+end
+--[[
+wrapper for io.open that throws on error
+]]
+function fsutil.open_e(path,mode)
+	local fh, err=io.open(path,mode)
+	if not fh then
+		errlib.throw{etype='io',msg=tostring(err)}
+	end
+	return fh
+end
 return fsutil

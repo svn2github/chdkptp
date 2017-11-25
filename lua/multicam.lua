@@ -311,10 +311,7 @@ function mc:save_list(path,opts)
 	local s=util.serialize(t,{pretty=true,bracket_keys=true})
 
 	fsutil.mkdir_parent(path)
-	local fh,err=io.open(path,'wb')
-	if not fh then
-		error(err)
-	end
+	local fh=fsutil.open_e(path,'wb')
 	fh:write(s)
 	fh:close()
 	printf("wrote: %s\n",path)
@@ -324,10 +321,7 @@ load and return saved camera list
 ]]
 function mc:load_list(path)
 	path=get_list_path(path)
-	local fh,err=io.open(path)
-	if not fh then
-		error(err)
-	end
+	local fh=fsutil.open_e(path)
 	local list=fh:read('*a')
 	fh:close()
 	return util.unserialize(list)
