@@ -1149,44 +1149,38 @@ chdku.remotecap_dtypes={
 return a handler that stores collected chunks into an array or using a function
 ]]
 function chdku.rc_handler_store(store)
+	local store_fn
+	if type(store) == 'function' then
+		store_fn = store
+	elseif type(store) == 'table' then
+		store_fn = function(val)
+			table.insert(store,val)
+		end
+	elseif type(store) ~= 'nil' then
+		errlib.throw{etype='bad_arg',msg='rc_handler_store: invalid store target'}
+	end
 	return function(lcon,hdata) 
-		local store_fn
 		if not store then
 			store_fn = hdata.store_return
-		elseif type(store) == 'function' then
-			store_fn = store
-		elseif type(store) == 'table' then
-			store_fn = function(val)
-				table.insert(store,val)
-			end
-		else
-			return false,'invalid store target'
 		end
 		local chunk
 		local n_chunks = 0
 		repeat
 			local status,err
 			cli.dbgmsg('rc chunk get %d %d\n',hdata.id,n_chunks)
-			status,chunk=lcon:capture_get_chunk_pcall(hdata.id)	
-			if not status then
-				return false,chunk
-			end
+			chunk=lcon:capture_get_chunk(hdata.id)	
 			cli.dbgmsg('rc chunk size:%d offset:%s last:%s\n',
 						chunk.size,
 						tostring(chunk.offset),
 						tostring(chunk.last))
 
 			chunk.imgnum = hdata.imgnum -- for convenience, store image number in chunk
-			status,err = store_fn(chunk)
-			if status==false then -- allow nil so simple functions don't need to return a value
-				return false,err
-			end
+			store_fn(chunk)
 			n_chunks = n_chunks + 1
 		until chunk.last or n_chunks > hdata.max_chunks
 		if n_chunks > hdata.max_chunks then
-			return false, 'exceeded max_chunks'
+			errlib.throw{etype='protocol',msg='rc_handler_store: exceeded max_chunks'}
 		end
-		return true
 	end
 end
 
@@ -1210,16 +1204,16 @@ end
 function chdku.rc_process_dng(dng_info,raw)
 	local hdr,err=dng.bind_header(dng_info.hdr)
 	if not hdr then
-		return false, err
+		error(err)
 	end
 	-- TODO makes assumptions about header layout
 	local ifd=hdr:get_ifd{0,0} -- assume main image is first subifd of first ifd
 	if not ifd then 
-		return false, 'ifd 0.0 not found'
+		error('ifd 0.0 not found')
 	end
 	local ifd0=hdr:get_ifd{0} -- assume thumb is first ifd
 	if not ifd0 then 
-		return false, 'ifd 0 not found'
+		error('ifd 0 not found')
 	end
 
 	raw.data:reverse_bytes()
@@ -1254,7 +1248,7 @@ function chdku.rc_process_dng(dng_info,raw)
 	if not status then
 		cli.dbgmsg('not creating thumb: %s\n',tostring(err))
 		dng_info.thumb = lbuf.new(twidth*theight*3)
-		return true -- thumb failure isn't fatal
+		return -- thumb failure isn't fatal
 	end
 	if dng_info.badpix then
 		cli.dbgmsg('patching badpixels: ')
@@ -1266,7 +1260,6 @@ function chdku.rc_process_dng(dng_info,raw)
 	-- TODO assumes header is set up for RGB uncompressed
 	-- TODO could make a better / larger thumb than default and adjust entries
 	dng_info.thumb = hdr.img:make_rgb_thumb(twidth,theight)
-	return true
 end
 --[[
 return a raw handler that will take a previously received dng header and build a DNG file
@@ -1277,43 +1270,29 @@ dng_info:
 
 ]]
 function chdku.rc_handler_raw_dng_file(dir,filename_base,ext,dng_info)
+	if not dng_info then
+		errlib.throw{etype='bad_arg',msg='rc_handler_raw_dng_file: missing dng_info'}
+	end
 	return function(lcon,hdata)
-		local filename,err = chdku.rc_build_path(hdata,dir,filename_base,ext)
-		if not filename then
-			return false, err
-		end
-		if not dng_info then
-			return false, 'missing dng_info'
-		end
+		local filename = chdku.rc_build_path(hdata,dir,filename_base,ext)
 		if not dng_info.hdr then
-			return false, 'missing dng_hdr'
+			errlib.throw{etype='bad_arg',msg='rc_handler_raw_dng_file: missing dng_info.hdr'}
 		end
 
 		cli.dbgmsg('rc file %s %d\n',filename,hdata.id)
-		
-		local fh,err=io.open(filename,'wb')
-		if not fh then
-			return false, err
-		end
-
 		cli.dbgmsg('rc chunk get %s %d\n',filename,hdata.id)
-		local status,raw=lcon:capture_get_chunk_pcall(hdata.id)	
-		if not status then
-			return false, raw
-		end
+		local raw=lcon:capture_get_chunk(hdata.id)	
 		cli.dbgmsg('rc chunk size:%d offset:%s last:%s\n',
 						raw.size,
 						tostring(raw.offset),
 						tostring(raw.last))
+		chdku.rc_process_dng(dng_info,raw)
+		local fh=fsutil.open_e(filename,'wb')
 		dng_info.hdr:fwrite(fh)
-		--fh:write(string.rep('\0',128*96*3)) -- TODO fake thumb
-		local status, err = chdku.rc_process_dng(dng_info,raw)
-		if status then
-			dng_info.thumb:fwrite(fh)
-			raw.data:fwrite(fh)
-		end
+		--fh:write(string.rep('\0',128*96*3)) -- fake thumb
+		dng_info.thumb:fwrite(fh)
+		raw.data:fwrite(fh)
 		fh:close()
-		return status,err
 	end
 end
 --[[
@@ -1322,49 +1301,43 @@ TODO should stream to disk in C code like download
 ]]
 function chdku.rc_handler_file(dir,filename_base,ext)
 	return function(lcon,hdata)
-		local filename,err = chdku.rc_build_path(hdata,dir,filename_base,ext)
-		if not filename then
-			return false, err
-		end
+		local filename = chdku.rc_build_path(hdata,dir,filename_base,ext)
 		cli.dbgmsg('rc file %s %d\n',filename,hdata.id)
 		
-		local fh,err = io.open(filename,'wb')
-		if not fh then
-			return false, err
-		end
+		local fh = fsutil.open_e(filename,'wb')
 
 		local chunk
 		local n_chunks = 0
 		-- note only jpeg has multiple chunks
-		repeat
-			cli.dbgmsg('rc chunk get %s %d %d\n',filename,hdata.id,n_chunks)
-			local status
-			status,chunk=lcon:capture_get_chunk_pcall(hdata.id)	
-			if not status then
-				fh:close()
-				return false,chunk
-			end
-			cli.dbgmsg('rc chunk size:%d offset:%s last:%s\n',
-						chunk.size,
-						tostring(chunk.offset),
-						tostring(chunk.last))
+		-- pcall to allow closing file on error
+		local status,err=pcall(function()
+			repeat
+				cli.dbgmsg('rc chunk get %s %d %d\n',filename,hdata.id,n_chunks)
+				chunk=lcon:capture_get_chunk(hdata.id)	
+				cli.dbgmsg('rc chunk size:%d offset:%s last:%s\n',
+							chunk.size,
+							tostring(chunk.offset),
+							tostring(chunk.last))
 
-			if chunk.offset then
-				fh:seek('set',chunk.offset)
-			end
-			if chunk.size ~= 0 then
-				chunk.data:fwrite(fh)
-			else
-				-- TODO zero size chunk could be valid but doesn't appear to show up in normal operation
-				util.warnf('ignoring zero size chunk\n')
-			end
-			n_chunks = n_chunks + 1
-		until chunk.last or n_chunks > hdata.max_chunks
+				if chunk.offset then
+					fh:seek('set',chunk.offset)
+				end
+				if chunk.size ~= 0 then
+					chunk.data:fwrite(fh)
+				else
+					-- TODO zero size chunk could be valid but doesn't appear to show up in normal operation
+					util.warnf('ignoring zero size chunk\n')
+				end
+				n_chunks = n_chunks + 1
+			until chunk.last or n_chunks > hdata.max_chunks
+		end)
 		fh:close()
-		if n_chunks > hdata.max_chunks then
-			return false, 'exceeded max_chunks'
+		if not status then
+			error(err)
 		end
-		return true
+		if n_chunks > hdata.max_chunks then
+			errlib.throw{etype='protocol',msg='rc_handler_store: exceeded max_chunks'}
+		end
 	end
 end
 --[[
@@ -1429,6 +1402,7 @@ opts:
 	dng_hdr=handler,
 handler:
 	f(lcon,handler_data)
+	handlers should throw with error() on error, return values are ignored
 handler_data:
 	ext -- extension from remotecap dtypes
 	id  -- data type number
@@ -1443,7 +1417,7 @@ function con_methods:capture_get_data(opts)
 	opts=util.extend_table({
 		timeout=20000,
 	},opts)
-	local wait_opts=util.extend_table({rsdata=true},opts,{keys={'timeout','initwait','poll','pollstart'}})
+	local wait_opts=util.extend_table({rsdata=true,timeout_error=true},opts,{keys={'timeout','initwait','poll','pollstart'}})
 
 	local toget = {}
 	local handlers = {}
@@ -1473,9 +1447,6 @@ function con_methods:capture_get_data(opts)
 	local done
 	while not done do
 		local status = con:wait_status(wait_opts)
-		if status.timeout then
-			error('timed out')
-		end
 		if status.rsdata == 0x10000000 then
 			error('remote shoot error')
 		end
@@ -1499,10 +1470,7 @@ function con_methods:capture_get_data(opts)
 					end,
 				},chdku.remotecap_dtypes[i])
 
-				local status, err = handlers[i](self,hdata)
-				if not status then
-					error(tostring(err))
-				end
+				handlers[i](self,hdata)
 				toget[i] = nil
 			end
 			if toget[i] then
