@@ -47,7 +47,7 @@ function methods.process_var(self,str,validate_only)
 	end
 	if self.funcs[func] then
 		if validate_only then
-			return
+			return func -- replace substs with name, removing ${ for syntax check
 		else
 			return self.funcs[func](argstr,self)
 		end
@@ -65,13 +65,23 @@ methods.run=function(obj,str,validate_only)
 		end)
 	return r
 end
+--[[
+syntax check
+]]
+methods.validate=function(obj,str)
+	local r=obj:run(str,true)
+	if string.match(r,'%${') then
+		errlib.throw{etype='varsubst',msg='unclosed ${'}
+	end
+	return r
+end
 
 --[[
 create a temporary varsubsts using 'funcs' and validate str with it
 throws on error
 ]]
 m.validate_funcs=function(funcs,str)
-	return m.new(funcs):run(str,true)
+	return m.new(funcs):validate(str)
 end
 --[[
 return a function that passes the named value from state through string.format, 

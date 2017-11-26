@@ -574,8 +574,9 @@ t.varsubst = function()
 	assert(subst:run('${date}') == '20011110_120000')
 	assert(subst:run('${date,%Y}') == '2001')
 	assert(subst:run('${date,whee %H:%M:%S}') == 'whee 12:00:00')
-	assert(pcall(function() vs.validate_funcs(funcs,'${sprintf,hello world %d,${fmt}}') end))
-	assert(not pcall(function() vs.validate_funcs(funcs,'${bogus}') end))
+	assert(pcall(function() subst:validate('${sprintf,hello world %d,${fmt}}') end))
+	assert(not pcall(function() subst:validate('${bogus}') end))
+	assert(not pcall(function() subst:validate('whee${fmt') end))
 end
 
 t.dng = function()
