@@ -360,7 +360,7 @@ chdku.name_subst_funcs={
 	name=varsubst.format_state_val('name','%s'),
 	basename=varsubst.format_state_val('basename','%s'),
 	ext=varsubst.format_state_val('ext','%s'),
-	imgnum=varsubst.format_state_val('imgnum','%s'),
+	imgnum=varsubst.format_state_val('imgnum','%s'), -- defaults to string format, since it could be empty
 	imgpfx=varsubst.format_state_val('imgpfx','%s'),
 }
 -- image directories
