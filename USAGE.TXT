@@ -403,7 +403,7 @@ shoot        [options]   : - shoot a picture with specified exposure
    -dng[=1|0] Force DNG on or off, implies raw if on, default current camera setting
    -pretend   print actions instead of running them
    -nowait    don't wait for shot to complete
-   -dl[=<dest spec>] download shot file(s), dest spec is a substituion string default ${name}
+   -dl[=<dest spec>] download shot file(s), dest spec is a substitution string default ${name}
    -rm        remove file after shooting
   Any exposure parameters not set use camera defaults
 
@@ -423,8 +423,13 @@ ${dirnum}         Image directory number like 101
 ${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cameras only
 ${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
 
-remoteshoot (rs) [local] [options]: - shoot and download without saving to SD (requires CHDK >= 1.2)
- [local]       local destination directory or filename (w/o extension!)
+remoteshoot (rs) [dest] [options]: - shoot and download without saving to SD (requires CHDK >= 1.2)
+ [dest] path/name specification for saved files
+  None: Save in current directory, with default names like IMG_0123.jpg
+  Contains a '$': Name generated using substitutions below (unless -nosubst)
+  Ending in '/' or name of existing directory: Default names saved in directory
+  Other: Extension appended based on type. Not useful with multi-shot options
+
  options:
    -u=<s|a|96>
       s   standard units (default)
@@ -450,9 +455,29 @@ remoteshoot (rs) [local] [options]: - shoot and download without saving to SD (r
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
    -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
    -jpgdummy    write dummy IMG_nnnn.JPG to avoid play / shutdown crash on some cams
+   -nosubst     don't do pattern substitution on file names
+   -seq=<n>     initial value for shotseq subst string, default cli_shotseq
 
-rsint        [local] [options]: - shoot and download with interactive control
- [local]       local destination directory or filename (w/o extension!)
+Substitutions
+${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${pid,strfmt}     camera platform ID, default format %x
+${ldate,datefmt}  Time of shot (PC clock), os.date format, default %Y%m%d_%H%M%S
+${lts,strfmt}     Time of shot as unix timestamp + microseconds, default format %f
+${lms,strfmt}     Time of shot milliseconds part, default format %03d
+${name}           Image full name, like IMG_1234.JPG
+${basename}       Image name without extension, like IMG_1234
+${ext}            Image extension, like .jpg
+${imgnum}         Image number like 1234
+${imgfmt}         Image format, one of 'jpg', 'dng', 'raw', 'dng_hdr'
+${shotseq}        Sequential number incremented per shot
+
+rsint        [dest] [options]: - shoot and download with interactive control
+ [dest] path/name specification for saved files
+  None: Save in current directory, with default names like IMG_0123.jpg
+  Contains a '$': Name generated using substitions below (unless -nosubst)
+  Ending in '/' or name of existing directory: Default names saved in directory
+  Other: Extension appended based on type. Not useful with multi-shot options
+
  options:
    -u=<s|a|96>
       s   standard units (default)
@@ -477,6 +502,8 @@ rsint        [local] [options]: - shoot and download with interactive control
    -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
    -pipe=<program> read commands from standard output of <program> instead of stdin
    -jpgdummy    write dummy IMG_nnnn.JPG to avoid play / shutdown crash on some cams (reg CHDK >= 1.3)
+   -nosubst     don't do pattern substitution on file names
+   -seq=<n>     initial value for shotseq subst string, default cli_shotseq
 
  The following commands are available at the rsint> prompt
   s    shoot
@@ -490,6 +517,19 @@ rsint        [local] [options]: - shoot and download with interactive control
  The camera must be set to continuous mode in the Canon UI
  CHDK 1.3 shoot hooks must be available
  The l command must be used to exit
+
+Substitutions
+${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${pid,strfmt}     camera platform ID, default format %x
+${ldate,datefmt}  Time of shot (PC clock), os.date format, default %Y%m%d_%H%M%S
+${lts,strfmt}     Time of shot as unix timestamp + microseconds, default format %f
+${lms,strfmt}     Time of shot milliseconds part, default format %03d
+${name}           Image full name, like IMG_1234.JPG
+${basename}       Image name without extension, like IMG_1234
+${ext}            Image extension, like .jpg
+${imgnum}         Image number like 1234
+${imgfmt}         Image format, one of 'jpg', 'dng', 'raw', 'dng_hdr'
+${shotseq}        Sequential number incremented per shot
 
 rec                      : - switch camera to shooting mode
 play                     : - switch camera to playback mode
@@ -578,14 +618,14 @@ dngbatch     [options] [files] { command ; command ... }: - manipulate multiple 
   take the same options as the corresponding standalone commands
   load and unload are implicitly called for each file
 
-
 ==Runtime options==
 The set command allows you to set the following runtime options
 cli_time=false       - boolean: show cli execution times
 cli_xferstats=false  - boolean: show cli data transfer stats
-cli_verbose=1        - number: control verbosity of cli
+cli_verbose=2        - number: control verbosity of cli
 cli_source_max=10    - number: max nested source calls
 cli_error_exit=false - boolean: exit on cli command error
+cli_shotseq=1        - number: shooting command ${shotseq} value, incremented on shot
 warn_deprecated=true - boolean: warn on deprecated libraries
 core_verbose=0       - number: ptp core verbosity
 err_trace=critical   - string: stack trace on error, values: 'always', 'critical', 'never'

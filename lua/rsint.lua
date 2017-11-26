@@ -26,7 +26,10 @@ function init_handlers(args,opts)
 	local dst = args[1]
 	local dst_dir
 	if dst then
-		if string.match(dst,'[\\/]+$') then
+		if not args.nosubst and string.match(dst,'%$') then
+			do_subst=true
+			varsubst.validate_funcs(chdku.rc_subst_funcs,dst)
+		elseif string.match(dst,'[\\/]+$') then
 			-- explicit / treat it as a directory
 			-- and check if it is
 			dst_dir = string.sub(dst,1,-2)
@@ -51,6 +54,8 @@ function init_handlers(args,opts)
 		lstart=opts.lstart,
 		lcount=opts.lcount,
 	}
+	m.rcopts.do_subst=do_subst
+
 	if args.shotwait then
 		m.rcopts.timeout=tonumber(args.shotwait)
 	elseif opts.tv then -- opts.tv is normalized to a tv96 value
@@ -118,6 +123,8 @@ m.rsint_once = function(cmd,args,opts)
 		-- TODO could check if remotecap has timed out here
 		con:write_msg(cmdname..' '..rest)
 		if cmdname == 's' or cmdname == 'l' then
+			m.rcopts.shotseq=prefs.cli_shotseq
+			prefs.cli_shotseq = prefs.cli_shotseq+1
 			-- throws on error
 			con:capture_get_data(m.rcopts)
 			if cmdname == 'l' then
@@ -140,6 +147,9 @@ m.run = function(args)
 	local opts,err = cli:get_shoot_common_opts(args)
 	if not opts then
 		return false,err
+	end
+	if args.seq and not tonumber(args.seq) then
+		return false,'invalid seq'
 	end
 
 	if args.cont then
@@ -230,6 +240,11 @@ m.run = function(args)
 
 	-- throws on error, rs_shoot should not initialize remotecap if there's an error, so no need to uninit
 	con:exec('return rsint_run('..opts_s..')',{libs={'rsint'}})
+
+	-- not done in init_handlers, only want once per invocation
+	if args.seq then
+		prefs.cli_shotseq = tonumber(args.seq)
+	end
 
 	local status
 	repeat

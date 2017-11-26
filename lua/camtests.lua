@@ -398,12 +398,12 @@ end
 	fsutil.mkdir_m(ldir)
 	-- TODO would be good to sanity check files
 	m.cliexec(string.format('remoteshoot -jpg -dng -jpgdummy %s/',ldir))
-	m.cliexec(string.format('remoteshoot -raw -dnghdr -jpgdummy %s/',ldir))
-	m.cliexec(string.format('remoteshoot -quick=3 -jpg -jpgdummy %s/',ldir))
-	m.cliexec(string.format('remoteshoot -quick=3 -int=5 -jpg -jpgdummy %s/',ldir))
+	m.cliexec(string.format('remoteshoot -seq=100 -raw -dnghdr -jpgdummy %s/${imgfmt}_${shotseq}${ext}',ldir))
+	m.cliexec(string.format('remoteshoot -quick=3 -jpg -jpgdummy %s/${imgfmt}_${shotseq}${ext}',ldir))
+	m.cliexec(string.format('remoteshoot -quick=3 -int=5 -jpg -jpgdummy %s/${imgfmt}_${shotseq}${ext}',ldir))
 	-- check if cont mode enabled
 	if con:execwait([[ return (get_prop(require'propcase'.DRIVE_MODE) == 1) ]]) then
-		m.cliexec(string.format('remoteshoot -cont=3 -jpg -jpgdummy %s/',ldir))
+		m.cliexec(string.format('remoteshoot -cont=3 -jpg -jpgdummy %s/${name}',ldir))
 	else
 		printf('cont mode not set, skipping remoteshoot cont test\n')
 	end
@@ -435,8 +435,9 @@ end
 	-- build arguments for rsint.run instead of using cli so we can override input
 	-- have to set some options that default to non-false in cli code (e.g. u)
 	assert(rsint.run{
-		[1]=ldir..'/',
+		[1]=ldir..'/${imgfmt}_${shotseq}${ext}',
 		u='s',
+		seq=200,
 		cmdwait=60,
 		jpg=true,
 		jpgdummy=true,
@@ -539,8 +540,11 @@ function m.runbatch(opts)
 	end
 	if opts.shoot then
 		if m.run('rec') then
+			-- save and restore cli_shotseq
+			local cli_shotseq = prefs.cli_shotseq
 			m.run('remoteshoot')
 			m.run('rsint')
+			prefs.cli_shotseq = cli_shotseq
 			m.run('play')
 		end
 	end

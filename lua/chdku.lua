@@ -355,18 +355,26 @@ chdku.stat_subst_funcs={
 	mdate=varsubst.format_state_date('mdate','%Y%m%d_%H%M%S'),
 	mts=varsubst.format_state_val('mts','%d'),
 }
--- name/path
-chdku.path_subst_funcs={
+-- image names
+chdku.name_subst_funcs={
 	name=varsubst.format_state_val('name','%s'),
 	basename=varsubst.format_state_val('basename','%s'),
 	ext=varsubst.format_state_val('ext','%s'),
-	subdir=varsubst.format_state_val('subdir','%s'),
 	imgnum=varsubst.format_state_val('imgnum','%s'),
 	imgpfx=varsubst.format_state_val('imgpfx','%s'),
+}
+-- image directories
+chdku.dir_subst_funcs={
+	subdir=varsubst.format_state_val('subdir','%s'),
 	dirnum=varsubst.format_state_val('dirnum','%s'),
 	dirmonth=varsubst.format_state_val('dirmonth','%s'),
 	dirday=varsubst.format_state_val('dirday','%s'),
 }
+-- image directories + name
+chdku.path_subst_funcs=util.extend_table({},{
+	chdku.name_subst_funcs,
+	chdku.dir_subst_funcs,
+})
 
 -- combine into one table for imdl etc
 chdku.imglist_subst_funcs=util.extend_table_multi({},{
@@ -375,6 +383,16 @@ chdku.imglist_subst_funcs=util.extend_table_multi({},{
 	chdku.seq_subst_funcs,
 	chdku.stat_subst_funcs,
 	chdku.path_subst_funcs,
+})
+-- remote capture
+chdku.rc_subst_funcs=util.extend_table_multi({},{
+	chdku.con_subst_funcs,
+	chdku.ltime_subst_funcs,
+	chdku.name_subst_funcs,
+	{
+		shotseq=varsubst.format_state_val('shotseq','%04d'),
+		imgfmt=varsubst.format_state_val('imgfmt','%s'),
+	}
 })
 
 --[[
@@ -1184,19 +1202,40 @@ function chdku.rc_handler_store(store)
 	end
 end
 
-function chdku.rc_build_path(hdata,dir,filename,ext)
-	if not filename then
+function chdku.rc_set_subst_state(state,hdata,opts)
+	if opts.ext then
+		state.ext=opts.ext
+	else
+		state.ext=hdata.ext
+	end
+	state.imgfmt=state.ext -- like ext, but without the .
+	-- ext includes the . to match other subst functions
+	state.ext='.'..state.ext
+	state.imgpfx='IMG' -- TODO could vary based on type, or from cam settings
+	state.imgnum=string.format('%04d',hdata.imgnum)
+	state.basename=string.format('%s_%s',state.imgpfx,state.imgnum)
+	state.name=state.basename..state.ext
+end
+
+function chdku.rc_build_path(hdata,opts)
+	local filename = opts.dst
+	if filename then
+		if hdata.subst then
+			chdku.rc_set_subst_state(hdata.subst.state,hdata,opts)
+			return hdata.subst:run(filename)
+		end
+	else
 		filename = string.format('IMG_%04d',hdata.imgnum)
 	end
 
-	if ext then
-		filename = filename..'.'..ext
+	if opts.ext then
+		filename = filename..'.'..opts.ext
 	else
 		filename = filename..'.'..hdata.ext
 	end
 
-	if dir then
-		filename = fsutil.joinpath(dir,filename)
+	if opts.dst_dir then
+		filename = fsutil.joinpath(opts.dst_dir,filename)
 	end
 	return filename
 end
@@ -1269,12 +1308,12 @@ dng_info:
 	hdr=<lbuf> dng header lbuf
 
 ]]
-function chdku.rc_handler_raw_dng_file(dir,filename_base,ext,dng_info)
+function chdku.rc_handler_raw_dng_file(hopts,dng_info)
 	if not dng_info then
 		errlib.throw{etype='bad_arg',msg='rc_handler_raw_dng_file: missing dng_info'}
 	end
 	return function(lcon,hdata)
-		local filename = chdku.rc_build_path(hdata,dir,filename_base,ext)
+		local filename = chdku.rc_build_path(hdata,hopts)
 		if not dng_info.hdr then
 			errlib.throw{etype='bad_arg',msg='rc_handler_raw_dng_file: missing dng_info.hdr'}
 		end
@@ -1287,6 +1326,7 @@ function chdku.rc_handler_raw_dng_file(dir,filename_base,ext,dng_info)
 						tostring(raw.offset),
 						tostring(raw.last))
 		chdku.rc_process_dng(dng_info,raw)
+		fsutil.mkdir_parent(filename)
 		local fh=fsutil.open_e(filename,'wb')
 		dng_info.hdr:fwrite(fh)
 		--fh:write(string.rep('\0',128*96*3)) -- fake thumb
@@ -1299,11 +1339,12 @@ end
 return a handler function that just downloads the data to a file
 TODO should stream to disk in C code like download
 ]]
-function chdku.rc_handler_file(dir,filename_base,ext)
+function chdku.rc_handler_file(hopts)
 	return function(lcon,hdata)
-		local filename = chdku.rc_build_path(hdata,dir,filename_base,ext)
+		local filename = chdku.rc_build_path(hdata,hopts)
 		cli.dbgmsg('rc file %s %d\n',filename,hdata.id)
 		
+		fsutil.mkdir_parent(filename)
 		local fh = fsutil.open_e(filename,'wb')
 
 		local chunk
@@ -1358,9 +1399,10 @@ function chdku.rc_init_std_handlers(opts)
 		lstart=0,
 		lcount=0,
 	},opts)
+	local hopts=util.extend_table({},opts,{keys={'dst','dst_dir'}})
 	local rcopts={}
 	if opts.jpg then
-		rcopts.jpg=chdku.rc_handler_file(opts.dst_dir,opts.dst)
+		rcopts.jpg=chdku.rc_handler_file(hopts)
 	end
 	if opts.dng then
 		if opts.raw or opts.dng_hdr then
@@ -1376,13 +1418,13 @@ function chdku.rc_init_std_handlers(opts)
 			badpix=opts.badpix,
 		}
 		rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
-		rcopts.raw = chdku.rc_handler_raw_dng_file(opts.dst_dir,opts.dst,'dng',dng_info)
+		rcopts.raw = chdku.rc_handler_raw_dng_file(util.extend_table({ext='dng'},hopts),dng_info)
 	else
 		if opts.raw then
-			rcopts.raw=chdku.rc_handler_file(opts.dst_dir,opts.dst)
+			rcopts.raw=chdku.rc_handler_file(hopts)
 		end
 		if opts.dnghdr then
-			rcopts.dng_hdr=chdku.rc_handler_file(opts.dst_dir,opts.dst)
+			rcopts.dng_hdr=chdku.rc_handler_file(hopts)
 		end
 	end
 	return rcopts
@@ -1416,6 +1458,7 @@ rets
 function con_methods:capture_get_data(opts)
 	opts=util.extend_table({
 		timeout=20000,
+		shotseq=1,
 	},opts)
 	local wait_opts=util.extend_table({rsdata=true,timeout_error=true},opts,{keys={'timeout','initwait','poll','pollstart'}})
 
@@ -1441,6 +1484,8 @@ function con_methods:capture_get_data(opts)
 		handlers[2] = opts.dng_hdr
 	end
 
+	local subst
+
 	-- table to return chunks (or other values) sent by hdata.store_return
 	local rets = {}
 
@@ -1450,6 +1495,15 @@ function con_methods:capture_get_data(opts)
 		if status.rsdata == 0x10000000 then
 			error('remote shoot error')
 		end
+		-- initialize subst state when first data available, ~shot time
+		if opts.do_subst and not subst then
+			subst=varsubst.new(chdku.rc_subst_funcs)
+			self:set_subst_con_state(subst.state)
+			chdku.set_subst_time_state(subst.state)
+			-- each capture_get_data only handles one shot, so caller is responsible for incrmenting
+			subst.state.shotseq = opts.shotseq
+		end
+
 		local avail = util.bit_unpack(status.rsdata)
 		local n_toget = 0
 		for i=0,2 do
@@ -1459,6 +1513,7 @@ function con_methods:capture_get_data(opts)
 					error(string.format('unexpected type %d',i))
 				end
 				local hdata = util.extend_table({
+					subst=subst,
 					opts=opts,
 					imgnum=status.rsimgnum,
 					store_return=function(val)

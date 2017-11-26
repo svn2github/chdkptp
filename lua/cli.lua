@@ -2061,7 +2061,7 @@ ${shotseq}        Sequential number incremented when imgnum changes.
    -dng[=1|0] Force DNG on or off, implies raw if on, default current camera setting
    -pretend   print actions instead of running them
    -nowait    don't wait for shot to complete
-   -dl[=<dest spec>] download shot file(s), dest spec is a substituion string default ${name}
+   -dl[=<dest spec>] download shot file(s), dest spec is a substitution string default ${name}
    -rm        remove file after shooting
   Any exposure parameters not set use camera defaults
 
@@ -2225,7 +2225,7 @@ rlib_wait_timeout(
 	{
 		names={'remoteshoot','rs'},
 		help='shoot and download without saving to SD (requires CHDK >= 1.2)',
-		arghelp="[local] [options]",
+		arghelp="[dest] [options]",
 		args=argparser.create{
 			u='s',
 			tv=false,
@@ -2247,10 +2247,17 @@ rlib_wait_timeout(
 			int=false,
 			badpix=false,
 			shotwait=false,
-			jpgdummy=false
+			jpgdummy=false,
+			nosubst=false,
+			seq=false,
 		},
 		help_detail=[[
- [local]       local destination directory or filename (w/o extension!)
+ [dest] path/name specification for saved files
+  None: Save in current directory, with default names like IMG_0123.jpg
+  Contains a '$': Name generated using substitutions below (unless -nosubst)
+  Ending in '/' or name of existing directory: Default names saved in directory 
+  Other: Extension appended based on type. Not useful with multi-shot options
+
  options:
    -u=<s|a|96>
       s   standard units (default)
@@ -2276,12 +2283,31 @@ rlib_wait_timeout(
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
    -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
    -jpgdummy	write dummy IMG_nnnn.JPG to avoid play / shutdown crash on some cams
+   -nosubst     don't do pattern substitution on file names
+   -seq=<n>     initial value for shotseq subst string, default cli_shotseq
+
+Substitutions
+${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${pid,strfmt}     camera platform ID, default format %x
+${ldate,datefmt}  Time of shot (PC clock), os.date format, default %Y%m%d_%H%M%S
+${lts,strfmt}     Time of shot as unix timestamp + microseconds, default format %f
+${lms,strfmt}     Time of shot milliseconds part, default format %03d
+${name}           Image full name, like IMG_1234.JPG
+${basename}       Image name without extension, like IMG_1234
+${ext}            Image extension, like .jpg
+${imgnum}         Image number like 1234
+${imgfmt}         Image format, one of 'jpg', 'dng', 'raw', 'dng_hdr'
+${shotseq}        Sequential number incremented per shot
 ]],
 		func=function(self,args)
 			local dst = args[1]
 			local dst_dir
+			local do_subst
 			if dst then
-				if string.match(dst,'[\\/]+$') then
+				if not args.nosubst and string.match(dst,'%$') then
+					do_subst=true
+					varsubst.validate_funcs(chdku.rc_subst_funcs,dst)
+				elseif string.match(dst,'[\\/]+$') then
 					-- explicit / treat it as a directory
 					-- and check if it is
 					dst_dir = string.sub(dst,1,-2)
@@ -2294,6 +2320,10 @@ rlib_wait_timeout(
 					dst_dir = dst
 					dst = nil
 				end
+			end
+
+			if args.seq and not tonumber(args.seq) then
+				return false,'invalid seq'
 			end
 
 			local opts,err = cli:get_shoot_common_opts(args)
@@ -2392,6 +2422,7 @@ rlib_wait_timeout(
 				lstart=opts.lstart,
 				lcount=opts.lcount,
 			}
+			rcopts.do_subst=do_subst
 
 			if args.shotwait then
 				rcopts.timeout=tonumber(args.shotwait)
@@ -2401,10 +2432,14 @@ rlib_wait_timeout(
 			else
 				rcopts.timeout=20000
 			end
+			if args.seq then
+				prefs.cli_shotseq = tonumber(args.seq)
+			end
 
 			local status,err
 			local shot = 1
 			repeat
+				rcopts.shotseq=prefs.cli_shotseq
 				cli.dbgmsg('get data %d\n',shot)
 				status,err = con:capture_get_data_pcall(rcopts)
 				if not status then
@@ -2414,6 +2449,7 @@ rlib_wait_timeout(
 					break
 				end
 				shot = shot + 1
+				prefs.cli_shotseq = prefs.cli_shotseq+1
 			until shot > opts.shots
 
 			local t0=ustime.new()
@@ -2466,7 +2502,7 @@ rlib_wait_timeout(
 	{
 		names={'rsint'},
 		help='shoot and download with interactive control',
-		arghelp="[local] [options]",
+		arghelp="[dest] [options]",
 		args=cli.argparser.create{
 			u='s',
 			tv=false,
@@ -2488,9 +2524,16 @@ rlib_wait_timeout(
 			pipe=false,
 			shotwait=false,
 			jpgdummy=false,
+			nosubst=false,
+			seq=false,
 		},
 		help_detail=[[
- [local]       local destination directory or filename (w/o extension!)
+ [dest] path/name specification for saved files
+  None: Save in current directory, with default names like IMG_0123.jpg
+  Contains a '$': Name generated using substitutions below (unless -nosubst)
+  Ending in '/' or name of existing directory: Default names saved in directory 
+  Other: Extension appended based on type. Not useful with multi-shot options
+
  options:
    -u=<s|a|96>
       s   standard units (default)
@@ -2515,6 +2558,8 @@ rlib_wait_timeout(
    -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
    -pipe=<program> read commands from standard output of <program> instead of stdin
    -jpgdummy	write dummy IMG_nnnn.JPG to avoid play / shutdown crash on some cams (reg CHDK >= 1.3)
+   -nosubst     don't do pattern substitution on file names
+   -seq=<n>     initial value for shotseq subst string, default cli_shotseq
 
  The following commands are available at the rsint> prompt
   s    shoot
@@ -2528,6 +2573,19 @@ rlib_wait_timeout(
  The camera must be set to continuous mode in the Canon UI
  CHDK 1.3 shoot hooks must be available
  The l command must be used to exit
+
+Substitutions
+${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${pid,strfmt}     camera platform ID, default format %x
+${ldate,datefmt}  Time of shot (PC clock), os.date format, default %Y%m%d_%H%M%S
+${lts,strfmt}     Time of shot as unix timestamp + microseconds, default format %f
+${lms,strfmt}     Time of shot milliseconds part, default format %03d
+${name}           Image full name, like IMG_1234.JPG
+${basename}       Image name without extension, like IMG_1234
+${ext}            Image extension, like .jpg
+${imgnum}         Image number like 1234
+${imgfmt}         Image format, one of 'jpg', 'dng', 'raw', 'dng_hdr'
+${shotseq}        Sequential number incremented per shot
 ]],
 		func=function(self,args)
 			return rsint.run(args)
@@ -2587,4 +2645,5 @@ prefs._add('cli_xferstats','boolean','show cli data transfer stats')
 prefs._add('cli_verbose','number','control verbosity of cli',1)
 prefs._add('cli_source_max','number','max nested source calls',10)
 prefs._add('cli_error_exit','boolean','exit on cli command error')
+prefs._add('cli_shotseq','number','shooting command ${shotseq} value, incremented on shot',1)
 return cli
