@@ -371,7 +371,7 @@ chdku.dir_subst_funcs={
 	dirday=varsubst.format_state_val('dirday','%s'),
 }
 -- image directories + name
-chdku.path_subst_funcs=util.extend_table({},{
+chdku.path_subst_funcs=util.extend_table_multi({},{
 	chdku.name_subst_funcs,
 	chdku.dir_subst_funcs,
 })
