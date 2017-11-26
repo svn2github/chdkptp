@@ -558,11 +558,12 @@ t.varsubst = function()
 		fmt=123.4,
 		date=os.time{year=2001,month=11,day=10},
 	}
-	local subst=vs.new({
+	local funcs={
 		fmt=vs.format_state_val('fmt','%d'),
 		date=vs.format_state_date('date','%Y%m%d_%H%M%S'),
 		sprintf=vs.sprintf,
-	},s)
+	}
+	local subst=vs.new(funcs,s)
 	assert(subst:run('${fmt}') == '123')
 	assert(subst:run('whee${fmt}ee') == 'whee123ee')
 	assert(subst:run('${fmt, %3.2f}') == '123.40')
@@ -571,6 +572,8 @@ t.varsubst = function()
 	assert(subst:run('${date}') == '20011110_120000')
 	assert(subst:run('${date,%Y}') == '2001')
 	assert(subst:run('${date,whee %H:%M:%S}') == 'whee 12:00:00')
+	assert(pcall(function() vs.validate_funcs(funcs,'${sprintf,hello world %d,${fmt}}') end))
+	assert(not pcall(function() vs.validate_funcs(funcs,'${bogus}') end))
 end
 
 t.dng = function()

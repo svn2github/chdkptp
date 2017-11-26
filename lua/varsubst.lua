@@ -25,9 +25,9 @@ local m={}
 local methods={}
 
 --[[
-expend a single ${} expression
+expand a single ${} expression
 ]]
-function methods.process_var(self,str)
+function methods.process_var(self,str,validate_only)
 	-- discard {}
 	str=str:sub(2,-2)
 	-- extract func name
@@ -38,30 +38,41 @@ function methods.process_var(self,str)
 		s,e,argstr=str:find(',%s*(.*)$')
 	end
 	if not s then
-		error('parse failed '..tostring(str))
+		errlib.throw{etype='varsubst',msg='parse failed '..tostring(str)}
 	end
 	-- recursively expand args, so ${foo, ${bar}} gets expanded
 	-- TODO there is no way to prevent any {} from being counted in the %b{}
 	if argstr then
-		argstr=self:run(argstr)
+		argstr=self:run(argstr,validate_only)
 	end
 	if self.funcs[func] then
-		return self.funcs[func](argstr,self)
+		if validate_only then
+			return
+		else
+			return self.funcs[func](argstr,self)
+		end
 	end
-	error('unknown substitution function '..tostring(func))
+	errlib.throw{etype='varsubst',msg='unknown substitution function '..tostring(func)}
 end
 
 --[[
 process a string
---]]
-methods.run=function(obj,str)
+]]
+methods.run=function(obj,str,validate_only)
 	local r=str:gsub('$(%b{})',
 		function(s)
-			return obj:process_var(s)
+			return obj:process_var(s,validate_only)
 		end)
 	return r
 end
 
+--[[
+create a temporary varsubsts using 'funcs' and validate str with it
+throws on error
+]]
+m.validate_funcs=function(funcs,str)
+	return m.new(funcs):run(str,true)
+end
 --[[
 return a function that passes the named value from state through string.format, 
 using the first arg as the format string, or default_fmt if not specified
