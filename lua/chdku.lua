@@ -1203,12 +1203,18 @@ function chdku.rc_handler_store(store)
 end
 
 function chdku.rc_set_subst_state(state,hdata,opts)
+	if opts.fmt then
+		state.imgfmt=opts.fmt
+	else
+		-- uppercase for consistency with shoot
+		state.imgfmt=string.upper(hdata.ext)
+	end
+
 	if opts.ext then
 		state.ext=opts.ext
 	else
 		state.ext=hdata.ext
 	end
-	state.imgfmt=state.ext -- like ext, but without the .
 	-- ext includes the . to match other subst functions
 	state.ext='.'..state.ext
 	state.imgpfx='IMG' -- TODO could vary based on type, or from cam settings
@@ -1418,7 +1424,7 @@ function chdku.rc_init_std_handlers(opts)
 			badpix=opts.badpix,
 		}
 		rcopts.dng_hdr = chdku.rc_handler_store(function(chunk) dng_info.hdr=chunk.data end)
-		rcopts.raw = chdku.rc_handler_raw_dng_file(util.extend_table({ext='dng'},hopts),dng_info)
+		rcopts.raw = chdku.rc_handler_raw_dng_file(util.extend_table({ext='dng',fmt='DNG'},hopts),dng_info)
 	else
 		if opts.raw then
 			rcopts.raw=chdku.rc_handler_file(hopts)

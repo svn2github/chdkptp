@@ -2327,7 +2327,7 @@ ${name}           Image full name, like IMG_1234.JPG
 ${basename}       Image name without extension, like IMG_1234
 ${ext}            Image extension, like .jpg
 ${imgnum}         Image number like 1234
-${imgfmt}         Image format, one of 'jpg', 'dng', 'raw', 'dng_hdr'
+${imgfmt}         Image format, one of 'JPG', 'DNG', 'RAW', 'DNG_HDR'
 ${shotseq}        Sequential number incremented per shot
 ]],
 		func=function(self,args)
@@ -2611,7 +2611,7 @@ ${name}           Image full name, like IMG_1234.JPG
 ${basename}       Image name without extension, like IMG_1234
 ${ext}            Image extension, like .jpg
 ${imgnum}         Image number like 1234
-${imgfmt}         Image format, one of 'jpg', 'dng', 'raw', 'dng_hdr'
+${imgfmt}         Image format, one of 'JPG', 'DNG', 'RAW', 'DNG_HDR'
 ${shotseq}        Sequential number incremented per shot
 ]],
 		func=function(self,args)

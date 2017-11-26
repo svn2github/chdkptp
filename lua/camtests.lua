@@ -397,11 +397,20 @@ end
 	local ldir='camtest'
 	fsutil.mkdir_m(ldir)
 	-- TODO would be good to sanity check files
-	m.cliexec(string.format('remoteshoot -jpg -dng -jpgdummy %s/',ldir))
-	m.cliexec(string.format('remoteshoot -seq=100 -raw -dnghdr -jpgdummy %s/${imgfmt}_${shotseq}${ext}',ldir))
+	m.cliexec(string.format('remoteshoot -jpg -jpgdummy %s/',ldir))
+
+	m.cliexec(string.format('remoteshoot -seq=100 -dng -jpg -jpgdummy %s/${imgpfx}_${imgfmt}_${shotseq}${ext}',ldir))
 	assert(prefs.cli_shotseq == 101)
+	assert(lfs.attributes(ldir..'/IMG_JPG_0100.jpg','mode') == 'file')
+	assert(lfs.attributes(ldir..'/IMG_DNG_0100.dng','mode') == 'file')
+
+	m.cliexec(string.format('remoteshoot -raw -dnghdr -jpgdummy %s/${imgfmt}_${shotseq}${ext}',ldir))
+	assert(prefs.cli_shotseq == 102)
+	assert(lfs.attributes(ldir..'/RAW_0101.raw','mode') == 'file')
+	assert(lfs.attributes(ldir..'/DNG_HDR_0101.dng_hdr','mode') == 'file')
+
 	m.cliexec(string.format('remoteshoot -quick=3 -jpg -jpgdummy %s/${imgfmt}_${shotseq}${ext}',ldir))
-	assert(prefs.cli_shotseq == 104)
+	assert(prefs.cli_shotseq == 105)
 	m.cliexec(string.format('remoteshoot -quick=3 -int=5 -jpg -jpgdummy %s/${imgfmt}_${shotseq}${ext}',ldir))
 	-- check if cont mode enabled
 	if con:execwait([[ return (get_prop(require'propcase'.DRIVE_MODE) == 1) ]]) then
