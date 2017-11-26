@@ -526,6 +526,13 @@ function cli:get_shoot_common_opts(args)
 	if  opts.tv == 0 and not con:is_ver_compatible(2,5) then
 		opts.tv = 1
 	end
+	-- shot sequence - ensure numeric
+	if args.seq then
+		args.seq = tonumber(args.seq)
+		if not args.seq then
+			return false,'invalid seq'
+		end
+	end
 	return opts
 end
 
@@ -2041,6 +2048,7 @@ ${shotseq}        Sequential number incremented when imgnum changes.
 			nowait=false,
 			dl=false,
 			rm=false,
+			seq=false,
 		}),
 		-- TODO allow setting destinations and filetypes for -dl
 		-- TODO should support canon native raw
@@ -2063,6 +2071,7 @@ ${shotseq}        Sequential number incremented when imgnum changes.
    -nowait    don't wait for shot to complete
    -dl[=<dest spec>] download shot file(s), dest spec is a substitution string default ${name}
    -rm        remove file after shooting
+   -seq=<n>     initial value for shotseq subst string, default cli_shotseq
   Any exposure parameters not set use camera defaults
 
 Substitutions
@@ -2073,13 +2082,15 @@ ${lts,strfmt}     PC clock date as unix timestamp + microseconds, default format
 ${lms,strfmt}     PC clock milliseconds part, default format %03d
 ${name}           Image full name, like IMG_1234.JPG
 ${basename}       Image name without extension, like IMG_1234
-${ext}            Image extension, like .JPG
+${ext}            Image extension, like .JPG. For raw, as set in CHDK settings
 ${subdir}         Image DCIM subdirectory, like 100CANON or 100___01 or 100_0101
 ${imgnum}         Image number like 1234
 ${imgpfx}         Image prefix like IMG
+${imgfmt}         Image format, one of 'JPG', 'DNG', 'RAW'
 ${dirnum}         Image directory number like 101
 ${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cameras only
 ${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
+${shotseq}        Sequential number incremented per shot
 ]],
 		func=function(self,args)
 			local opts,err = cli:get_shoot_common_opts(args)
@@ -2110,6 +2121,24 @@ ${dirday}         Image DCIM subdirectory day, like 01, date folder naming camer
 				end
 				opts.info=true
 			end
+			local subst = varsubst.new(util.extend_table_multi({},{
+				chdku.con_subst_funcs,
+				chdku.ltime_subst_funcs,
+--				chdku.stat_subst_funcs,
+				chdku.path_subst_funcs,
+				{
+					shotseq=varsubst.format_state_val('shotseq','%04d'),
+					imgfmt=varsubst.format_state_val('imgfmt','%s'),
+				},
+			}))
+			-- default download name - match camera name with no directory
+			if args.dl == true then
+				args.dl='${name}'
+			end
+			if args.dl then
+				-- syntax check
+				subst:validate(args.dl)
+			end
 			local cmd=string.format('rlib_shoot(%s)',util.serialize(opts))
 			if args.pretend then
 				return true,cmd
@@ -2118,16 +2147,6 @@ ${dirday}         Image DCIM subdirectory day, like 01, date folder naming camer
 				con:exec(cmd,{libs={'rlib_shoot'}})
 				return true
 			end
-			-- default download name - match camera name with no directory
-			if args.dl == true then
-				args.dl='${name}'
-			end
-			local subst = varsubst.new(util.extend_table_multi({},{
-				chdku.con_subst_funcs,
-				chdku.ltime_subst_funcs,
---				chdku.stat_subst_funcs,
-				chdku.path_subst_funcs,
-			})) 
 
 			local rstatus,rerr = con:execwait('return '..cmd,{libs={'serialize_msgs','rlib_shoot'}})
 
@@ -2140,6 +2159,12 @@ ${dirday}         Image DCIM subdirectory day, like 01, date folder naming camer
 
 			chdku.set_subst_time_state(subst.state)
 			con:set_subst_con_state(subst.state)
+			-- seq only modified for downloaded shots
+			if args.seq then
+				prefs.cli_shotseq = tonumber(args.seq)
+			end
+			subst.state.shotseq = prefs.cli_shotseq
+			prefs.cli_shotseq = prefs.cli_shotseq + 1
 
 			local info = rstatus
 
@@ -2183,6 +2208,11 @@ ${dirday}         Image DCIM subdirectory day, like 01, date folder naming camer
 					raw_pfx = 'RAW_'
 				end
 				raw_path = string.format('%s/%s_%04d.%s',raw_dir,raw_pfx,info.exp,raw_ext)
+				if info.dng then
+					subst.state.imgfmt='DNG'
+				else
+					subst.state.imgfmt='RAW'
+				end
 			end
 			-- raw should always exist by the time shoot() finishes
 			if raw_path then
@@ -2211,6 +2241,7 @@ rlib_wait_timeout(
 
 			if args.dl then
 				util.extend_table(subst.state,fsutil.parse_image_path_cam(jpg_path,{string=true}))
+				subst.state.imgfmt='JPG'
 				local dst=subst:run(args.dl)
 				cli:print_status(cli:execute('download '..jpg_path..' '..dst))
 			end
@@ -2320,10 +2351,6 @@ ${shotseq}        Sequential number incremented per shot
 					dst_dir = dst
 					dst = nil
 				end
-			end
-
-			if args.seq and not tonumber(args.seq) then
-				return false,'invalid seq'
 			end
 
 			local opts,err = cli:get_shoot_common_opts(args)

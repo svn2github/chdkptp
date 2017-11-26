@@ -148,9 +148,6 @@ m.run = function(args)
 	if not opts then
 		return false,err
 	end
-	if args.seq and not tonumber(args.seq) then
-		return false,'invalid seq'
-	end
 
 	if args.cont then
 		opts.cont=1

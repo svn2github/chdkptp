@@ -399,7 +399,9 @@ end
 	-- TODO would be good to sanity check files
 	m.cliexec(string.format('remoteshoot -jpg -dng -jpgdummy %s/',ldir))
 	m.cliexec(string.format('remoteshoot -seq=100 -raw -dnghdr -jpgdummy %s/${imgfmt}_${shotseq}${ext}',ldir))
+	assert(prefs.cli_shotseq == 101)
 	m.cliexec(string.format('remoteshoot -quick=3 -jpg -jpgdummy %s/${imgfmt}_${shotseq}${ext}',ldir))
+	assert(prefs.cli_shotseq == 104)
 	m.cliexec(string.format('remoteshoot -quick=3 -int=5 -jpg -jpgdummy %s/${imgfmt}_${shotseq}${ext}',ldir))
 	-- check if cont mode enabled
 	if con:execwait([[ return (get_prop(require'propcase'.DRIVE_MODE) == 1) ]]) then
@@ -469,6 +471,18 @@ end
 		printf('cont mode not set, skipping rsint cont test\n')
 	end
 	
+	fsutil.rm_r(ldir)
+end
+
+function tests.shoot()
+	local ldir='camtest'
+	fsutil.mkdir_m(ldir)
+	-- imgfmt avoids depending on camera ext settings
+	m.cliexec(string.format('shoot -dng=1 -seq=300 -dl=%s/IMG_${shotseq}.${imgfmt}',ldir))
+	assert(prefs.cli_shotseq == 301)
+	assert(lfs.attributes(ldir..'/IMG_0300.JPG','mode') == 'file')
+	assert(lfs.attributes(ldir..'/IMG_0300.DNG','mode') == 'file')
+	-- TODO should clean up camera files
 	fsutil.rm_r(ldir)
 end
 
@@ -544,6 +558,7 @@ function m.runbatch(opts)
 			local cli_shotseq = prefs.cli_shotseq
 			m.run('remoteshoot')
 			m.run('rsint')
+			m.run('shoot')
 			prefs.cli_shotseq = cli_shotseq
 			m.run('play')
 		end
