@@ -65,7 +65,7 @@ function argparser:get_word(str)
 		elseif not qchar and string.match(c,"[%c%s]") then
 			break
 		-- hit a quote and not inside a quote, enter quote and discard
-		elseif not qchar and c == '"' or c == "'" then
+		elseif not qchar and (c == '"' or c == "'") then
 			qchar = c
 		-- anything else, copy
 		else
