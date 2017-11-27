@@ -181,6 +181,11 @@ The filexfer tests will create and delete a local directory called camtests
 in the current working directory. If you already have a directory of this name,
 it will be deleted when the test completes.
 
+You can add shoot=true to the camtests command to test some shooting related
+functions. This will attempt to switch to record mode and shoot. It may fail
+on some cameras which have issues with CHDK remoteshoot. Some files
+will be created on the camera.
+
 Camtests will also create and delete some files and directories on the camera.
 
 The final line of output from both test modules should be 

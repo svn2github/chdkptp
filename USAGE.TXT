@@ -405,6 +405,7 @@ shoot        [options]   : - shoot a picture with specified exposure
    -nowait    don't wait for shot to complete
    -dl[=<dest spec>] download shot file(s), dest spec is a substitution string default ${name}
    -rm        remove file after shooting
+   -seq=<n>     initial value for shotseq subst string, default cli_shotseq
   Any exposure parameters not set use camera defaults
 
 Substitutions
@@ -415,19 +416,21 @@ ${lts,strfmt}     PC clock date as unix timestamp + microseconds, default format
 ${lms,strfmt}     PC clock milliseconds part, default format %03d
 ${name}           Image full name, like IMG_1234.JPG
 ${basename}       Image name without extension, like IMG_1234
-${ext}            Image extension, like .JPG
+${ext}            Image extension, like .JPG. For raw, as set in CHDK settings
 ${subdir}         Image DCIM subdirectory, like 100CANON or 100___01 or 100_0101
 ${imgnum}         Image number like 1234
 ${imgpfx}         Image prefix like IMG
+${imgfmt}         Image format, one of 'JPG', 'DNG', 'RAW'
 ${dirnum}         Image directory number like 101
 ${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cameras only
 ${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
+${shotseq}        Sequential number incremented per shot
 
 remoteshoot (rs) [dest] [options]: - shoot and download without saving to SD (requires CHDK >= 1.2)
  [dest] path/name specification for saved files
   None: Save in current directory, with default names like IMG_0123.jpg
   Contains a '$': Name generated using substitutions below (unless -nosubst)
-  Ending in '/' or name of existing directory: Default names saved in directory
+  Ending in '/' or name of existing directory: Default names saved in directory 
   Other: Extension appended based on type. Not useful with multi-shot options
 
  options:
@@ -454,7 +457,7 @@ remoteshoot (rs) [dest] [options]: - shoot and download without saving to SD (re
    -int=<n.m>   interval for multiple shots, in seconds
    -badpix[=n]  interpolate over pixels with value <= n, default 0, (dng only)
    -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
-   -jpgdummy    write dummy IMG_nnnn.JPG to avoid play / shutdown crash on some cams
+   -jpgdummy	write dummy IMG_nnnn.JPG to avoid play / shutdown crash on some cams
    -nosubst     don't do pattern substitution on file names
    -seq=<n>     initial value for shotseq subst string, default cli_shotseq
 
@@ -468,14 +471,14 @@ ${name}           Image full name, like IMG_1234.JPG
 ${basename}       Image name without extension, like IMG_1234
 ${ext}            Image extension, like .jpg
 ${imgnum}         Image number like 1234
-${imgfmt}         Image format, one of 'jpg', 'dng', 'raw', 'dng_hdr'
+${imgfmt}         Image format, one of 'JPG', 'DNG', 'RAW', 'DNG_HDR'
 ${shotseq}        Sequential number incremented per shot
 
 rsint        [dest] [options]: - shoot and download with interactive control
  [dest] path/name specification for saved files
   None: Save in current directory, with default names like IMG_0123.jpg
-  Contains a '$': Name generated using substitions below (unless -nosubst)
-  Ending in '/' or name of existing directory: Default names saved in directory
+  Contains a '$': Name generated using substitutions below (unless -nosubst)
+  Ending in '/' or name of existing directory: Default names saved in directory 
   Other: Extension appended based on type. Not useful with multi-shot options
 
  options:
@@ -501,7 +504,7 @@ rsint        [dest] [options]: - shoot and download with interactive control
    -cont        use continuous mode
    -shotwait=<n> wait n ms for shot to complete, default 20000 or 2*tv+10000 if -tv given
    -pipe=<program> read commands from standard output of <program> instead of stdin
-   -jpgdummy    write dummy IMG_nnnn.JPG to avoid play / shutdown crash on some cams (reg CHDK >= 1.3)
+   -jpgdummy	write dummy IMG_nnnn.JPG to avoid play / shutdown crash on some cams (reg CHDK >= 1.3)
    -nosubst     don't do pattern substitution on file names
    -seq=<n>     initial value for shotseq subst string, default cli_shotseq
 
@@ -528,7 +531,7 @@ ${name}           Image full name, like IMG_1234.JPG
 ${basename}       Image name without extension, like IMG_1234
 ${ext}            Image extension, like .jpg
 ${imgnum}         Image number like 1234
-${imgfmt}         Image format, one of 'jpg', 'dng', 'raw', 'dng_hdr'
+${imgfmt}         Image format, one of 'JPG', 'DNG', 'RAW', 'DNG_HDR'
 ${shotseq}        Sequential number incremented per shot
 
 rec                      : - switch camera to shooting mode
