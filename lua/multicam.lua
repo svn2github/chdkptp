@@ -1052,6 +1052,7 @@ function mc:download_images(opts)
 	local subst=varsubst.new(util.extend_table({
 		id=varsubst.format_state_val('id','%02d'),
 	},chdku.imglist_subst_funcs))
+	subst:validate(opts.dst)
 	chdku.set_subst_time_state(subst.state)
 
 	-- list all images
