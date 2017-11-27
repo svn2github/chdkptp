@@ -612,6 +612,9 @@ function cli.init_lvdumpimg_file_opts(which,args,subst)
 			opts.pipe_oneproc = true
 		end
 	end
+	if filespec and not args.nosubst then
+		subst:validate(filespec)
+	end
 
 	opts.write = function(frame)
 		if not args.nosubst then

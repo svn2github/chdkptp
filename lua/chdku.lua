@@ -574,6 +574,7 @@ function con_methods:imglist_download(files,opts)
 		opts.verbose = true
 	end
 	local subst=varsubst.new(chdku.imglist_subst_funcs)
+	subst:validate(opts.dst)
 	chdku.set_subst_time_state(subst.state)
 	self:set_subst_con_state(subst.state)
 	subst.state.dlseq = opts.dlseq_start
@@ -1909,19 +1910,16 @@ local function live_dump_img_open(opts)
 		error('no filename or filehandle')
 	end
 
-	local fh, err
+	local fh
 	if opts.pipe then
-		fh,err = fsutil.popen(opts.filename,'wb')
+		fh = fsutil.popen_e(opts.filename,'wb')
 		if opts.pipe_oneproc then
 			opts.filehandle = fh
 		end
 	else
 		-- ensure parent dir exists
 		fsutil.mkdir_parent(opts.filename)
-		fh, err = io.open(opts.filename,'wb')
-	end
-	if not fh then
-		error(err)
+		fh = fsutil.open_e(opts.filename,'wb')
 	end
 	return fh
 end

@@ -365,6 +365,17 @@ function tests.rmemfile()
 	fsutil.rm_r(ldir)
 end
 
+function tests.lvdump()
+	local ldir='camtest'
+	m.cliexec('lvdumpimg -count=2 -vp='..ldir..'/${frame}.ppm -bm='..ldir..'/${frame}.pam -quiet')
+	assert(lfs.attributes(ldir..'/000001.pam','mode') == 'file')
+	assert(lfs.attributes(ldir..'/000001.ppm','mode') == 'file')
+	m.cliexec('lvdump -count=2 -quiet '..ldir..'/test.lvdump')
+	assert(lfs.attributes(ldir..'/test.lvdump','mode') == 'file')
+	fsutil.rm_r(ldir)
+end
+
+
 function tests.msgs()
 	local mt=require'extras/msgtest'
 	assert(mt.test({size=1,sizeinc=1,count=100,verbose=0}))
@@ -560,6 +571,7 @@ function m.runbatch(opts)
 		m.run('filexfer')
 		m.run('mfilexfer')
 		m.run('rmemfile')
+		m.run('lvdump')
 	end
 	if opts.shoot then
 		if m.run('rec') then
