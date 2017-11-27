@@ -635,7 +635,7 @@ end
 wrapper for fsutil.popen that throws on error
 ]]
 function fsutil.popen_e(prog,mode)
-	local fh, err=fsutil.popen(path,mode)
+	local fh, err=fsutil.popen(prog,mode)
 	if not fh then
 		errlib.throw{etype='io',msg=tostring(err)}
 	end
