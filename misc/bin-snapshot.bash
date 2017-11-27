@@ -94,6 +94,10 @@ if [ ! -z "$gui" ] ; then
 	PROGS="$PROGS chdkptp_gui$EXE"
 fi
 
+if [ -f signal.so ] ; then
+	PROGS="$PROGS signal.so"
+fi
+
 if [ -z "$debug" ] ; then
 	strip $PROGS
 fi
