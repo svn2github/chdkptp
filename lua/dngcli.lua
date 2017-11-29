@@ -540,7 +540,7 @@ m.init_cli = function()
     region of image to search, either active area (default) or all
   -bin=<n>
     number of values in histogram bin
-  -fmt=<count|%>
+  -fmt=<count|%|%.>
     format for output
 ]],
 		func=function(self,args)
@@ -576,51 +576,15 @@ m.init_cli = function()
 				return false, 'invalid region'
 			end
 
-			if args.fmt ~= '%' and args.fmt ~= 'count' then
-				return false, 'invalid format'
-			end
-
 			local h = d:build_histogram({top=top,left=left,bottom=bottom,right=right})
 			local binsize = tonumber(args.bin)
-
-			local fmt_range
-			local fmt_count
-			if args.fmt == '%' then
-				fmt_count = function(count)
-					return string.format('%f',(count / h.total) * 100)
-				end
-			else
-				fmt_count = function(count)
-					return tostring(count)
-				end
-			end
-			if binsize == 1 then
-				fmt_range = function(v1)
-					return tostring(v1)
-				end
-			else
-				fmt_range = function(v1,v2)
-					return string.format('%d-%d',v1,v2)
-				end
-			end
-
-			local outfn=function(count,v1,v2)
-				printf("%s %s\n",fmt_range(v1,v2),fmt_count(count))
-			end
-
-			local v = vmin
-
-			while v <= vmax do
-				local count = 0
-				for i=0,binsize - 1 do
-					-- bin size may not evenly divide range
-					if v+i <= vmax then
-						count = count + h[v+i]
-					end
-				end
-				outfn(count,v,v+binsize-1)
-				v = v + binsize
-			end
+			local histoutil=require'histoutil'
+			histoutil.print(h,{
+				min=vmin,
+				max=vmax,
+				fmt=args.fmt,
+				bin=binsize,
+			})
 			return true
 		end,
 	},

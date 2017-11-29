@@ -21,7 +21,7 @@ histogram utilities
 local m={ }
 
 --[[
-assumes histo is a 0 based array of values, with a field count optionaly giving the total number of values
+assumes histo is a 0 based array of values, with a field total optionaly giving the total number of values
 opts {
 	fmt=string|function -- 'count' = raw count, '%' = % as float, '%.' = % as line of '.'
 						-- or function(count), default 'count'
@@ -39,19 +39,20 @@ function m.print(histo,opts)
 		fmt='count',
 		bin=1,
 		min=0,
-		total=histo.count,
+		total=histo.total,
 	},opts)
 	-- only use #histo if max not specified, in case histo is userdate without length operator
 	if not opts.max then
 		opts.max = #histo
 	end
 	-- dng histo makes total a member of histo
+	local total=opts.total
 	if not total then
-		errlib.throw{etype='bad_arg',msg='print_histo: missing total'}
+		errlib.throw{etype='bad_arg',msg='histoutil.print: missing total'}
 	end
 
 	if not opts.max then
-		errlib.throw{etype='bad_arg',msg='print_histo: missing max'}
+		errlib.throw{etype='bad_arg',msg='histoutil.print: missing max'}
 	end
 	if not opts.rfmt then
 		local l=string.len(string.format('%d',opts.max))
@@ -75,16 +76,18 @@ function m.print(histo,opts)
 			return tostring(count)
 		end
 	else
-		errlib.throw{etype='bad_arg',msg='print_histo: bad fmt '..tostring(opts.fmt)}
+		errlib.throw{etype='bad_arg',msg='histoutil.print: bad fmt '..tostring(opts.fmt)}
 	end
 
 	if opts.bin == 1 then
+		local fstr=opts.rfmt
 		fmt_range = function(v1)
 			return string.format(opts.rfmt,v1)
 		end
 	else
+		local fstr=opts.rfmt..'-'..opts.rfmt
 		fmt_range = function(v1,v2)
-			return string.format(opts.rfmt..'-'..opts.rfmt,v1,v2)
+			return string.format(fstr,v1,v2)
 		end
 	end
 
@@ -97,18 +100,19 @@ function m.print(histo,opts)
 		end
 	end
 
+	local bin = opts.bin
 	local v = opts.min
 
 	while v <= opts.max do
 		local count = 0
-		for i=0,opts.bin - 1 do
+		for i=0,bin - 1 do
 			-- bin size may not evenly divide range
 			if v+i <= opts.max then
 				count = count + histo[v+i]
 			end
 		end
-		outfn(count,v,v+opts.bin-1)
-		v = v + opts.bin
+		outfn(count,v,v+bin-1)
+		v = v + bin
 	end
 	return true
 end
