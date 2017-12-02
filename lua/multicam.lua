@@ -267,6 +267,51 @@ function mc:list_sel()
 	end
 end
 
+--[[
+check for disconnected cameras,
+powercycle them with cam_powercycle_cmd if set, otherwise wait for manual power cycle
+reconnect using connect_opts (default all cameras) and start multicam script
+]]
+function mc:check_connections(connect_opts)
+	local dis_cams={}
+	local con_cams={}
+	-- build lists of connected and disconnected
+	for lcon in self:icams() do
+		if lcon:is_connected() then
+			table.insert(con_cams,lcon.mc_id)
+		else
+			table.insert(dis_cams,lcon.mc_id)
+		end
+	end
+	-- no disconnected cams, done
+	if #dis_cams == 0 then
+		printf("all %d cams ok\n",#con_cams)
+		return
+	end
+	self:sel(con_cams)
+	-- exit camera side script on still running cams
+	self:cmd('exit')
+	for i, mc_id in ipairs(dis_cams) do
+		printf("restart %d\n",mc_id)
+		-- some command that powercycles the crashed cameras based on camera id
+		if self.cam_powercycle_cmd then
+			os.execute(self.cam_powercycle_cmd .. ' ' .. mc_id)
+		end
+	end
+	if self.cam_powercycle_cmd then
+		-- give the cameras time to start
+		sys.sleep(5000)
+	else
+		cli.readline("press return when cameras are restarted >")
+	end
+	-- (re)connect cameras
+	self:connect(connect_opts)
+	-- restart script
+	self:start()
+	return
+end
+
+
 function mc:list_all()
 	for i,lcon in ipairs(self.cams) do
 		self:describe(lcon)
