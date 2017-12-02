@@ -32,6 +32,10 @@ local mc={
 	cams={},     -- array of all connections
 	selected={}, -- array of selected connects, ordered by ID
 	max_id=0,    -- max used ID, since list may not be contiguous
+	cmd_defaults={ -- defaults for mc:cmd
+		flushmsgs=true,
+		printcmd='once'
+	},
 }
 
 --[[
@@ -737,7 +741,7 @@ command must accept a camera tick time as it's argument (e.g. shoot)
 ]]
 function mc:cmd(cmd,opts)
 	local tstart = ustime.new()
-	opts=util.extend_table({flushmsgs=true,printcmd='once'},opts)
+	opts=util.extend_table_multi({},{mc.cmd_defaults,opts})
 	if opts.flushmsgs then
 		self:flushmsgs()
 	end
