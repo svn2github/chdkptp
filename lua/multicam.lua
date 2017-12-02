@@ -36,6 +36,9 @@ local mc={
 		flushmsgs=true,
 		printcmd='once'
 	},
+	download_images_subst_funcs=util.extend_table({
+		id=varsubst.format_state_val('id','%02d'),
+	},chdku.imglist_subst_funcs)
 }
 
 --[[
@@ -1078,13 +1081,14 @@ opts={
 	dst=string -- substitution pattern for downloaded files
 	delete=bool -- delete after download - not directories will not be deleted
 	overwrite=bool -- overwrite existing
-	pretend=bool -- print actions without doing anything
+	pretend=bool -- print actions without doing anything. Sets verbose unless verbose is explicitly false
 	verbose=bool -- print actions
 	-- everything else passed to imagelist, download_file_ff
 }
 multicam specific substitution variables
 ${id,strfmt} camera ID, default format %02d
 see chdku imglist_subst_funcs for standard variables
+returns list of images
 ]]
 function mc:download_images(opts)
 	opts=util.extend_table({
@@ -1095,12 +1099,10 @@ function mc:download_images(opts)
 		sort='date',
 		sort_order='asc',
 	},opts)
-	if opts.pretend then
+	if opts.pretend and opts.verbose ~= false then
 		opts.verbose = true
 	end
-	local subst=varsubst.new(util.extend_table({
-		id=varsubst.format_state_val('id','%02d'),
-	},chdku.imglist_subst_funcs))
+	local subst=varsubst.new(self.download_images_subst_funcs)
 	subst:validate(opts.dst)
 	chdku.set_subst_time_state(subst.state)
 
@@ -1123,12 +1125,12 @@ function mc:download_images(opts)
 			chdku.imglist_set_subst_seq_state(subst.state)
 			local dst = subst:run(opts.dst)
 			lcon:download_file_ff(f,dst,opts)
-
 		end
 	end
 	if opts.delete then
 		self:delete_files_list(list,{pretend=opts.pretend,verbose=opts.verbose})
 	end
+	return list
 end
 
 --[[
