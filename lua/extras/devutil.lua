@@ -323,8 +323,8 @@ else
 end
 ]])
 			if not status then
-				cli.infomsg("%s->%s\n",errlogname,errdst)
-				con:download(errlogname,errdst)
+				cli.infomsg("%s->%s\n",logname,errdst)
+				con:download(logname,errdst)
 				return false,string.format("ROMLOG failed, error %s\n",errdst)
 			end
 			cli.infomsg("%s->%s\n",logname,dst)
