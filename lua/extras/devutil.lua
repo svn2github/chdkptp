@@ -222,9 +222,12 @@ call_event_proc('Printf','%s dlgetcam end\n',os.date('%Y%m%d %H:%M:%S'))
 	{
 		names={'dsearch32'},
 		help='search memory for specified 32 bit value',
-		arghelp="[-l=<n>] <start> <end> <val>",
+		arghelp="[-l=<n>] [-c=<n>] [-cb=<n>] [-ca=<n>] <start> <end> <val>",
 		args=cli.argparser.create{
 			l=false,
+			c=false,
+			cb=false,
+			ca=false,
 		},
 		help_detail=[[
  <start> start address
@@ -232,6 +235,9 @@ call_event_proc('Printf','%s dlgetcam end\n',os.date('%Y%m%d %H:%M:%S'))
  <val>   value to find
  options
   -l=<n> stop after n matches 
+  -c=<n> show N words before and after
+  -cb=<n> show N words before match
+  -ca=<n> show N words after match
 ]],
 		func=function(self,args)
 			local start=tonumber(args[1])
@@ -246,6 +252,23 @@ call_event_proc('Printf','%s dlgetcam end\n',os.date('%Y%m%d %H:%M:%S'))
 			if not val then
 				return false, 'missing value'
 			end
+			local do_ctx
+			local ctx_before = 0
+			local ctx_after = 0
+			if args.c then
+				do_ctx=true
+				ctx_before = tonumber(args.c)
+				ctx_after = tonumber(args.c)
+			end
+			if args.cb then
+				do_ctx=true
+				ctx_before = tonumber(args.cb)
+			end
+			if args.ca then
+				do_ctx=true
+				ctx_after = tonumber(args.ca)
+			end
+
 			printf("search 0x%08x-0x%08x 0x%08x\n",start,last,val)
 			local t={}
 			-- TODO should have ability to save results since it's slow
@@ -253,7 +276,18 @@ call_event_proc('Printf','%s dlgetcam end\n',os.date('%Y%m%d %H:%M:%S'))
 mem_search_word{start=0x%x, last=0x%x, val=0x%x, limit=%s}
 ]],start,last,val,tostring(args.l)),{libs='mem_search_word',msgs=chdku.msg_unbatcher(t)})
 			for i,v in ipairs(t) do
-				printf("0x%08x\n",bit32.band(v,0xFFFFFFFF)) 
+				local adr=bit32.band(v,0xFFFFFFFF)
+				if do_ctx then
+					if adr > ctx_before then
+						adr = adr - 4*ctx_before
+					else
+						adr = 0
+					end
+					local count=ctx_before + ctx_after + 1
+					cli:print_status(cli:execute(('rmem -i32 0x%08x %d'):format(adr,count)))
+				else
+					printf("0x%08x\n",adr) 
+				end
 			end
 			return true
 		end
