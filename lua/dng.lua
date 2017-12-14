@@ -207,7 +207,7 @@ local ifd_entry_methods = {
 		end
 	end,
 	--[[
-	get a numeric elements of a value
+	get a numeric element of a value
 	for ASCII, bytes are returned
 	for rational, numerator and denominator are retuned in an array
 	--]]
@@ -233,6 +233,52 @@ local ifd_entry_methods = {
 		end
 		return t.lb_get(self._lb,v_off)
 	end,
+	--[[
+	set a numeric element
+	for ascii, value is a byte
+	for rational, val must be an array of two numbers
+		TODO converting to X/1000 or something would be convenient
+	--]]
+	setel = function(self,val,index)
+		if not index then
+			index = 0
+		end
+		if index >= self.count then
+			errlib.throw{etype='bad_arg', msg='setel: invalid index '..tostring(index)}
+		end
+		local t = self:type()
+		-- TODO would be better to allow setting arbitrary bytes
+		if t.name == 'unk' then
+			errlib.throw{etype='bad_arg', msg='setel: cannot set unk value'}
+		end
+		if not t.lb_get then
+			errlib.throw{etype='bad_arg', msg='setel: no setter for this type'}
+		end
+		local v_off = self:get_data_off() + t.size*index
+		if t.rational then
+			if type(val) ~= 'table' then
+				errlib.throw{etype='bad_arg', msg='setel: expected table for rational'}
+			end
+			if #val ~= 2 then
+				errlib.throw{etype='bad_arg', msg='setel: expected exactly 2 elements for rational'}
+			end
+			local v1,v2=tonumber(val[1]),tonumber(val[2])
+			if not (v1 and v2) then
+				errlib.throw{etype='bad_arg', msg='setel: expected numbers'}
+			end
+			t.lb_set(self._lb,v_off,v1)
+			t.lb_set(self._lb,v_off+t.elsize,v2)
+		else
+			local v=tonumber(val)
+			if not v then
+				errlib.throw{etype='bad_arg', msg='setel: expected number'}
+			end
+			t.lb_set(self._lb,v_off,v)
+		end
+	end,
+	--[[
+	get multiple elements of a value
+	--]]
 	getel_array = function(self,start,count)
 		local r = {}
 		if not start then
@@ -249,6 +295,26 @@ local ifd_entry_methods = {
 			table.insert(r,self:getel(i))
 		end
 		return r
+	end,
+	--[[
+	set multiple elements of a value
+	--]]
+	setel_array = function(self,vals,start)
+		local r = {}
+		if not start then
+			start = 0
+		elseif start >= self.count then
+			errlib.throw{etype='bad_arg', msg='setel_array: invalid start index '..tostring(start)}
+		end
+		if type(vals) ~= 'table' then
+			errlib.throw{etype='bad_arg', msg='setel_array: expected array'}
+		end
+		if start + #vals > self.count then
+			errlib.throw{etype='bad_arg', msg='setel_array: too many elements'}
+		end
+		for i,v in ipairs(vals) do
+			self:setel(vals[i],start+i-1)
+		end
 	end,
 	-- get bytes as a lua string
 	get_byte_str = function(self)
@@ -291,6 +357,10 @@ local ifd_entry_methods = {
 			return self:getel_array(start,max)
 		end
 	end,
+	-- override lbu hexdump, which defaults to the entire lbuf
+	hexdump = function(self)
+		return util.hexdump(self:get_byte_str())
+	end
 }
 function m.bind_ifd_entry(d,ifd,i)
 	local off = ifd.off + 2 + i*12 -- offset + entry count + index*sizeof(entry)
