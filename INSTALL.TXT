@@ -1,5 +1,4 @@
-Binaries for some platforms are available from the assembla files area
-https://www.assembla.com/spaces/chdkptp/documents
+Binaries for some platforms are available from the assembla files area https://www.assembla.com/spaces/chdkptp/documents
 
 *NOTE*: Google chrome may block the windows binary zip as malware, because
 Google has decided that any unknown, unsigned exe *is* malware. If you want
@@ -18,17 +17,17 @@ To install using this tool:
 
 * Download the appropriate file for your OS from http://zadig.akeo.ie/
 * Connect the camera
- * If you have never connected the camera before, wait for windows to install
+** If you have never connected the camera before, wait for windows to install
    the default driver. 
 * Run the zadig program
 * Select "List all devices" in the options menu
 * Select your camera in the dropdown. It will probably appear as "Canon Digital Camera".
- * If you have multiple Canon cameras, make sure only one is connected and powered on.
- * You can edit the name to allow identifying the driver later.
- * Be sure you have the camera selected. If you select the wrong device, the
+** If you have multiple Canon cameras, make sure only one is connected and powered on.
+** You can edit the name to allow identifying the driver later.
+** Be sure you have the camera selected. If you select the wrong device, the
    device you selected may become unusable until you remove the driver. The
-   first item in the Driver link should be something referring to Mtp, 
-   (e.g. WUDFWpdMtp on windows 10.) The first part of the USB ID will be 04A9
+   first item in the Driver link should be something referring to Mtp,
+   (e.g. <code>WUDFWpdMtp</code> on windows 10.) The first part of the USB ID will be 04A9
    for a Canon camera, and the second part will be the PID of your camera. 
 * Select libusb-win32 in the driver option.
 * click "Reinstall driver"
@@ -40,7 +39,7 @@ See http://chdk.wikia.com/wiki/PTP_Extension for additional information
 After the driver is configured, simply run the executable. If you double click
 on the .exe, the GUI will start. If you want to start the cli, run chdkptp -i
 
-Note that installing the libusb driver normally prevents standard windows
+*NOTE*: Installing the libusb driver normally prevents standard windows
 software from connecting to the camera. To restore normal windows access, use
 Zadig or windows device manager to remove the libusb driver.
 
@@ -90,10 +89,44 @@ to handle hot plugged USB devices. For PTP capable devices this will often
 invoke some kind of auto mount, which will often put the camera in the state
 described above where it cannot be fully controlled by chdkptp.
 
-Some general information on writing udev rules can be found at 
+Some general information on writing udev rules can be found at
 http://www.reactivated.net/writing_udev_rules.html
 
-Some discussion can be found in the following forum threads:
+On Ubuntu 16.04 with the default desktop, the following appears to prevent
+gphoto from automatically accessing the camera. Paths and other details may
+vary on other distros, so please treat this as a representative example.
+Everything below needs to be done as root.
+
+Copy the distro provided udev files to the corresponding directories in etc.
+This is the approved way to override them.
+
+ cp /lib/udev/rules.d/60-libgphoto2-6.rules /etc/udev/rules.d
+ cp /lib/udev/hwdb.d/20-libgphoto2-6.hwdb /etc/udev/hwdb.d
+
+edit /etc/udev/rules.d/60-libgphoto2-6.rules, immediately below the line
+
+ENV{ID_USB_INTERFACES}=="", IMPORT{builtin}="usb_id"
+
+add 
+
+ENV{ID_USB_INTERFACES}=="*:060101:*", ATTR{idVendor}=="04a9", MODE="0664", GROUP="plugdev", GOTO="libgphoto2_rules_end"
+
+edit /etc/udev/hwdb.d/20-libgphoto2-6.hwdb and remove or comment out the
+entries for the Canon cameras you want to use with chdkptp (or all of them)
+
+run
+
+ udevadm hwdb --update
+
+Both the rule and hwdb need to be updated, because the rules are only applied to
+cameras not specifically mentioned in hwdb. If a camera isn't mentioned in hwdb,
+the rule change is sufficient, but the distro vendor might add it to the db later.
+The udevadm command must be run to make the system aware of the hwdb change. The
+rule change appears to take effect immediately.
+
+This is not the only possible solution, and it may or may not apply to other
+distros. Additional discussion can be found in the following forum threads:
+
 http://chdk.setepontos.com/index.php?topic=10664.msg115401#msg115401
 http://chdk.setepontos.com/index.php?topic=6231.msg100671#msg100671
 
