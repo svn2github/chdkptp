@@ -107,7 +107,6 @@ and possibly comma separated values enclosed in ${ }. Command specific
 substitutions are documented in the command help. Other details
 are covered in the "Substitution patterns" section below.
 
-
 ==Command reference==
 output of help -v
 
@@ -216,7 +215,7 @@ imdl         [options] [src ...]: - download images from the camera
   if -rm is specified, file will be deleted even if not downloaded due to overwrite options.
 
 Substitutions
-${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${serial}         camera serial number, or empty if not available
 ${pid,strfmt}     camera platform ID, default format %x
 ${ldate,datefmt}  PC clock date, os.date format, default %Y%m%d_%H%M%S
 ${lts,strfmt}     PC clock date as unix timestamp + microseconds, default format %f
@@ -234,6 +233,7 @@ ${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cam
 ${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
 ${dlseq}          Sequential number incremented per file downloaded
 ${shotseq}        Sequential number incremented when imgnum changes.
+Standard string substitutions
 
  NOTE
   ${shotseq} depends on sort grouping related shots together, like 'date' or 'shot'
@@ -389,6 +389,9 @@ lvdumpimg    [options]   : - dump camera display frames to netpbm images
    ${date,datefmt} current time formatted with os.date()
    ${frame,strfmt} current frame number formatted with string.format
    ${time,strfmt}  current time in seconds, as float, formatted with string.format
+   ${serial}       camera serial number, or empty if not available
+   ${pid,strfmt}   camera platform ID, default format %x
+   Standard string substitutions
    default vp_${time,%014.3f}.ppm bm_${time,%014.3f}.pam for viewfinder and ui respectively
    if piping with oneproc, time will be the start of the first frame and frame will be 1
 
@@ -415,7 +418,7 @@ shoot        [options]   : - shoot a picture with specified exposure
   Any exposure parameters not set use camera defaults
 
 Substitutions
-${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${serial}         camera serial number, or empty if not available
 ${pid,strfmt}     camera platform ID, default format %x
 ${ldate,datefmt}  PC clock date of shot, os.date format, default %Y%m%d_%H%M%S
 ${lts,strfmt}     PC clock date as unix timestamp + microseconds, default format %f
@@ -431,6 +434,7 @@ ${dirnum}         Image directory number like 101
 ${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cameras only
 ${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
 ${shotseq}        Sequential number incremented per shot
+Standard string substitutions
 
 remoteshoot (rs) [dest] [options]: - shoot and download without saving to SD (requires CHDK >= 1.2)
  [dest] path/name specification for saved files
@@ -468,7 +472,7 @@ remoteshoot (rs) [dest] [options]: - shoot and download without saving to SD (re
    -seq=<n>     initial value for shotseq subst string, default cli_shotseq
 
 Substitutions
-${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${serial}         camera serial number, or empty if not available
 ${pid,strfmt}     camera platform ID, default format %x
 ${ldate,datefmt}  Time of shot (PC clock), os.date format, default %Y%m%d_%H%M%S
 ${lts,strfmt}     Time of shot as unix timestamp + microseconds, default format %f
@@ -479,6 +483,7 @@ ${ext}            Image extension, like .jpg
 ${imgnum}         Image number like 1234
 ${imgfmt}         Image format, one of 'JPG', 'DNG', 'RAW', 'DNG_HDR'
 ${shotseq}        Sequential number incremented per shot
+Standard string substitutions
 
 rsint        [dest] [options]: - shoot and download with interactive control
  [dest] path/name specification for saved files
@@ -528,7 +533,7 @@ rsint        [dest] [options]: - shoot and download with interactive control
  The l command must be used to exit
 
 Substitutions
-${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${serial}         camera serial number, or empty if not available
 ${pid,strfmt}     camera platform ID, default format %x
 ${ldate,datefmt}  Time of shot (PC clock), os.date format, default %Y%m%d_%H%M%S
 ${lts,strfmt}     Time of shot as unix timestamp + microseconds, default format %f
@@ -539,6 +544,7 @@ ${ext}            Image extension, like .jpg
 ${imgnum}         Image number like 1234
 ${imgfmt}         Image format, one of 'JPG', 'DNG', 'RAW', 'DNG_HDR'
 ${shotseq}        Sequential number incremented per shot
+Standard string substitutions
 
 rec                      : - switch camera to shooting mode
 play                     : - switch camera to playback mode
@@ -660,7 +666,11 @@ Some commands accept substitution patterns, also referred to as "subst strings"
 
 Subst strings are enclosed in ${}, and start with a name. If the subst string
 accepts arguments, they are separated from the name and preceding arguments
-by a comma and optionally whitespace like ${name, arg1, arg2}.
+by a comma and optionally whitespace like ${name, arg1, arg2}. In the chdkptp
+CLI, options and arguments includes spaces must be quoted.
+
+Subst strings may by nested, e.g to convert image numbers to hexadecimal, you 
+could use ${s_format,%x,${imgnum}}
 
 There is currently no mechanism for quoting or escaping in subst strings, so
 a literal "${" may not appear in a command argument which expects a subst
@@ -675,13 +685,56 @@ Subst strings are generally available in commands that need to generate
 multiple unique filenames, or where it is useful to generate filenames based
 on other state available to the command.
 
-Some examples:
+===Standard formats===
+Many subst strings take an optional format argument, listed in the help as 
+either 'datefmt' or 'strfmt'
+* datefmt - formats dates using Lua os.data / C strftime codes
+  Common codes
+	  %Y = year, 4 digit
+	  %m = month, 2 digit 
+	  %d = day, 2 digit
+	  %H = hour, two digit 00-24
+	  %M = minute, two digit
+	  %S = second, two digit
+* strfmt  = formats strings and numbers using Lua string.format / C printf codes
+
+===Examples===
 Download to directory c:/users/bob, named by date and time like 20171229_165226.JPG
  imdl -d=c:/users/bob/${mdate}${ext}
 
 Download files in directories under the current directory, organized by year, month
 and day, keeping original image name, like 2017/12/29/CRW_0123.DNG
  imdl -d=${mdate,%Y/%m/%d}/${name}
+
+===Standard substitutions===
+Most commands that support subst strings support the following, which implement
+standard Lua string manipulation functions. Arguments listed in [] are optional
+
+${s_format,fmt[,args]} - Format a string with "printf" formating 
+  e.g. ${s_format,0x%x %s,101,good doggos} = 0x65 good doggos
+${s_sub,string[,start,end]} - Return a substring of string. Negative values
+  are counted from the end. e.g. ${s_sub,hello world,-5} = world
+${s_upper,string} - Convert string to upper case, e.g. ${s_upper,hi} = HI
+${s_lower,string} - Convert string to lower case, e.g. ${s_lower,Bye} = bye
+${s_reverse,string} - Reverse the string, e.g. ${s_reverse,he} = eh
+${s_rep,string,count} - Repeat the string count times,
+  e.g. ${s_rep,he,2} = hehe
+${s_match,string,pat[,start]} - Return the portion of the string matching 
+  Lua pattern 'pat', starting from 'start'. If the pattern contains captures,
+  the result is all captures concatenated in sequence
+  e.g. ${s_match,hello world,.o%s.*} = lo world
+${s_gsub,string,pat,rep[,limit]} - Return the string with up to 'limit'
+  instances of Lua pattern 'pat' replaced by 'rep'. %0 in the 'rep' is
+  replaced by the entire match, %1-%9 are replaced by the corresponding captures
+  e.g. ${s_gsub,hello world,(%a+)%s+(%a+),%2 %1} = world hello
+
+These are mainly useful for manipulating the results of other, command specific
+subst strings. E.g
+* Convert an extension to lowercase: ${s_lower,${ext}}
+* Return the last 5 digits of a serial number: ${s_sub,${serial},-5}
+
+See also the Lua documentation for the corresponding string.* functions
+http://www.lua.org/manual/5.2/manual.html#6.4
 
 =Examples=
 start chdkptp in interactive mode and connect to the first available camera

@@ -109,7 +109,7 @@ m.format_state_date=function(name,default_fmt)
 end
 
 -- general purpose string functions
-m.string_funcs={
+m.string_subst_funcs={
 --[[
 TODO doesn't have quoting or escaping, string args better not contain , or {} or leading spaces
 TODO error checking isn't done at validation time. Non-nested could in principle
@@ -151,7 +151,7 @@ TODO error checking isn't done at validation time. Non-nested could in principle
 		end
 		return string.upper(argstr)
 	end,
-	-- ${s_lower,BYE} = "bye"
+	-- ${s_lower,Bye} = "bye"
 	s_lower=function(argstr,obj)
 		if not argstr then
 			errlib.throw{etype='varsubst',msg='s_lower missing arguments'}

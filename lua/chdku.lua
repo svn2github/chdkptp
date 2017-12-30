@@ -378,6 +378,7 @@ chdku.path_subst_funcs=util.extend_table_multi({},{
 
 -- combine into one table for imdl etc
 chdku.imglist_subst_funcs=util.extend_table_multi({},{
+	varsubst.string_subst_funcs,
 	chdku.con_subst_funcs,
 	chdku.ltime_subst_funcs,
 	chdku.seq_subst_funcs,
@@ -386,6 +387,7 @@ chdku.imglist_subst_funcs=util.extend_table_multi({},{
 })
 -- remote capture
 chdku.rc_subst_funcs=util.extend_table_multi({},{
+	varsubst.string_subst_funcs,
 	chdku.con_subst_funcs,
 	chdku.ltime_subst_funcs,
 	chdku.name_subst_funcs,

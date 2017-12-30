@@ -1150,7 +1150,7 @@ cli:add_commands{
   if -rm is specified, file will be deleted even if not downloaded due to overwrite options.
 
 Substitutions
-${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${serial}         camera serial number, or empty if not available
 ${pid,strfmt}     camera platform ID, default format %x
 ${ldate,datefmt}  PC clock date, os.date format, default %Y%m%d_%H%M%S
 ${lts,strfmt}     PC clock date as unix timestamp + microseconds, default format %f
@@ -1168,6 +1168,7 @@ ${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cam
 ${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
 ${dlseq}          Sequential number incremented per file downloaded
 ${shotseq}        Sequential number incremented when imgnum changes.
+Standard string substitutions
 
  NOTE
   ${shotseq} depends on sort grouping related shots together, like 'date' or 'shot'
@@ -1938,6 +1939,9 @@ ${shotseq}        Sequential number incremented when imgnum changes.
    ${date,datefmt} current time formatted with os.date()
    ${frame,strfmt} current frame number formatted with string.format
    ${time,strfmt}  current time in seconds, as float, formatted with string.format
+   ${serial}       camera serial number, or empty if not available
+   ${pid,strfmt}   camera platform ID, default format %x
+   Standard string substitutions
    default vp_${time,%014.3f}.ppm bm_${time,%014.3f}.pam for viewfinder and ui respectively
    if piping with oneproc, time will be the start of the first frame and frame will be 1
 ]],
@@ -1981,11 +1985,15 @@ ${shotseq}        Sequential number incremented when imgnum changes.
 			end
 
 			-- state for substitutions
-			local subst=varsubst.new({
+			local subst=varsubst.new(util.extend_table_multi({
 				frame=varsubst.format_state_val('frame','%06d'),
 				time=varsubst.format_state_val('time','%d'),
 				date=varsubst.format_state_date('date','%Y%m%d_%H%M%S'),
-			})
+			},{
+				varsubst.string_subst_funcs,
+				chdku.con_subst_funcs,
+			}))
+			con:set_subst_con_state(subst.state)
 
 			local vp_opts = cli.init_lvdumpimg_file_opts('vp',args,subst)
 			local bm_opts = cli.init_lvdumpimg_file_opts('bm',args,subst)
@@ -2078,7 +2086,7 @@ ${shotseq}        Sequential number incremented when imgnum changes.
   Any exposure parameters not set use camera defaults
 
 Substitutions
-${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${serial}         camera serial number, or empty if not available
 ${pid,strfmt}     camera platform ID, default format %x
 ${ldate,datefmt}  PC clock date of shot, os.date format, default %Y%m%d_%H%M%S
 ${lts,strfmt}     PC clock date as unix timestamp + microseconds, default format %f
@@ -2094,6 +2102,7 @@ ${dirnum}         Image directory number like 101
 ${dirmonth}       Image DCIM subdirectory month, like 01, date folder naming cameras only
 ${dirday}         Image DCIM subdirectory day, like 01, date folder naming cameras only
 ${shotseq}        Sequential number incremented per shot
+Standard string substitutions
 ]],
 		func=function(self,args)
 			local opts,err = cli:get_shoot_common_opts(args)
@@ -2321,7 +2330,7 @@ rlib_wait_timeout(
    -seq=<n>     initial value for shotseq subst string, default cli_shotseq
 
 Substitutions
-${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${serial}         camera serial number, or empty if not available
 ${pid,strfmt}     camera platform ID, default format %x
 ${ldate,datefmt}  Time of shot (PC clock), os.date format, default %Y%m%d_%H%M%S
 ${lts,strfmt}     Time of shot as unix timestamp + microseconds, default format %f
@@ -2332,6 +2341,7 @@ ${ext}            Image extension, like .jpg
 ${imgnum}         Image number like 1234
 ${imgfmt}         Image format, one of 'JPG', 'DNG', 'RAW', 'DNG_HDR'
 ${shotseq}        Sequential number incremented per shot
+Standard string substitutions
 ]],
 		func=function(self,args)
 			local dst = args[1]
@@ -2605,7 +2615,7 @@ ${shotseq}        Sequential number incremented per shot
  The l command must be used to exit
 
 Substitutions
-${serial,strfmt}  camera serial number, or empty if not available, default format %s
+${serial}         camera serial number, or empty if not available
 ${pid,strfmt}     camera platform ID, default format %x
 ${ldate,datefmt}  Time of shot (PC clock), os.date format, default %Y%m%d_%H%M%S
 ${lts,strfmt}     Time of shot as unix timestamp + microseconds, default format %f
@@ -2616,6 +2626,7 @@ ${ext}            Image extension, like .jpg
 ${imgnum}         Image number like 1234
 ${imgfmt}         Image format, one of 'JPG', 'DNG', 'RAW', 'DNG_HDR'
 ${shotseq}        Sequential number incremented per shot
+Standard string substitutions
 ]],
 		func=function(self,args)
 			return rsint.run(args)

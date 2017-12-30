@@ -615,7 +615,7 @@ t.varsubst = function()
 	local funcs=util.extend_table({
 		fmt=vs.format_state_val('fmt','%d'),
 		date=vs.format_state_date('date','%Y%m%d_%H%M%S'),
-	},vs.string_funcs)
+	},vs.string_subst_funcs)
 	local subst=vs.new(funcs,s)
 	assert(subst:run('${fmt}') == '123')
 	assert(subst:run('whee${fmt}ee') == 'whee123ee')

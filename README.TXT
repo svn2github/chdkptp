@@ -98,7 +98,7 @@ before 1.2.4.6 used a different name for the header file.
 The above installs the development files only. To use libusb-win32 programs,
 the driver must be installed. Using Zadig (http://zadig.akeo.ie/) as
 described on http://chdk.wikia.com/wiki/PTP_Extension#Installing_LibUSB_using_Zadig
-is the way to do this.
+is the recommended way to do this.
 
 =Linux development environment=
 A fully working gcc C build environment is required.
