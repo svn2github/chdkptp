@@ -32,6 +32,58 @@ local function tas(cond,msg,level)
 	error(msg,level)
 end
 
+--[[
+call f and very that the expected error is thrown
+match may be
+nil,false: any error
+sting: pattern match for error() string
+table: match for errlib error
+{
+	etype:string -- expected etype, nil for any
+	msg_match:string -- pattern matching expected message
+}
+
+--]]
+function m.assert_thrown(f,match)
+	local status,err=pcall(f)
+	if status then
+		error('expected error')
+	end
+	if not match then
+		return
+	end
+	if type(match) == 'string' then
+		if type(err) ~= 'string' then
+			error('expected error string')
+		end
+		if not string.match(err,match) then
+			error('expected msg matching='..tostring(match)..' not '..tostring(err),3)
+		end
+		return
+	end
+	if type(match) ~= 'table' then
+		error('match must be false, string or table')
+	end
+
+	if type(err) ~= 'table' then
+		error('expected errlib object')
+	end
+
+	if match.etype then
+		if match.etype ~= err.etype then
+			error('expected etype='..tostring(match.etype))
+		end
+	end
+	if match.msg_match then
+		if not err.msg then
+			error('expected msg')
+		end
+		if not string.match(err.msg,match.msg_match) then
+			error('expected msg matching='..tostring(match.msg_match)..' not '..tostring(err.msg))
+		end
+	end
+end
+
 local function spoof_fsutil_ostype(name)
 	fsutil.ostype = function()
 		return name
@@ -560,23 +612,45 @@ t.varsubst = function()
 		fmt=123.4,
 		date=os.time{year=2001,month=11,day=10},
 	}
-	local funcs={
+	local funcs=util.extend_table({
 		fmt=vs.format_state_val('fmt','%d'),
 		date=vs.format_state_date('date','%Y%m%d_%H%M%S'),
-		sprintf=vs.sprintf,
-	}
+	},vs.string_funcs)
 	local subst=vs.new(funcs,s)
 	assert(subst:run('${fmt}') == '123')
 	assert(subst:run('whee${fmt}ee') == 'whee123ee')
 	assert(subst:run('${fmt, %3.2f}') == '123.40')
-	assert(subst:run('${sprintf, hello world}') == 'hello world')
-	assert(subst:run('${sprintf,hello world %d,${fmt}}') == 'hello world 123')
+	assert(subst:run('${s_format, hello world}') == 'hello world')
+	assert(subst:run('${s_format,hello world %d,${fmt}}') == 'hello world 123')
 	assert(subst:run('${date}') == '20011110_120000')
 	assert(subst:run('${date,%Y}') == '2001')
 	assert(subst:run('${date,whee %H:%M:%S}') == 'whee 12:00:00')
-	assert(pcall(function() subst:validate('${sprintf,hello world %d,${fmt}}') end))
-	assert(not pcall(function() subst:validate('${bogus}') end))
-	assert(not pcall(function() subst:validate('whee${fmt') end))
+	assert(pcall(function() subst:validate('${s_format,hello world %d,${fmt}}') end))
+	m.assert_thrown(function() subst:validate('${bogus}') end,{etype='varsubst',msg_match='unknown'})
+	m.assert_thrown(function() subst:validate('whee${fmt') end,{etype='varsubst',msg_match='unclosed'})
+	m.assert_thrown(function() subst:validate('whee${fmt ___}') end,{etype='varsubst',msg_match='parse failed'})
+	assert(subst:run('${s_format,0x%x %s,101,good doggos}') == '0x65 good doggos')
+	assert(subst:run('${s_format,}') == '') -- empty string->empty string
+	m.assert_thrown(function() subst:run('${s_format}') end,{etype='varsubst',msg_match='s_format missing arguments'})
+	assert(subst:run('${s_sub,hello world,-5}') == 'world')
+	m.assert_thrown(function() subst:run('${s_sub,hello world}') end,{etype='varsubst',msg_match='s_sub expected 2'})
+	m.assert_thrown(function() subst:run('${s_sub,hello world,bob}') end,{etype='varsubst',msg_match='s_sub expected number'})
+	m.assert_thrown(function() subst:run('${s_sub,hello world,5,bob}') end,{etype='varsubst',msg_match='s_sub expected number'})
+	assert(subst:run('${s_upper,hi}') == 'HI')
+	assert(subst:run('${s_lower,Bye}') == 'bye')
+	assert(subst:run('${s_reverse,he}') == 'eh')
+	assert(subst:run('${s_rep, he, 2}') == 'hehe')
+	m.assert_thrown(function() subst:run('${s_rep,hello world}') end,{etype='varsubst',msg_match='s_rep expected 2'})
+	m.assert_thrown(function() subst:run('${s_rep,hello world,}') end,{etype='varsubst',msg_match='s_rep expected number'})
+	assert(subst:run('${s_match,hello world,.o%s.*}') == 'lo world')
+	assert(subst:run('${s_match,hello world,o.,6}') == 'or')
+	assert(subst:run('${s_match,hello world,(%a+)%s+(%a+)}') == 'helloworld')
+	m.assert_thrown(function() subst:run('${s_match,hello world,.,bob}') end,{etype='varsubst',msg_match='s_match expected number'})
+	assert(subst:run('${s_gsub,hello world,(%a+)%s+(%a+),%2 %1}') == 'world hello')
+	assert(subst:run('${s_gsub,hello world,l,_,2}') == 'he__o world')
+	m.assert_thrown(function() subst:run('${s_gsub,hello world,one,two,three,four}') end,{etype='varsubst',msg_match='s_gsub expected 3'})
+	assert(pcall(function() subst:validate('${s_gsub,${s_sub,${s_upper,${s_format,hello world %d,${fmt}}},${s_sub,${fmt},1,1},${s_sub,${fmt},-1}},$,L}') end))
+	assert(subst:run('${s_gsub,${s_sub,${s_upper,${s_format,hello world %d,${fmt}}},${s_sub,${fmt},1,1},${s_sub,${fmt},-1}},$,L}') == 'HELL')
 end
 
 t.dng = function()
