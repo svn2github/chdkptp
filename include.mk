@@ -11,13 +11,19 @@ DLL=.dll
 # Note may be freetype or freetype6 depending on your CD version, zlib requried for 5.5 and later
 CD_FREETYPE_LIB=freetype6 z
 #CD_FREETYPE_LIB=freetype z
-else
+endif
 ifeq ($(HOSTPLATFORM),Linux)
 OSTYPE=Linux
-EXE= 
+EXE=
 DLL=.so
 CD_FREETYPE_LIB=freetype z
 endif
+ifeq ($(HOSTPLATFORM),Darwin)
+OSTYPE=Darwin
+EXE=
+DLL=.so
+# TODO?
+CD_FREETYPE_LIB=freetype z
 endif
 
 #extra suffix to add to executable name
