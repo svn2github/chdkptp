@@ -6,14 +6,21 @@
 # Lua 5.1 is no longer supported by chdkptp, but it might work
 USE_LUA_52=1
 
+# use GUI=1 on the make command line or uncomment here for GUI support
+#GUI=1
+ifdef GUI
 # should IUP gui be built ?
-IUP_SUPPORT=0
+IUP_SUPPORT=1
 # should CD support be built
-CD_SUPPORT=0
-# enable "plus" context support with cairo, you will need libcairo2-dev or similar
+CD_SUPPORT=1
+# enable "plus" context support for better live view rendering
+# some GTK version may use cairo for plus support, requiring libcairo2-dev or similar
 #CD_USE_PLUS=cairo
-# should this build include PTP/IP (wifi camera) support
-PTPIP_SUPPORT=0
+CD_USE_PLUS=1
+# suffix for gui enabled executable, used with misc/bin-snapshot.bash to make
+# distribution zips with both executables
+#EXE_EXTRA=_gui
+endif
 
 # include gnu readline support (command history+editing)
 # may require libreadline-dev or similar package
