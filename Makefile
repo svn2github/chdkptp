@@ -22,6 +22,10 @@ endif
 ifeq ("$(PTPIP_SUPPORT)","1")
 CFLAGS +=-DCHDKPTP_PTPIP=1
 PTPIP_SRCS=sockutil.c
+# some gcc versions require for __atribute__((packed)) to work
+ifeq ($(OSTYPE),Windows)
+CFLAGS +=-mno-ms-bitfields
+endif
 # ws2_32 already included
 endif
 # PTPIP

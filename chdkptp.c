@@ -1233,6 +1233,7 @@ static int connect_cam_tcp(lua_State *L, PTPParams *params, PTP_CON_STATE *ptp_c
 #ifdef CHDKPTP_PTPIP
 	if(!init_ptp_tcp(params,ptp_cs)) {
 		close_camera_tcp(ptp_cs,params); // TODO should clean up any partially open stuff
+		ptp_cs->connected = 0;
 		// TODO return detailed error messages instead of printing
 		return api_throw_error(L,"connect_fail","connection failed");
 	}
