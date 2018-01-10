@@ -175,7 +175,7 @@ To test functions that connect to the camera, use
 chdkptp -e"exec require'camtests'.runbatch{bench=true,filexfer=true}"
 
 If more than one camera is connected to the system, a random one will be used
-unless you also specify devspec={dev="device name",bus="bus id"}
+unless you also specify devspec="<options for connect>"
 
 The filexfer tests will create and delete a local directory called camtests
 in the current working directory. If you already have a directory of this name,

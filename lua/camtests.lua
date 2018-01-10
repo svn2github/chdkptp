@@ -262,7 +262,7 @@ end
 -- devspec is a string for connect
 function tests.connect(devspec)
 	local devs=chdk.list_usb_devices()
-	if #devs == 0 then
+	if #devs == 0 and not devspec then
 		error('no usb devices available')
 	end
 	if con:is_connected() then
