@@ -38,9 +38,6 @@ CD 5.11
  https://sourceforge.net/projects/canvasdraw/files/5.11/Linux%20Libraries/cd-5.11_Linux313_64_lib.tar.gz
  https://sourceforge.net/projects/canvasdraw/files/5.11/Linux%20Libraries/Lua52/cd-5.11-Lua52_Linux313_64_lib.tar.gz
 
- https://sourceforge.net/projects/canvasdraw/files/5.10/Linux%20Libraries/cd-5.10_Linux313_64_lib.tar.gz
- https://sourceforge.net/projects/canvasdraw/files/5.10/Linux%20Libraries/Lua52/cd-5.10-Lua52_Linux313_64_lib.tar.gz
-
 IUP 3.21
  https://sourceforge.net/projects/iup/files/3.21/Linux%20Libraries/iup-3.21_Linux313_64_lib.tar.gz
  https://sourceforge.net/projects/iup/files/3.21/Linux%20Libraries/Lua52/iup-3.21-Lua52_Linux313_64_lib.tar.gz

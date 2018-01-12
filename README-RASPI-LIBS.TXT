@@ -63,7 +63,7 @@ The following packages should be installed. Some may be automatically selected
 as dependencies
 libreadline-dev
 g++
-libfreeetype6-dev
+libfreetype6-dev
 libgl1-mesa-dev
 libgtk3-dev
 libx11-dev
