@@ -83,6 +83,10 @@ camera has entered the black screen state, chdkptp will be unable to switch
 to record mode, even if software that triggered the change has been closed
 or the camera "unmounted" in the UI.
 
+Instilling a Linux without a GUI desktop (headless) often avoids these issues,
+though may result in the permission issues described in the following section.
+For Raspberry PI, you can get a headless install using the Raspbian "lite" image.
+
 In general, most modern distros use
 https://www.kernel.org/pub/linux/utils/kernel/hotplug/udev/udev.html
 to handle hot plugged USB devices. For PTP capable devices this will often
@@ -133,7 +137,18 @@ http://chdk.setepontos.com/index.php?topic=6231.msg100671#msg100671
 h3. Permissions issues
 
 In some configurations, the camera will only be accessible to the root user by
-default. udev is generally used to control permissions on hot plugged devices.
+default. This often occurs when the no default camera software is installed.
+udev is generally used to control permissions on hot plugged devices. 
+
+On systems which do not otherwise have rules for PTP devices in udev, something
+like the following as /etc/udev/rules.d/99-chdkptp.rules can be used to set the
+device permissions for Canon PTP cameras. Adjust the mode and group to taste.
+
+ENV{ID_USB_INTERFACES}=="", IMPORT{builtin}="usb_id"
+ENV{ID_USB_INTERFACES}=="*:060101:*", ATTR{idVendor}=="04a9", MODE="0664", GROUP="plugdev"
+
+*NOTE*: The above should only be used cases where the "Interactions with default
+software" section above *does not* apply.
 
 Some discussion can be found at: 
 http://chdk.setepontos.com/index.php?topic=6231.msg89252#msg89252
