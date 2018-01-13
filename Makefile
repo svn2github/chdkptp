@@ -65,7 +65,7 @@ endif
 
 ifeq ("$(IUP_SUPPORT)","1")
 ifdef IUP_LIB_DIR
-LIB_PATHS+=-L$(IUP_LIB_DIR)
+LIB_PATHS+=-L$(IUP_LIB_DIR) -L$(IUP_LIB_DIR)/Lua$(LUA_SFX)
 endif
 ifdef IUP_INCLUDE_DIR
 INC_PATHS+=-I$(IUP_INCLUDE_DIR)
@@ -76,7 +76,7 @@ SYS_LIBS+=$(IUP_SYS_LIBS)
 # CD only usable with IUP
 ifeq ("$(CD_SUPPORT)","1")
 ifdef CD_LIB_DIR
-LIB_PATHS+=-L$(CD_LIB_DIR)
+LIB_PATHS+=-L$(CD_LIB_DIR) -L$(CD_LIB_DIR)/Lua$(LUA_SFX)
 endif
 ifdef CD_INCLUDE_DIR
 INC_PATHS+=-I$(CD_INCLUDE_DIR)
