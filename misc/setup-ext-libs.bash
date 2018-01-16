@@ -368,12 +368,10 @@ do_patch() {
 
 prepare_source() {
 	if [ "$BUILD_OS" == 'Linux' -a "$BUILD_ARCH" == 'armv6l' -a -z "$nogui" ] ; then
-		# TODO patch should be renamed
 		for d in cd iup ; do
-			do_patch "$SRC_DIR/$d" "$CHDKPTP_DIR"/misc/tecmake.mak.patch
-	     	done
+			do_patch "$SRC_DIR/$d" "$CHDKPTP_DIR"/misc/arv6l-tecmake.mak.patch
+		done
 	fi
-	# TODO add in svn
 	if [ "$BUILD_OS" == 'Darwin' -a -z "$nogui" ] ; then
 		do_patch "$SRC_DIR/$d" "$CHDKPTP_DIR"/misc/macports-tecmake.mak.patch 1
 	fi

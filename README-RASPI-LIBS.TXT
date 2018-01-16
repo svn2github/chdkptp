@@ -92,7 +92,7 @@ $ tar -xzf pkg/iup-3.21_Sources.tar.gz
 
 The default tekmake.mak files do not properly detect the raspbian as arm,
 which in turn makes it define TEC_BIGENDIAN. Apply the included
-tecmake.mak.patch patch with
+armv7l-tecmake.mak.patch patch with
 
 $ for d in im cd iup ; do pushd $d ; patch -p0 </path/to/chdkptp/misc/tecmake.mak.patch ; popd ; done
 
