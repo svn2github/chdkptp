@@ -48,6 +48,7 @@ Misc tuning / debugging options
  -tec-linver=<ver>: set linux version for downloaded binary packages, e.g 313
                     for kernel 3.13. Valid values depend on what tecgraf built,
                     see tecgraf download pages
+ -tec-freetype-src: Force using freetype from tecgraf source
 
 Prerequisites:
 * Normal development stuff, i.e. build-essential on Debian distros
@@ -94,8 +95,13 @@ init_vars() {
 	LUA_SRC_PKG="lua-${LUA_VER}.tar.gz"
 	IUP_SRC_PKG="iup-${IUP_VER}_Sources.tar.gz"
 	CD_SRC_PKG="cd-${CD_VER}_Sources.tar.gz"
-	# only needed for OSX
+	# only needed for OSX, can be forced on others
 	FREETYPE_SRC_PKG="freetype-2.6.3_Sources.zip"
+	if [ -z "$opt_tec_freetype_src" ] ; then
+		USE_FREETYPE_SRC=""
+	else
+		USE_FREETYPE_SRC=1
+	fi
 	# IM_SRC_PKG="im-${IM_VER}_Sources.tar.gz"
 
 	# platform requires IUP/CD built from source
@@ -171,6 +177,7 @@ init_os() {
 			error_exit "Unsupported Darwin arch $BUILD_ARCH"
 		fi
 		TEC_SOURCE_BUILD=1
+		USE_FREETYPE_SRC=1
 		LUA_TARGET="macosx"
 		TEC_UNAME="MacOS$(sw_vers -productVersion | awk '{printf("%s%s\n",substr($1,1,2),substr($1,4,2))}')"
 	;;
@@ -300,7 +307,7 @@ do_download() {
 			do_wget "${CD_URL_ROOT}/Docs%20and%20Sources" "${CD_SRC_PKG}"
 			do_wget "${IUP_URL_ROOT}/Docs%20and%20Sources" "${IUP_SRC_PKG}"
 			# OSX needs freetype
-			if [ "$BUILD_OS" == 'Darwin' ] ; then
+			if [ ! -z "$USE_FREETYPE_SRC" ] ; then
 				do_wget "${IUP_URL_ROOT}/Docs%20and%20Sources" "${FREETYPE_SRC_PKG}"
 			fi
 		fi
@@ -330,7 +337,7 @@ extract_pkgs() {
 			remove_dir "$SRC_DIR/iup"
 			extract "$PKG_DIR/$IUP_SRC_PKG" "$SRC_DIR"
 			# OSX needs freetype
-			if [ "$BUILD_OS" == 'Darwin' ] ; then
+			if [ ! -z "$USE_FREETYPE_SRC" ] ; then
 				remove_dir "$SRC_DIR/freetype"
 				extract "$PKG_DIR/${FREETYPE_SRC_PKG}" "$SRC_DIR"
 			fi
@@ -420,10 +427,16 @@ copy_built_lua() {
 }
 
 make_tec() {
-	# pi CPATH=/usr/include/gtk-3.0/unix-print
+	# pi (and probably other debian based) CPATH=/usr/include/gtk-3.0/unix-print
 	# osx/macports CPATH=/opt/local/include/gtk-3.0/unix-print
+	local freetype_opt=""
+	if [ ! -z "$USE_FREETYPE_SRC" ] ; then
+		freetype_opt="FREETYPE_INC=${SRC_DIR}/freetype/include"
+	fi
+
 	if [ "$BUILD_OS" == 'Darwin' ] ; then
 		do_make BUILD_DYLIB=Yes \
+			"$freetype_opt" \
 			CPATH=/opt/local/include/gtk-3.0/unix-print \
 			USE_GTK3=Yes \
 			USE_PKGCONFIG=Yes \
@@ -435,6 +448,7 @@ make_tec() {
 	else
 		# TODO unix-print path is probably distro specific
 		do_make USE_PKGCONFIG=Yes \
+			"$freetype_opt" \
 			CPATH=/usr/include/gtk-3.0/unix-print \
 			USE_LUA52=Yes \
 			LUA_SUFFIX="${LUA_VER_SFX}" \
@@ -478,7 +492,7 @@ build_iup() {
 
 build_tec_libs() {
 	# build_im
-	if [ "$BUILD_OS" == 'Darwin' ] ; then
+	if [ ! -z "$USE_FREETYPE_SRC" ] ; then
 		build_freetype
 	fi
 	build_cd
@@ -561,6 +575,9 @@ while [ ! -z "$arg" ] ; do
 	;;
 	-tec-linver=*)
 		opt_tec_linver="${arg#-tec-linver=}"
+	;;
+	-tec-freetype-src)
+		opt_tec_freetype_src="1"
 	;;
 	*)
 		usage "unknown option $arg"
