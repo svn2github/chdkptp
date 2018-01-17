@@ -380,7 +380,9 @@ prepare_source() {
 		done
 	fi
 	if [ "$BUILD_OS" == 'Darwin' -a -z "$nogui" ] ; then
-		do_patch "$SRC_DIR/$d" "$CHDKPTP_DIR"/misc/macports-tecmake.mak.patch 1
+		for d in freetype cd iup ; do
+			do_patch "$SRC_DIR/$d" "$CHDKPTP_DIR"/misc/macports-tecmake.mak.patch
+		done
 	fi
 }
 

@@ -1,0 +1,25 @@
+--- tecmake.mak.orig	2018-01-16 19:27:06.762718194 -0800
++++ tecmake.mak	2018-01-16 19:27:40.378668913 -0800
+@@ -726,8 +726,11 @@
+   #STDINCS += /usr/local/include
+   #LDIR += /usr/local/lib
+   #Fink
+-  STDINCS += /sw/include
+-  LDIR += /sw/lib
++  #STDINCS += /sw/include
++  #LDIR += /sw/lib
++  #Macports
++  STDINCS += /opt/local/include
++  LDIR += /opt/local/lib
+   
+   UNIX_BSD = Yes
+   X11_LIBS := Xp Xext X11
+@@ -736,7 +739,7 @@
+   MOTIF_INC := /usr/OpenMotif/include
+   MOTIF_LIB := /usr/OpenMotif/lib
+   ifdef BUILD_DYLIB
+-    STDLDFLAGS := -dynamiclib -Wl -fno-common -headerpad_max_install_names -undefined dynamic_lookup -install_name lib$(TARGETNAME).dylib
++    STDLDFLAGS := -dynamiclib -fno-common -headerpad_max_install_names -undefined dynamic_lookup -install_name lib$(TARGETNAME).dylib
+     DLIBEXT := dylib
+     STDFLAGS += -fno-common
+   else
