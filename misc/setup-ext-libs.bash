@@ -38,6 +38,7 @@ Options controlling which actions are performed:
  -noextract: do not extract / prepare source and binary archives
  -nobuild: do not build source components
  -nocopy: do not copy built components to locations expected by later build steps
+ -nocopyrt: do not copy runtime libraries to chdkptp/lib
 
 Misc tuning / debugging options
  -ignore-ssl-err: make wget ignore ssl errors on download
@@ -437,7 +438,9 @@ make_tec() {
 	fi
 
 	if [ "$BUILD_OS" == 'Darwin' ] ; then
-		do_make BUILD_DYLIB=Yes \
+		# ftm script had USE_MACOS_OPENGL=Yes probably? not needed if not building ogl components?
+		do_make GTK_BASE=/opt/local \
+			BUILD_DYLIB=Yes \
 			"$freetype_opt" \
 			CPATH=/opt/local/include/gtk-3.0/unix-print \
 			USE_GTK3=Yes \
@@ -523,6 +526,22 @@ copy_built_tec_libs() {
 	done
 }
 
+copy_runtime() {
+	# windows currently static
+	if [ "$BUILD_OS" == 'Windows' ] ; then
+		return
+	fi
+	local liblist
+	if [ "$BUILD_OS" == 'Linux' ] ; then
+		 liblist="$(cat "${CHDKPTP_DIR}"/misc/liblist-linux.txt)"
+	elif [ "$BUILD_OS" == 'Darwin' ] ; then
+		 liblist="$(cat "${CHDKPTP_DIR}"/misc/liblist-osx.txt)"
+	fi
+	create_dir "$CHDKPTP_DIR"/lib
+	for f in $liblist ; do
+		do_cp "$BUILT_DIR/$f" "$CHDKPTP_DIR"/lib
+	done
+}
 
 arg="$1"
 pretend=""
@@ -531,6 +550,7 @@ nogui=""
 nobuild=""
 noextract=""
 nocopy=""
+nocopyrt=""
 opt_force_os=""
 opt_force_arch=""
 opt_force_tec_src=""
@@ -562,6 +582,9 @@ while [ ! -z "$arg" ] ; do
 	;;
 	-nocopy)
 		nocopy=1
+	;;
+	-nocopyrt)
+		nocopyrt=1
 	;;
 	-ignore-ssl-err)
 		opt_ignore_ssl_err=1
@@ -611,4 +634,7 @@ if [ ! -z "$TEC_SOURCE_BUILD" -a -z "$nogui" ] ; then
 	if [ -z "$nocopy" ] ; then
 		copy_built_tec_libs
 	fi
+fi
+if [ -z "$nocopyrt" ] ; then
+	copy_runtime
 fi
