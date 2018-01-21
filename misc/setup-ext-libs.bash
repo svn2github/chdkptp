@@ -1,7 +1,19 @@
 #!/bin/bash
 # download and configure external sources and binaries
 selfname=`basename "$0"`
-selfdir="$(dirname "$(readlink -f "$0")")"
+
+# osx doesn't have readlink -f, want before main OS init...
+# python should always be present
+if [ "$(uname -s)" == 'Darwin' ] ; then
+	selfdir=$(python <<EOF
+import os.path
+print os.path.abspath('$0')
+EOF
+)
+	selfdir=$(dirname "$selfdir")
+else
+	selfdir="$(dirname "$(readlink -f "$0")")"
+fi
 
 error_exit() {
 	echo "$selfname error: $1" >&2
