@@ -76,6 +76,7 @@ init_vars() {
 	PKG_DIR="$EXTDEP_DIR/archive"
 	SRC_DIR="$EXTDEP_DIR/src"
 	BUILT_DIR="$EXTDEP_DIR/built"
+	LOG_DIR="$BUILT_DIR"
 	# versions expected current chdkptp builds
 	LUA_VER="5.2.4"
 	LUA_VER_SFX="52"
@@ -377,7 +378,7 @@ do_patch() {
 prepare_source() {
 	if [ "$BUILD_OS" == 'Linux' -a "$BUILD_ARCH" == 'armv6l' -a -z "$nogui" ] ; then
 		for d in cd iup ; do
-			do_patch "$SRC_DIR/$d" "$CHDKPTP_DIR"/misc/arv6l-tecmake.mak.patch
+			do_patch "$SRC_DIR/$d" "$CHDKPTP_DIR"/misc/armv6l-tecmake.mak.patch
 		done
 	fi
 	if [ "$BUILD_OS" == 'Darwin' -a -z "$nogui" ] ; then
@@ -388,10 +389,12 @@ prepare_source() {
 }
 
 do_make() {
+	local log="$LOG_DIR/$1"
+	shift
 	if [ -z "$pretend" ] ; then
-		make "$@" || error_exit "make $*"
+		make "$@" > "$log" 2>&1 || error_exit "make $*"
 	else
-		echo "make $*"
+		echo "make $* > "$log" 2>&1"
 	fi
 }
 
@@ -405,14 +408,14 @@ do_slink() {
 build_lua() {
 	info_msg "building Lua"
 	change_dir "$SRC_DIR/lua-$LUA_VER"
-	do_make "$LUA_TARGET"
+	do_make build-lua.log "$LUA_TARGET"
 }
 
 copy_built_lua() {
 	info_msg "configure Lua binaries"
 	change_dir "$SRC_DIR/lua-$LUA_VER"
 	remove_dir "$BUILT_DIR"/"$LUA_VER_DIR"
-	do_make INSTALL_TOP="$BUILT_DIR"/"$LUA_VER_DIR" install
+	do_make install-lua.log INSTALL_TOP="$BUILT_DIR"/"$LUA_VER_DIR" install
 	# tec libs seem to require suffix, can't force empty
 	if [ "$BUILD_OS" == 'Linux' ] ; then
 		change_dir "$BUILT_DIR"/"${LUA_VER_DIR}"/lib
@@ -430,39 +433,32 @@ copy_built_lua() {
 }
 
 make_tec() {
-	# pi (and probably other debian based) CPATH=/usr/include/gtk-3.0/unix-print
-	# osx/macports CPATH=/opt/local/include/gtk-3.0/unix-print
-	local freetype_opt=""
+	local log="$1"
+	shift
+	# common values
+	local makevars=(
+		USE_PKGCONFIG=Yes
+		USE_LUA52=Yes
+		LUA_SUFFIX="${LUA_VER_SFX}"
+		LUA_INC="$BUILT_DIR/$LUA_VER_DIR/include"
+		LUA_LIB="$BUILT_DIR/$LUA_VER_DIR/lib"
+		LUA_BIN="$BUILT_DIR/$LUA_VER_DIR/bin"
+	)
 	if [ ! -z "$USE_FREETYPE_SRC" ] ; then
-		freetype_opt="FREETYPE_INC=${SRC_DIR}/freetype/include"
+		makevars[${#makevars}]="FREETYPE_INC=${SRC_DIR}/freetype/include"
 	fi
 
 	if [ "$BUILD_OS" == 'Darwin' ] ; then
 		# ftm script had USE_MACOS_OPENGL=Yes probably? not needed if not building ogl components?
-		do_make GTK_BASE=/opt/local \
-			BUILD_DYLIB=Yes \
-			"$freetype_opt" \
-			CPATH=/opt/local/include/gtk-3.0/unix-print \
-			USE_GTK3=Yes \
-			USE_PKGCONFIG=Yes \
-			USE_LUA52=Yes \
-			LUA_SUFFIX="${LUA_VER_SFX}" \
-			LUA_INC="$BUILT_DIR/$LUA_VER_DIR/include" \
-			LUA_LIB="$BUILT_DIR/$LUA_VER_DIR/lib" \
-			LUA_BIN="$BUILT_DIR/$LUA_VER_DIR/bin" "$@"
+		makevars[${#makevars}]='GTK_BASE=/opt/local'
+		makevars[${#makevars}]='BUILD_DYLIB=Yes'
+		makevars[${#makevars}]='USE_GTK3=Yes'
+		makevars[${#makevars}]='CPATH=/opt/local/include/gtk-3.0/unix-print'
 	else
-		# TODO unix-print path is probably distro specific
-		do_make USE_PKGCONFIG=Yes \
-			"$freetype_opt" \
-			CPATH=/usr/include/gtk-3.0/unix-print \
-			USE_LUA52=Yes \
-			LUA_SUFFIX="${LUA_VER_SFX}" \
-			LUA_INC="$BUILT_DIR/$LUA_VER_DIR/include" \
-			LUA_LIB="$BUILT_DIR/$LUA_VER_DIR/lib" \
-			LUA_BIN="$BUILT_DIR/$LUA_VER_DIR/bin" "$@"
+		# TODO unix-print path might be distro specific
+		makevars[${#makevars}]='CPATH=/usr/include/gtk-3.0/unix-print'
 	fi
-
-	
+	do_make "$log" "${makevars[@]}" "$@"
 }
 # not needed at the moment
 #build_im() {
@@ -473,26 +469,26 @@ make_tec() {
 build_freetype() {
 	info_msg "building freetype"
 	change_dir "$SRC_DIR/freetype"
-	make_tec
+	make_tec build-freetype.log
 }
 
 build_cd() {
 	info_msg "building CD"
 	change_dir "$SRC_DIR/cd/src"
-	make_tec cd
-	make_tec cdcontextplus
-	make_tec cdlua5
-	make_tec cdluacontextplus5
+	make_tec build-cd.log cd
+	make_tec build-cdcontextplus.log cdcontextplus
+	make_tec build-cdlua5.log cdlua5
+	make_tec build-cdluacontextplus5.log cdluacontextplus5
 }
 
 build_iup() {
 	info_msg "building IUP"
 	change_dir "$SRC_DIR/iup"
-	make_tec iup
-	make_tec iupcd
+	make_tec build-iup.log iup
+	make_tec build-iupcd.log iupcd
 	change_dir "$SRC_DIR/iup/srclua5"
-	make_tec iuplua
-	make_tec iupluacd
+	make_tec build-iuplua.log iuplua
+	make_tec build-iupcdlua.log iupluacd
 }
 
 build_tec_libs() {
