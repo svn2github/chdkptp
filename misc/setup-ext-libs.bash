@@ -266,7 +266,8 @@ extract() {
 		dst="."
 	fi
 	if [ "${src##*.}" == 'zip' ] ; then
-		cmd='unzip'
+		# -o because iup / iuplua packages have duplicated etc content
+		cmd='unzip -o'
 		dst_opt="-d"
 	fi
 	if [ ! -d "$dst" ] ; then
