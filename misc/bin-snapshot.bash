@@ -32,7 +32,7 @@ debug=""
 libsfile=""
 liblist=""
 stagedir=""
-libroot="../teclibs/"
+libroot="./extlibs/built/"
 distutildir="$(dirname "$(readlink -f "$0")")"
 while [ ! -z "$arg" ] ; do
 	case $arg in
@@ -90,7 +90,7 @@ fi
 PROGS=chdkptp$EXE
 make DEBUG="$debug" clean all || error_exit "build failed"
 if [ ! -z "$gui" ] ; then
-	make DEBUG="$debug" GUI=1 clean all || error_exit "GUI build failed"
+	make DEBUG="$debug" GUI=1 GUI_SFX=_gui clean all || error_exit "GUI build failed"
 	PROGS="$PROGS chdkptp_gui$EXE"
 fi
 

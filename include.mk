@@ -75,8 +75,8 @@ else
 #CD_USE_PLUS=cairo
 CD_USE_PLUS=1
 GUI=
-# TODO only needed when building dist
-GUI_SFX=_gui
+# only needed when building both, e.g for dist zip
+#GUI_SFX=_gui
 # include gnu readline support (command history+editing)
 # may require libreadline-dev or similar package
 READLINE_SUPPORT=1
