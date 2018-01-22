@@ -95,9 +95,14 @@ IUP_INCLUDE_DIR=$(EXTLIB_DIR)/iup/include
 CD_LIB_DIR=$(EXTLIB_DIR)/cd
 CD_INCLUDE_DIR=$(EXTLIB_DIR)/cd/include
 
+ifeq ($(OSTYPE),Windows)
 LIBUSB_INCLUDE_DIR=$(LIBUSB_DIR)/include
+ifeq ($(MSYSTEM_CARCH),x86_64)
+LIBUSB_LIB_DIR=$(LIBUSB_DIR)/lib/gcc_x64
+else
 LIBUSB_LIB_DIR=$(LIBUSB_DIR)/lib/gcc
-
+endif
+endif
 # build optional signal module, for automation applications
 # not used by default, but source included and should build on any linux
 # TODO possibly OK for OSX too?
