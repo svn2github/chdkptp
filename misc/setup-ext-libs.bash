@@ -343,6 +343,7 @@ do_download() {
 
 extract_pkgs() {
 	info_msg "unpacking downloads"
+	remove_dir "$SRC_DIR/lua-${LUA_VER}"
 	extract "$PKG_DIR/$LUA_SRC_PKG" "$SRC_DIR"
 	if [ "$TEC_SOURCE_BUILD" == '1' ] ; then
 		if [ -z "$nogui" ] ; then
