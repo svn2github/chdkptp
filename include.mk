@@ -68,7 +68,7 @@ GUI=1
 GUI_SFX=
 # define if you get unresolved externals on
 # GdipFontFamilyCachedGenericSansSerif building with CD context plus
-CD_GDIP_FONT_HACK=1
+#CD_GDIP_FONT_HACK=1
 LIBUSB_DIR=$(EXTLIB_DIR)/libusb-win32-bin-1.2.6.0
 else
 # older linux / CD combos?
