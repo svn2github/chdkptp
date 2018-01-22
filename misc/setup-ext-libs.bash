@@ -153,9 +153,8 @@ init_os() {
 	Windows)
 		if [ "$BUILD_ARCH" == 'i686' ] ; then
 			TEC_LIB_SFX="Win32_mingw4_lib.zip"
-# TODO should support x64, but need 64 bit libusb
-#		elif [ "$BUILD_ARCH" == 'x86_64' ] ; then
-#			TEC_LIB_SFX="Win64_mingw4_lib.zip"
+		elif [ "$BUILD_ARCH" == 'x86_64' ] ; then
+			TEC_LIB_SFX="Win64_mingw4_lib.zip"
 		else
 			error_exit "Unsupported Windows arch $BUILD_ARCH"
 		fi
@@ -263,6 +262,14 @@ change_dir() {
 	fi
 }
 
+do_dlltool() {
+	if [ ! -z "$pretend" ] ; then
+		echo "dlltool $*"
+	else
+		dlltool "$@" || error_exit "dlltool $* failed"
+	fi
+}
+
 # extract zip or gzip'd tar to specified directory
 extract() {
 	local src="$1"
@@ -350,6 +357,9 @@ do_download() {
 }
 
 extract_pkgs() {
+	local LIBUSB_DEF="$CHDKPTP_DIR/misc/libusb-win32-${LIBUSBWIN32_VER}-libusb0.def"
+	local LIBUSB_DIR="$BUILT_DIR/libusb-win32-bin-${LIBUSBWIN32_VER}"
+
 	info_msg "unpacking downloads"
 	remove_dir "$SRC_DIR/lua-${LUA_VER}"
 	extract "$PKG_DIR/$LUA_SRC_PKG" "$SRC_DIR"
@@ -369,8 +379,17 @@ extract_pkgs() {
 	else
 		if [ "$BUILD_OS" == 'Windows' ] ; then
 			# subdir is in zip
-			remove_dir "$BUILT_DIR/libusb-win32-bin-${LIBUSBWIN32_VER}"
+			remove_dir "$LIBUSB_DIR"
 			extract "$PKG_DIR/$LIBUSBWIN32_PKG" "$BUILT_DIR"
+			# libusbwin32 package doesn't contain a gcc x64 import lib
+			if [ "$BUILD_ARCH" == 'x86_64' ] ; then
+				if [ ! -f "$LIBUSB_DEF" ] ; then
+					warn "missing ${LIBUSB_DEF} skipping import library"
+				else
+					recreate_dir "${LIBUSB_DIR}/lib/gcc_x64"
+					do_dlltool -l "${LIBUSB_DIR}/lib/gcc_x64/libusb.a" -D libusb0.dll -d "$LIBUSB_DEF"
+				fi
+			fi
 		fi
 		if [ -z "$nogui" ] ; then
 			remove_dir "$BUILT_DIR/cd"
