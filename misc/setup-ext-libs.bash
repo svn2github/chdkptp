@@ -139,18 +139,26 @@ init_os() {
 		BUILD_OS="$opt_force_os"
 	fi
 	if [ -z "$opt_force_arch" ] ; then
-		BUILD_ARCH="$(uname -m)"
+		# msys2 32 bit env still identifies as x64 in uname
+		if [ "$BUILD_OS" == 'Windows'  -a ! -z "$MSYSTEM_CARCH" ] ; then
+			BUILD_ARCH="$MSYSTEM_CARCH"
+		else
+			BUILD_ARCH="$(uname -m)"
+		fi
 	else
 		BUILD_ARCH="$opt_force_arch"
 	fi
 
 	case "$BUILD_OS" in
 	Windows)
-		# TODO should support x64
-		if [ "$BUILD_ARCH" != 'i686' ] ; then
+		if [ "$BUILD_ARCH" == 'i686' ] ; then
+			TEC_LIB_SFX="Win32_mingw4_lib.zip"
+# TODO should support x64, but need 64 bit libusb
+#		elif [ "$BUILD_ARCH" == 'x86_64' ] ; then
+#			TEC_LIB_SFX="Win64_mingw4_lib.zip"
+		else
 			error_exit "Unsupported Windows arch $BUILD_ARCH"
 		fi
-		TEC_LIB_SFX="Win32_mingw4_lib.zip"
 		LIBUSBWIN32_PKG="libusb-win32-bin-${LIBUSBWIN32_VER}.zip"
 		LUA_TARGET="mingw"
 	;;
