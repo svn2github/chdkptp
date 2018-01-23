@@ -63,15 +63,25 @@ Misc tuning / debugging options
                     see tecgraf download pages
  -tec-freetype-src: Force using freetype from tecgraf source
 
-Prerequisites:
-* Normal development stuff, i.e. build-essential on Debian distros
+Prerequisites: (Deb = Debian-ish package names, Fed=Fedora-ish, YMMV)
+* Normal development stuff
+ Deb: build-essential
+ Fed: groups "Development Tools", "C Development Tools and Libraries"
 * wget - You can download manually using URLs listed by pretend
 * unzip (Info-ZIP compatible)
-* For GUI, the CD/IUP prerequisites. On Debian based systems, something like:
-    g++ libfreetype6-dev libgtk-3-dev libx11-dev libxpm-dev libxmu-dev libxft-dev
-  chdkptp also requires:
-    libusb-dev libreadline-dev
-* On Windows, mingw MSYS is assumed
+* On Windows, mingw MSYS or MSYS2 is assumed
+* Development packages on *nix 
+ All builds
+  Deb: libusb-dev, libreadline-dev
+  Fed: libusb-devel, readline-devel
+ CD/IUP precompiled
+  Deb: libfreetype6-dev
+  Fed: freetype-devel
+ CD/IUP from source
+  Deb: g++ libfreetype6-dev libgtk-3-dev libx11-dev libxpm-dev libxmu-dev libxft-dev
+  Fed: gcc-c++ freetype-devel gtk3-devel libX11-devel libXpm-devel libXmu-devel libXft-devel
+ Freetype may be built from source instead, using -tec-freetype-src
+ Readline is optional in chdkptp, but expected by the default Lua build
 
 EOF
 	exit 1
