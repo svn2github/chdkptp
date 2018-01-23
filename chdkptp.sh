@@ -11,4 +11,6 @@ export LD_LIBRARY_PATH="$CHDKPTP_DIR/lib"
 # set lua paths, double ; appends default
 export LUA_PATH="$CHDKPTP_DIR/lua/?.lua;;"
 export LUA_CPATH="$CHDKPTP_DIR/?.so;;"
+# required on fedora 27/wayland
+export GDK_BACKEND=x11
 "$CHDKPTP_DIR/$CHDKPTP_EXE" "$@"
