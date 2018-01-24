@@ -70,7 +70,7 @@ Prerequisites: (Deb = Debian-ish package names, Fed=Fedora-ish, YMMV)
 * wget - You can download manually using URLs listed by pretend
 * unzip (Info-ZIP compatible)
 * On Windows, mingw MSYS or MSYS2 is assumed
-* Development packages on *nix 
+* Development packages on *nix
  All builds
   Deb: libusb-dev, libreadline-dev
   Fed: libusb-devel, readline-devel
