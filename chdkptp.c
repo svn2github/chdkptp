@@ -1506,11 +1506,11 @@ static int chdk_capture_get_chunk(lua_State *L) {
 r=con:getmem(address,count[,dest[,flags]])
 dest is
 "string"
+"lbuf"
 "number" TODO int or unsigned ?
 -- not implemented yet ->
 "array" array of numbers
 "file",<filename>
-"pointer" userdata to pass on to C elsewhere
 default is string
 */
 static int chdk_getmem(lua_State *L) {
@@ -1533,6 +1533,9 @@ static int chdk_getmem(lua_State *L) {
 		lua_pushlstring(L,buf,count);
 	} else if(strcmp(dest,"number") == 0) {
 		lua_pushnumber(L,(lua_Number)(*(unsigned *)buf));
+	} else if(strcmp(dest,"lbuf") == 0) {
+		lbuf_create(L,buf,count,LBUF_FL_FREE);
+		return 1; // buf will be freed when lbuf is garbage collected
 	}
 	free(buf);
 	return 1;
