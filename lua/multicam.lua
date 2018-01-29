@@ -119,8 +119,8 @@ function mc:connect(opts)
 				printf('+ %d:%s b=%s d=%s s=%s\n',
 					lcon.mc_id,
 					lcon.ptpdev.model,
-					lcon.condev.dev,
 					lcon.condev.bus,
+					lcon.condev.dev,
 					tostring(lcon.ptpdev.serial_number))
 			end
 		end
@@ -156,7 +156,7 @@ function mc:connect(opts)
 		else
 			local status,err = lcon:connect_pcall()
 			if not status then
-				warnf('%d: connect failed bus:%s dev:%s err:%s\n',i,devinfo.dev,devinfo.bus,tostring(err))
+				warnf('%d: connect failed bus:%s dev:%s err:%s\n',i,devinfo.bus,devinfo.dev,tostring(err))
 			end
 		end
 		-- if connection didn't fail
@@ -204,8 +204,8 @@ function mc:connect(opts)
 				status,
 				i,
 				lcon.ptpdev.model,
-				lcon.condev.dev,
 				lcon.condev.bus,
+				lcon.condev.dev,
 				tostring(lcon.ptpdev.serial_number))
 			-- disconnect temporary connections
 			if status == 'i' and opts.close_tempcons then
@@ -309,8 +309,8 @@ function mc:describe(lcon)
 		status,
 		lcon.mc_id,
 		lcon.ptpdev.model,
-		lcon.condev.dev,
 		lcon.condev.bus,
+		lcon.condev.dev,
 		tostring(lcon.ptpdev.serial_number))
 end
 
