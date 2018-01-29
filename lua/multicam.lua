@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2012-2017 <reyalp (at) gmail dot com>
+ Copyright (C) 2012-2018 <reyalp (at) gmail dot com>
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
   published by the Free Software Foundation.
@@ -79,7 +79,7 @@ function mc:find_id(id)
 end
 
 --[[
-connect to all available cams
+connect to cameras, default all available
 opts:{
 	add=bool -- don't reset existing list, just add any matching camereas
 	match={ -- match spec as used in CLI connect
@@ -91,6 +91,8 @@ opts:{
 		plain=bool -- controls whether dev, bus, model, and serial are pattern or plain text match
 	}
 	list=bool or string -- list file defining serial numbers and order, exclusive with add and match
+	selected=bool -- connect to connections already in selected list. Assumes disconnected with
+	                 mc:disconnect, exclusive of other options
 	close_tempcons -- disconnect non-selected cameras, otherwise left connected but not in the mc list
 }
 ]]
@@ -99,6 +101,30 @@ function mc:connect(opts)
 	},opts)
 	if opts.list and (opts.match or opts.add) then
 		errlib.throw{etype='bad_arg',msg='list may not be combined with match or add'}
+	end
+	if opts.selected then
+		if opts.match or opts.add or opts.list then
+			errlib.throw{etype='bad_arg',msg='selected may not be combined with list, match or add'}
+		end
+		for lcon in self:icams() do
+			local con_status = lcon:is_connected()
+			if not con_status then
+				local err
+				con_status,err = lcon:connect_pcall()
+				if not con_status then
+					warnf('%d: connect failed bus:%s dev:%s err:%s\n',lcon.mc_id,lcon.condev.bus,lcon.condev.dev,tostring(err))
+				end
+			end
+			if con_status then
+				printf('+ %d:%s b=%s d=%s s=%s\n',
+					lcon.mc_id,
+					lcon.ptpdev.model,
+					lcon.condev.dev,
+					lcon.condev.bus,
+					tostring(lcon.ptpdev.serial_number))
+			end
+		end
+		return
 	end
 	if not opts.match then
 		opts.match = {}
@@ -128,7 +154,7 @@ function mc:connect(opts)
 		if lcon:is_connected() then
 			lcon:update_connection_info()
 		else
-			local status,err = pcall(lcon.connect,lcon)
+			local status,err = lcon:connect_pcall()
 			if not status then
 				warnf('%d: connect failed bus:%s dev:%s err:%s\n',i,devinfo.dev,devinfo.bus,tostring(err))
 			end
@@ -199,6 +225,26 @@ function mc:connect(opts)
 		end
 	end
 	self:sel('all')
+end
+
+--[[
+disconnect selected cameras
+]]
+function mc:disconnect()
+	for lcon in self:icams() do
+		lcon:disconnect()
+	end
+end
+
+--[[
+reconnect selected cameras
+]]
+function mc:reconnect()
+	for lcon in self:icams() do
+		lcon:disconnect()
+	end
+	sys.sleep(2000)
+	self:connect({selected=true})
 end
 
 --[[
