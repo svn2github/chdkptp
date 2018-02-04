@@ -20,24 +20,13 @@ LUA_INCLUDE_DIR=/usr/local/opt/lua/
 LUA_LIB=lua
 
 4) Build with 'make'
-5) update chdkptp-sample.sh
-========
 
-    adjust the following to your configuration 
-
-CHDKPTP_DIR=`pwd`
-export LUA_PATH="$CHDKPTP_DIR/lua/?.lua"
-
-reyalp note: 
-Above will only work if the shell script is executed from the directory with chdkptp. Use a hard code path
-like /usr/local/chdkptp if you want to be able to run from anywhere.
-
-6) Prevent PTPCamera from hogging:
+5) Prevent PTPCamera from hogging:
 sudo chmod -x "/System/Library/Image Capture/Devices/PTPCamera.app/Contents/MacOS/PTPCamera"
 (more fine-grained control: https://github.com/mejedi/mac-gphoto-enabler/blob/master/gphoto-enable.sh)
 
-7) run via ./chdkptp-sample.sh 
+6) run via ./chdkptp-mac.sh 
 examples:
-./chdkptp-sample.sh -h
-./chdkptp-sample.sh -c 
+./chdkptp-mac.sh -h
+./chdkptp-mac.sh -c 
 
