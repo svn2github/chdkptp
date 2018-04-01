@@ -540,10 +540,7 @@ function cli:get_luatext_arg(arg)
 	if not arg.input then
 		return arg.text
 	end
-	local fh = fsutil.open_e(arg.input,'rb')
-	local r=fh:read("*a")
-	fh:close()
-	return r
+	return fsutil.readfile_e(arg.input,'b')
 end
 
 --[[
@@ -2438,9 +2435,7 @@ Standard string substitutions
 			end
 			local shootscript
 			if args.script then
-				local fh = fsutil.open_e(args.script,'rb')
-				shootscript=fh:read("*a")
-				fh:close()
+				shootscript=fsutil.readfile_e(args.script,'b')
 			end
 
 			-- convert to integer ms

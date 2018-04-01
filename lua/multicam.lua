@@ -419,9 +419,7 @@ load and return saved camera list
 ]]
 function mc:load_list(path)
 	path=get_list_path(path)
-	local fh=fsutil.open_e(path)
-	local list=fh:read('*a')
-	fh:close()
+	local list=fsutil.readfile_e(path)
 	return util.unserialize(list)
 end
 

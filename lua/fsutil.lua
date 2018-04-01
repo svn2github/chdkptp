@@ -651,4 +651,20 @@ function fsutil.open_e(path,mode)
 	end
 	return fh
 end
+--[[
+read the entire contents of file, throw on error
+mode='b' for binary where applicable
+]]
+function fsutil.readfile_e(path,mode)
+	if not mode then
+		mode = ''
+	elseif mode ~= 'b' then
+		errlib.throw{etype='bad_arg',msg='invalid mode'}
+	end
+	mode = 'r'..mode
+	local fh=fsutil.open_e(path,mode)
+	local r=fh:read('*a')
+	fh:close()
+	return r
+end
 return fsutil
