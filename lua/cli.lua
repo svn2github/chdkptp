@@ -2293,6 +2293,7 @@ rlib_wait_timeout(
 			jpgdummy=false,
 			nosubst=false,
 			seq=false,
+			script=false,
 		},
 		help_detail=[[
  [dest] path/name specification for saved files
@@ -2328,6 +2329,7 @@ rlib_wait_timeout(
    -jpgdummy	write dummy IMG_nnnn.JPG to avoid play / shutdown crash on some cams
    -nosubst     don't do pattern substitution on file names
    -seq=<n>     initial value for shotseq subst string, default cli_shotseq
+   -script=<filename> use local file <filename> for shooting script
 
 Substitutions
 ${serial}         camera serial number, or empty if not available
@@ -2434,6 +2436,12 @@ Standard string substitutions
 					opts.shots = 1
 				end
 			end
+			local shootscript
+			if args.script then
+				local fh = fsutil.open_e(args.script,'rb')
+				shootscript=fh:read("*a")
+				fh:close()
+			end
 
 			-- convert to integer ms
 			if args.int then
@@ -2447,9 +2455,14 @@ Standard string substitutions
 				return false,rerr
 			end
 
-			cli.dbgmsg('rs_shoot\n')
-			-- TODO script errors will not get picked up here
-			con:exec('rs_shoot('..opts_s..')',{libs={'rs_shoot'}})
+			if shootscript then
+				cli.dbgmsg('rs script %s\n',args.script)
+				con:exec('rs_opts='..opts_s..' '..shootscript,{libs={'rs_shoot'}})
+			else
+				cli.dbgmsg('rs_shoot\n')
+				-- TODO script errors will not get picked up here
+				con:exec('rs_shoot('..opts_s..')',{libs={'rs_shoot'}})
+			end
 
 			local rcopts=chdku.rc_init_std_handlers{
 				jpg=args.jpg,
@@ -2466,11 +2479,17 @@ Standard string substitutions
 
 			if args.shotwait then
 				rcopts.timeout=tonumber(args.shotwait)
-			elseif opts.tv then -- opts.tv is normalized to a tv96 value
-				-- 2x to allow for dark frame if enabled
-				rcopts.timeout=10000 + 2*exp.tv96_to_shutter(opts.tv)*1000
 			else
-				rcopts.timeout=20000
+				if opts.tv then -- opts.tv is normalized to a tv96 value
+					-- 2x to allow for dark frame if enabled
+					rcopts.timeout=10000 + 2*exp.tv96_to_shutter(opts.tv)*1000
+				else
+					rcopts.timeout=20000
+				end
+				-- ensure timeout is longer than interval
+				if opts.int and rcopts.timeout < opts.int + 10000 then
+					rcopts.timeout = opts.int + 10000 
+				end
 			end
 			if args.seq then
 				prefs.cli_shotseq = tonumber(args.seq)
