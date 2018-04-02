@@ -2504,6 +2504,8 @@ Standard string substitutions
 				end
 				shot = shot + 1
 				prefs.cli_shotseq = prefs.cli_shotseq+1
+				collectgarbage('collect') -- keep uncollected lbufs from building up
+										  -- TODO should be done in a generic way in wait_status / cli prompt?
 			until shot > opts.shots
 
 			local t0=ustime.new()
