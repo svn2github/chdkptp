@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2010-2017 <reyalp (at) gmail dot com>
+ Copyright (C) 2010-2018 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -519,6 +519,24 @@ function cli:get_shoot_common_opts(args)
 			return false,string.format('invalid sd units %s',tostring(units))
 		end
 		opts.sd = util.round(sd*convert[units])
+	end
+	if args.sdmode then
+		if not args.sd then
+			return false,'sdmode requires sd'
+		end
+		if type(args.sdmode) ~= 'string' then
+			return false,'sdmode requires a value'
+		end
+		args.sdmode=string.upper(args.sdmode)
+		if not util.in_table({'AF','AFL','MF','NONE'},args.sdmode) then
+			return false,string.format('invalid sd mode %s',tostring(args.sdmode))
+		end
+		if args.sdmode == 'NONE' then
+			opts.sdprefmode=nil
+			opts.sdnoenable=true
+		else
+			opts.sdprefmode=args.sdmode
+		end
 	end
 
 	-- hack for CHDK override bug that ignores APEX 0
@@ -2050,6 +2068,7 @@ Standard string substitutions
 			isomode=false,
 			nd=false,
 			sd=false,
+			sdmode=false,
 			raw=false,
 			dng=false,
 			pretend=false,
@@ -2058,7 +2077,7 @@ Standard string substitutions
 			rm=false,
 			seq=false,
 		}),
-		-- TODO allow setting destinations and filetypes for -dl
+		-- TODO allow filetypes for -dl
 		-- TODO should support canon native raw
 		help_detail=[[
  options:
@@ -2072,7 +2091,11 @@ Standard string substitutions
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
-   -sd=<v>[units]  subject distance, units one of m, mm, in, ft default m
+   -sd=<v>[units]  subject distance (focus), units one of m, mm, in, ft default m
+   -sdmode=<mode> prefer <mode> for SD override, one of AF, AFL, MF, NONE
+                  if NONE, override will be ignored if not supported in current mode
+                  if not given, the current camera mode is preferred
+                  if port requires a different mode for SD override, it will be used
    -raw[=1|0] Force raw on or off, defaults to current camera setting
    -dng[=1|0] Force DNG on or off, implies raw if on, default current camera setting
    -pretend   print actions instead of running them
@@ -2275,6 +2298,7 @@ rlib_wait_timeout(
 			isomode=false,
 			nd=false,
 			sd=false,
+			sdmode=false,
 			jpg=false,
 			raw=false,
 			dng=false,
@@ -2310,7 +2334,11 @@ rlib_wait_timeout(
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
-   -sd=<v>[units]  subject distance, units one of m, mm, in, ft default m
+   -sd=<v>[units]  subject distance (focus), units one of m, mm, in, ft default m
+   -sdmode=<mode> prefer <mode> for SD override, one of AF, AFL, MF, NONE
+                  if NONE, override will be ignored if not supported in current mode
+                  if not given, the current camera mode is preferred
+                  if port requires a different mode for SD override, it will be used
    -jpg         jpeg, default if no other options (not supported on all cams)
    -raw         framebuffer dump raw
    -dng         DNG format raw
@@ -2568,6 +2596,7 @@ Standard string substitutions
 			isomode=false,
 			nd=false,
 			sd=false,
+			sdmode=false,
 			jpg=false,
 			raw=false,
 			dng=false,
@@ -2601,7 +2630,11 @@ Standard string substitutions
    -av=<v>    Aperture value. In standard units, f number
    -isomode=<v> ISO mode, must be ISO value in Canon UI, shooting mode must have manual ISO
    -nd=<in|out> set ND filter state
-   -sd=<v>[units]  subject distance, units one of m, mm, in, ft default m
+   -sd=<v>[units]  subject distance (focus), units one of m, mm, in, ft default m
+   -sdmode=<mode> prefer <mode> for SD override, one of AF, AFL, MF
+                  if NONE, override will be ignored if not supported in current mode
+                  if not given, the current camera mode is preferred
+                  if port requires a different mode for SD override, it will be used
    -jpg         jpeg, default if no other options (not supported on all cams)
    -raw         framebuffer dump raw
    -dng         DNG format raw
