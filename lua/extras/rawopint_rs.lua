@@ -1,10 +1,10 @@
 --[[
-camera side "glue" script to use rawopint v0.24 with remoteshoot
+camera side "glue" script to use rawopint v0.25 with remoteshoot
 http://chdk.wikia.com/wiki/Lua/Scripts:_Raw_Meter_Intervalometer
 
 -shots and -int options to remoteshoot are passed through
 use like 
-rs -script=rawopint_rs.lua -shot=100 -int=5
+rs -script=rawopint_rs.lua -shots=100 -int=5
 
 other options are ignored
 --]]
@@ -44,9 +44,18 @@ ui_exp_under_weight_max=200 --"Underexp max weight" [100 300]
 ui_exp_under_prio=0 --"Underexp prio" [0 200]
 ui_histo_step_t={} --"Histogram step (pixels)" {5 7 9 11 15 19 23 27 31} table
 ui_histo_step_t.value=5
+ui_zoom_mode_t={} -- "Zoom mode" {Off Pct Step} table
+ui_zoom_mode_t.value="Off"
+ui_zoom=0 -- "Zoom value" [0 500]
+ui_sd_mode_t={} -- "Focus override mode" {Off MF AFL AF} table
+ui_sd_mode_t.value="Off" -- "Focus override mode" {Off MF AFL AF} table
+ui_sd=0 -- "Focus dist (mm)" long
 ui_image_size_e=0 --"Image size" {Default L M1 M2 M3 S W}
 ui_use_raw_e=0 --"Use raw" {Default Yes No}
 ui_use_cont=true --"Use cont. mode if set"
+ui_start_hour=-1 -- "Start hour (-1 off)" [-1 23]
+ui_start_min=0 -- "Start minute" [0 59]
+ui_start_sec=0 -- "Start second" [0 59]
 ui_display_mode_t={} --"Display" {On Off Blt_Off} table
 ui_display_mode_t.value="On"
 ui_shutdown_finish=false --"Shutdown on finish"
