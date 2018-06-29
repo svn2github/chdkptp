@@ -1163,7 +1163,7 @@ function mc:download_images(opts)
 
 		subst.state.dlseq = opts.dlseq_start
 		subst.state.shotseq = opts.shotseq_start
-
+		subst.state._seq_first_done = false -- state is re-used for multiple cams
 		for i,f in ipairs(imgs) do
 			chdku.imglist_set_subst_finfo_state(subst.state,f)
 			chdku.imglist_set_subst_seq_state(subst.state)
