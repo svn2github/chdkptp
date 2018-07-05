@@ -38,7 +38,8 @@ local mc={
 	},
 	download_images_subst_funcs=util.extend_table({
 		id=varsubst.format_state_val('id','%02d'),
-	},chdku.imglist_subst_funcs)
+	},chdku.imglist_subst_funcs),
+	verbose=false, -- default to verbose status
 }
 
 --[[
@@ -883,13 +884,34 @@ opts:{
 	shots=number -- number of shots, default 1
 	interval=number -- number of milliseconds between shots, default 2000
 	cont=bool -- use continuous mode for shooting, if enabled in canon UI, default true
-	usb_pwr_sync=bool -- hardware usb sync, shoots when +5v goes to 0.
-						-- synctime and interval ignored, does not wait for status
+
+	remote_sync=bool -- hardware remote sync, shoots when remote signal goes "off" (usb power = 0)
+		-- synctime and interval ignored
+		-- if remote_on_wait not used, returns without status to avoid USB connection issues
+		-- caused by remote busy wait
+
+	remote_on_wait=number -- wait for hardware remote to go "on" in script for N ms prior to
+		-- remote code busy loop. Also allows arbitrarily long wait in ready state
+		-- using a brief pulse (~100ms) avoids remote busy loop interfering with USB connection
+
+	-- additional options passed to cmd, wait_status_msg
+	initwait
+	timeout
+	poll
 --]]
 function mc:shoot(opts) 
 	opts = util.extend_table({
+		shots=1,
+		interval=2000,
 	},opts)
-	if not opts.usb_pwr_sync then
+	-- old name
+	if opts.usb_pwr_sync then
+		opts.remote_sync = opts.usb_pwr_sync
+	end
+	if not opts.shots then
+		opts.shots=1
+	end
+	if not opts.remote_sync then
 		if not self.min_sync_delay then
 			warnf('sync not initialized\n')
 			return
@@ -923,16 +945,33 @@ function mc:shoot(opts)
 		self:print_cmd_status_short(self:cmdwait(init_cmd))
 	end
 	self:print_cmd_status_short(self:cmdwait('preshoot'))
-	if opts.usb_pwr_sync then
+	local cmd_opts=util.extend_table({},opts,{keys={'timeout','poll','initwait'}})
+	if opts.remote_sync then
+		if opts.remote_on_wait then
+			cmd_opts.args=util.serialize{
+				shots=opts.shots,
+				cont=opts.cont,
+				release_half=true,
+				remote_on_wait=opts.remote_on_wait,
+			}
+			-- ensure message wait timeout is reasonably long
+			if not cmd_opts.timeout then
+				cmd_opts.timeout = opts.shots*opts.remote_on_wait + 10000
+			end
+			self:print_cmd_status_short(self:cmdwait('shoot_burst_usb_pwr',cmd_opts))
+		else
 		-- no wait because polling while camera is in USB busy loop causes errors
-		self:cmd('shoot_burst_usb_pwr',{
-			args=util.serialize{shots=opts.shots,cont=opts.cont,release_half=true}
-		})
+			cmd_opts.args=util.serialize{shots=opts.shots,cont=opts.cont,release_half=true}
+			self:cmd('shoot_burst_usb_pwr',cmd_opts)
+		end
 	else
-		self:print_cmd_status_short(self:cmdwait('shoot_burst',{
-			syncat=opts.synctime,
-			args=util.serialize{shots=opts.shots,interval=opts.interval,cont=opts.cont,release_half=true}
-		}))
+		cmd_opts.syncat=opts.synctime
+		cmd_opts.args=util.serialize{shots=opts.shots,interval=opts.interval,cont=opts.cont,release_half=true}
+		-- ensure message wait timeout is reasonably long
+		if not cmd_opts.timeout then
+			cmd_opts.timeout = opts.shots*(opts.interval + 500) + 10000
+		end
+		self:print_cmd_status_short(self:cmdwait('shoot_burst',cmd_opts))
 	end
 end
 --[[
@@ -1462,9 +1501,16 @@ function cmds.shoot_burst_usb_pwr()
 		shoot_hook_ready_timeout=mc.shoot_hook_ready_timeout,
 		raw_hook_ready_timeout=mc.raw_hook_ready_timeout, -- TODO should account for expected USB interval, exposure time
 	},opts)
+	-- ensure script will wait at least rise_wait in shoot hook
+	if opts.remote_on_wait and opts.shoot_hook_timeout < opts.remote_on_wait then
+		opts.shoot_hook_timeout = opts.remote_on_wait
+	end
+
 	local cont = opts.cont and get_prop(props.DRIVE_MODE) == 1
 
-	usb_force_active(true) -- users should probably set this on startup, but setting again doesn't hurt
+	-- users should probably set this on script startup, but setting again doesn't hurt
+	-- not required for non-USB remote, but should be harmless 
+	usb_force_active(true) 
 
 	local r={}
 	hook_shoot.set(opts.shoot_hook_timeout)
@@ -1487,6 +1533,13 @@ function cmds.shoot_burst_usb_pwr()
 			hook_raw.set(0)
 			write_status(false, 'hook_shoot ready timeout')
 			return
+		end
+		if opts.remote_on_wait then
+			local timeout=get_tick_count() + opts.remote_on_wait
+			while get_usb_power(1) ~= 1 and timeout > get_tick_count() do
+				sleep(10)
+			end
+			-- TODO could check for timeout here, but can't abort shot, remote will trigger immediately
 		end
 		hook_shoot.continue()
 		if not cont then
