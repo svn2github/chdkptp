@@ -753,7 +753,13 @@ function mc:wait_status_msg(cmd,opts)
 			return true, results
 		end
 		if ustime.diffms(tstart) > opts.timeout then
-			return false, results, 'timeout'
+			for lcon in self:icams() do
+				if not results[lcon.mc_id].done then
+					results[lcon.mc_id].failed=true
+					results[lcon.mc_id].err='timeout'
+				end
+			end
+			return false, results
 		end
 		local poll = opts.poll - ustime.diffms(tpoll)
 		if poll > 0 then
