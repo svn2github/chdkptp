@@ -24,7 +24,7 @@ usage
 ]]
 local m={}
 function m.sync(opts)
-	opts=util.extend_table({utc=false},opts)
+	opts=util.extend_table({utc=false,subsec=true,subsec_margin=10},opts)
 	con:execwait[[
 if call_event_proc('FA.Create') == -1 then
 	error('FA.Create failed')
@@ -38,7 +38,18 @@ end
 	if opts.utc then
 		lfmt='!*t'
 	end
-	local lt=os.date(lfmt)
+	-- send set command on next second change, less subsec_margin for USB overhead
+	local sec,usec=sys.gettimeofday()
+	if opts.subsec then
+		local waitms = (1000 - usec/1000) - opts.subsec_margin
+		if waitms < 0 then
+			waitms = waitms + 1000
+			sec = sec + 1
+		end
+		sec = sec+1 -- setting time on transition to next second
+		sys.sleep(waitms)
+	end
+	local lt=os.date(lfmt,sec)
 	local ot,nt=con:execwait(string.format([[
 local ot=os.date('*t')
 if call_event_proc('SetYear',%d) == -1
