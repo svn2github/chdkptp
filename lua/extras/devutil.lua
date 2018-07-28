@@ -370,6 +370,38 @@ end
 			return true
 		end
 	},
+	{
+		names={'dscriptdisk'},
+		help='make script disk',
+		arghelp="",
+		args=cli.argparser.none,
+		help_detail=[[
+Prepare card as Canon Basic script disk. Requires native calls
+]],
+		func=function(self,args)
+			con:execwait([[
+if call_event_proc("SystemEventInit") == -1 then
+	if call_event_proc("System.Create") ~= 0 then
+		error('System eventproc reg failed')
+	end
+end
+
+f=io.open("A/SCRIPT.REQ","w")
+if not f then
+	error("file open failed")
+end
+f:write("for DC_scriptdisk")
+f:close()
+
+if call_event_proc("MakeScriptDisk",0) ~= 0 then
+	error('MakeScriptDisk failed')
+end
+
+]])
+			return true, 'Script disk initialized'
+		end
+	},
+
 }
 end
 
