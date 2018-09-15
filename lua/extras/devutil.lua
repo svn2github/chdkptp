@@ -1,5 +1,5 @@
 --[[
- Copyright (C) 2016-2017 <reyalp (at) gmail dot com>
+ Copyright (C) 2016-2018 <reyalp (at) gmail dot com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 as
@@ -21,6 +21,7 @@ use help for information about individual commands
 --]]
 local m={}
 local proptools=require'extras/proptools'
+local vxromlog=require'extras/vxromlog'
 
 m.stop_uart_log = function()
 	if not m.logname then
@@ -399,6 +400,24 @@ end
 
 ]])
 			return true, 'Script disk initialized'
+		end
+	},
+	{
+		names={'dvxromlog'},
+		help='decode VxWorks ROMLOG',
+		arghelp="[file]",
+		args=cli.argparser.create{ },
+		help_detail=[[
+[files] - local path of VxWorks ROMLOG to decode
+]],
+		func=function(self,args)
+			local logname=args[1]
+			if not logname then
+				error('missing log name')
+			end
+			local log=vxromlog.load(logname)
+			log:print()
+			return true
 		end
 	},
 
